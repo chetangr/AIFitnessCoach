@@ -3,11 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../widgets/glass_container.dart';
-import '../workouts/workouts_screen.dart';
-import '../compass/compass_screen.dart';
+import '../workouts/workouts_screen_v2.dart';
+import '../discover/discover_screen_v2.dart';
 import '../exercises/exercise_library_screen.dart';
-import '../guest_pass/guest_pass_screen.dart';
 import '../messages/messages_screen.dart';
+import '../profile/profile_screen.dart';
+import '../../../utils/workout_dialogs.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -22,40 +23,46 @@ class _MainScreenState extends ConsumerState<MainScreen>
   late PageController _pageController;
   late AnimationController _fabAnimationController;
   late Animation<double> _fabScaleAnimation;
-
   final List<BottomNavItem> _navItems = [
     BottomNavItem(
-      icon: Icons.fitness_center,
-      label: 'Workouts',
+      icon: Icons.calendar_today,
+      label: 'Schedule',
       activeColor: const Color(0xFF007AFF),
     ),
     BottomNavItem(
       icon: Icons.explore,
-      label: 'Discover',
+      label: 'Programs',
       activeColor: const Color(0xFF30D158),
     ),
     BottomNavItem(
-      icon: Icons.list_alt,
+      icon: Icons.fitness_center,
       label: 'Exercises',
-      activeColor: const Color(0xFF6C5CE7),
+      activeColor: const Color(0xFFFF9F0A),
     ),
     BottomNavItem(
       icon: Icons.chat_bubble,
-      label: 'Messages',
+      label: 'AI Coach',
       activeColor: const Color(0xFFFF375F),
+    ),
+    BottomNavItem(
+      icon: Icons.person,
+      label: 'Profile',
+      activeColor: const Color(0xFF6C5CE7),
     ),
   ];
 
-  final List<Widget> _screens = [
-    const WorkoutsScreen(),
-    const CompassScreen(),
-    const ExerciseLibraryScreen(),
-    const MessagesScreen(),
-  ];
+  late final List<Widget> _screens;
 
   @override
   void initState() {
     super.initState();
+    _screens = [
+      const WorkoutsScreenV2(),
+      const DiscoverScreenV2(),
+      const ExerciseLibraryScreen(),
+      const MessagesScreen(),
+      const ProfileScreen(),
+    ];
     _pageController = PageController();
     _fabAnimationController = AnimationController(
       duration: const Duration(milliseconds: 300),
@@ -84,32 +91,24 @@ class _MainScreenState extends ConsumerState<MainScreen>
     setState(() {
       _currentIndex = index;
     });
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
   }
 
   @override
   Widget build(BuildContext context) {
+    print('MainScreen building, current index: $_currentIndex');
+    
     return Scaffold(
       extendBody: true,
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+      body: IndexedStack(
+        index: _currentIndex,
         children: _screens,
       ),
       floatingActionButton: _currentIndex == 0 ? ScaleTransition(
         scale: _fabScaleAnimation,
         child: FloatingActionButton(
           onPressed: () {
-            // Navigate to create workout or quick start
-            _showQuickActionBottomSheet();
+            // Show add workout dialog using the utility
+            WorkoutDialogs.showAddWorkoutDialog(context, ref);
           },
           backgroundColor: AppTheme.primaryColor,
           elevation: 8,
@@ -120,7 +119,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
           ),
         ),
       ) : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       bottomNavigationBar: _buildBottomNavBar(),
     );
   }

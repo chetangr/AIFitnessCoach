@@ -1,9 +1,20 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../widgets/glass_container.dart';
+import '../../widgets/glass_widgets.dart';
+import '../../widgets/workout/workout_header.dart';
+import '../../widgets/workout/exercise_display.dart';
+import '../../widgets/workout/workout_controls.dart';
 import '../../../models/workout.dart';
+import '../../../models/coach.dart';
+import '../../../providers/user_preferences_provider.dart';
+import '../../../services/text_to_speech_service.dart';
+import '../../../services/workout_tracking_service.dart';
+import '../../../services/dynamic_coaching_service.dart';
 
 class ActiveWorkoutScreen extends ConsumerStatefulWidget {
   final WorkoutPlan workoutPlan;
@@ -25,35 +36,49 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen>
   bool _isPaused = false;
   int _currentExerciseIndex = 0;
   int _currentSet = 1;
-  int _totalSets = 10;
-  int _currentReps = 3;
-  String _currentWeight = '30 LB';
+  bool _soundEnabled = true;
+  int _totalWorkoutDuration = 0;
+  bool _showWelcome = true;
+  final TextToSpeechService _ttsService = TextToSpeechService();
+  final DynamicCoachingService _coachingService = DynamicCoachingService();
+  bool _audioEnabled = true;
   
   late AnimationController _pulseController;
   late AnimationController _progressController;
   late Animation<double> _pulseAnimation;
   late Animation<double> _progressAnimation;
-
-  // Mock exercise data - in real app this would come from the workout plan
-  final Exercise _currentExercise = Exercise(
-    id: '1',
-    name: 'Turkish Sit-Up',
-    description: 'Core strengthening exercise',
-    muscleGroups: ['Core', 'Shoulders'],
-    equipment: ['Kettlebell'],
-    difficulty: WorkoutDifficulty.medium,
-    instructions: [
-      'Lie on your back with kettlebell extended overhead',
-      'Keep arm straight and sit up slowly',
-      'Return to starting position with control',
-    ],
+  
+  Exercise get _currentExercise => widget.workoutPlan.exercises.isNotEmpty
+      ? widget.workoutPlan.exercises[_currentExerciseIndex]
+      : _defaultExercise;
+      
+  int get _totalSets => (_currentExercise.metadata['sets'] as int?) ?? 3;
+  
+  final Exercise _defaultExercise = Exercise(
+    id: 'default',
+    name: 'Rest',
+    description: 'Take a break',
+    muscleGroups: [],
+    equipment: ['None'],
+    difficulty: WorkoutDifficulty.easy,
+    instructions: ['Rest and recover'],
+    metadata: {'sets': 1, 'reps': 1, 'rest': 60},
   );
 
   @override
   void initState() {
     super.initState();
-    _startTimer();
-    
+    _calculateTotalDuration();
+    _initAnimations();
+    _initTTS();
+    _showWelcomeMessage();
+  }
+  
+  Future<void> _initTTS() async {
+    await _ttsService.initialize();
+  }
+
+  void _initAnimations() {
     _pulseController = AnimationController(
       duration: const Duration(seconds: 1),
       vsync: this,
@@ -75,16 +100,37 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen>
     _pulseController.repeat(reverse: true);
     _progressController.forward();
   }
+  
+  void _calculateTotalDuration() {
+    final durationString = widget.workoutPlan.duration;
+    final match = RegExp(r'(\d+)').firstMatch(durationString);
+    if (match != null) {
+      _totalWorkoutDuration = int.parse(match.group(1)!);
+    } else {
+      _totalWorkoutDuration = 30;
+    }
+  }
+  
+  String _formatRemainingTime() {
+    final totalSeconds = _totalWorkoutDuration * 60;
+    final remainingSeconds = totalSeconds - _secondsElapsed;
+    if (remainingSeconds <= 0) return '0 MIN LEFT';
+    final minutes = remainingSeconds ~/ 60;
+    return '$minutes MIN LEFT';
+  }
 
   @override
   void dispose() {
     _timer?.cancel();
     _pulseController.dispose();
     _progressController.dispose();
+    _ttsService.dispose();
     super.dispose();
   }
 
   void _startTimer() {
+    if (_timer != null) return; // Prevent multiple timers
+    
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!_isPaused) {
         setState(() {
@@ -94,7 +140,222 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen>
     });
     setState(() {
       _isPlaying = true;
+      _showWelcome = false;
     });
+    if (_soundEnabled) {
+      _playSound('workout_start');
+    }
+  }
+
+  void _showWelcomeMessage() {
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => _buildWelcomeDialog(),
+        );
+      }
+    });
+  }
+
+  Widget _buildWelcomeDialog() {
+    final userData = ref.watch(userPreferencesProvider);
+    final coach = userData.selectedCoach;
+    
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withOpacity(0.1),
+                    Colors.white.withOpacity(0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1.5,
+                ),
+              ),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Coach Avatar
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      gradient: coach?.gradient ?? AppTheme.primaryGradient,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: (coach?.color ?? AppTheme.primaryColor).withOpacity(0.5),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        coach?.avatar ?? '💪',
+                        style: const TextStyle(fontSize: 36),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Coach Name
+                  Text(
+                    coach?.name ?? 'Your Coach',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // Welcome Message
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _getWelcomeMessage(coach?.personality),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 16,
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Workout Info
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          widget.workoutPlan.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.timer,
+                              color: Colors.white.withOpacity(0.7),
+                              size: 16,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              widget.workoutPlan.duration,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Icon(
+                              Icons.fitness_center,
+                              color: Colors.white.withOpacity(0.7),
+                              size: 16,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${widget.workoutPlan.exercises.length} exercises',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Start Button
+                  GestureDetector(
+                    onTap: () async {
+                      Navigator.pop(context);
+                      // Speak the welcome message
+                      if (_audioEnabled && coach != null) {
+                        await _ttsService.speakCoachMessage(
+                          _getWelcomeMessage(coach.personality),
+                          coach.personality,
+                        );
+                      }
+                      _startTimer();
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.primaryGradient,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primaryColor.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Text(
+                        'Start Workout',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getWelcomeMessage(CoachPersonality? personality) {
+    return _coachingService.getWelcomeMessage(
+      widget.workoutPlan.name,
+      widget.workoutPlan.exercises.length,
+      personality ?? CoachPersonality.steadyPace,
+    );
   }
 
   void _pauseTimer() {
@@ -124,88 +385,47 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen>
         child: SafeArea(
           child: Column(
             children: [
-              _buildHeader(),
+              WorkoutHeader(
+                remainingTime: _formatRemainingTime(),
+                soundEnabled: _soundEnabled,
+                audioEnabled: _audioEnabled,
+                isPaused: _isPaused,
+                onClose: _stopWorkout,
+                onToggleSound: () {
+                  setState(() {
+                    _soundEnabled = !_soundEnabled;
+                  });
+                  if (_soundEnabled) {
+                    _playSound('toggle');
+                  }
+                },
+                onToggleAudio: () {
+                  setState(() {
+                    _audioEnabled = !_audioEnabled;
+                  });
+                  if (!_audioEnabled) {
+                    _ttsService.stop();
+                  }
+                },
+                onTogglePause: _pauseTimer,
+              ),
               _buildTimer(),
               _buildExerciseImage(),
-              _buildExerciseInfo(),
+              ExerciseDisplay(
+                exercise: _currentExercise,
+                currentSet: _currentSet,
+                totalSets: _totalSets,
+                onInfoTap: _showExerciseInfo,
+              ),
               _buildProgressIndicator(),
-              _buildControlButtons(),
+              WorkoutControls(
+                onOverview: _showWorkoutOverview,
+                onPrevious: _canGoPrevious() ? _previousExercise : null,
+                onNext: _nextExercise,
+              ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.1),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.2),
-                ),
-              ),
-              child: const Icon(
-                Icons.close,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-          ),
-          
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.2),
-              ),
-            ),
-            child: const Text(
-              '13 MIN LEFT',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          
-          Row(
-            children: [
-              GestureDetector(
-                onTap: _pauseTimer,
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.1),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.2),
-                    ),
-                  ),
-                  child: Icon(
-                    _isPaused ? Icons.play_arrow : Icons.pause,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -246,7 +466,6 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen>
         ),
         child: Stack(
           children: [
-            // Exercise illustration placeholder
             Center(
               child: Container(
                 width: 200,
@@ -267,8 +486,6 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen>
                 ),
               ),
             ),
-            
-            // Coach avatar
             Positioned(
               bottom: 20,
               right: 20,
@@ -293,20 +510,20 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen>
                 ),
               ),
             ),
-            
-            // Heart rate indicator
             Positioned(
               top: 20,
               left: 20,
-              child: GlassCard(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: GlassMorphicCard(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                blur: 25,
+                borderRadius: BorderRadius.circular(16),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       Icons.favorite,
                       color: const Color(0xFFFF375F),
-                      size: 16,
+                      size: 18,
                     ),
                     const SizedBox(width: 8),
                     const Text(
@@ -323,79 +540,6 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen>
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildExerciseInfo() {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        children: [
-          Text(
-            _currentWeight,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white.withOpacity(0.7),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _currentExercise.name,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF30D158).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: const Color(0xFF30D158).withOpacity(0.3),
-                  ),
-                ),
-                child: Text(
-                  '$_currentReps / $_totalSets reps',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF30D158),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              GestureDetector(
-                onTap: () {
-                  // Show exercise instructions or info
-                },
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.1),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.2),
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.info_outline,
-                    color: Colors.white,
-                    size: 16,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -440,43 +584,407 @@ class _ActiveWorkoutScreenState extends ConsumerState<ActiveWorkoutScreen>
       ),
     );
   }
-
-  Widget _buildControlButtons() {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: GlassButton(
-              text: 'Previous',
-              icon: Icons.skip_previous,
-              onPressed: _currentSet > 1 ? () {
-                setState(() {
-                  _currentSet--;
-                });
-              } : null,
+  
+  bool _canGoPrevious() {
+    return _currentSet > 1 || _currentExerciseIndex > 0;
+  }
+  
+  void _previousExercise() {
+    setState(() {
+      if (_currentSet > 1) {
+        _currentSet--;
+      } else if (_currentExerciseIndex > 0) {
+        _currentExerciseIndex--;
+        _currentSet = _totalSets;
+        _progressController.reset();
+        _progressController.forward();
+      }
+    });
+  }
+  
+  void _nextExercise() async {
+    setState(() {
+      if (_currentSet < _totalSets) {
+        _currentSet++;
+        if (_soundEnabled) {
+          _playSound('set_complete');
+        }
+      } else if (_currentExerciseIndex < widget.workoutPlan.exercises.length - 1) {
+        _currentExerciseIndex++;
+        _currentSet = 1;
+        _progressController.reset();
+        _progressController.forward();
+        if (_soundEnabled) {
+          _playSound('exercise_complete');
+        }
+      } else {
+        if (_soundEnabled) {
+          _playSound('workout_complete');
+        }
+        _showCompletionDialog();
+        return;
+      }
+    });
+    
+    // Provide audio guidance for the new exercise/set
+    if (_audioEnabled) {
+      final userData = ref.read(userPreferencesProvider);
+      final coach = userData.selectedCoach;
+      
+      // Wait a moment for the UI to update
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Speak workout guidance
+      await _ttsService.speakWorkoutGuidance(
+        _currentExercise.name,
+        _currentSet,
+        _totalSets,
+        coach?.personality,
+      );
+      
+      // Provide breathing guidance for new exercises
+      if (_currentSet == 1) {
+        await Future.delayed(const Duration(seconds: 2));
+        await _ttsService.speakBreathingGuidance(_currentExercise.name, coach?.personality);
+      }
+    }
+  }
+  
+  void _showExerciseInfo() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _currentExercise.name,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: GlassButton(
-              text: 'Next',
-              icon: Icons.skip_next,
-              isPrimary: true,
-              onPressed: () {
-                setState(() {
-                  if (_currentSet < _totalSets) {
-                    _currentSet++;
-                  } else {
-                    // Complete workout
-                    _stopWorkout();
-                  }
-                });
-              },
+            const SizedBox(height: 8),
+            Text(
+              _currentExercise.description,
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.white.withOpacity(0.7),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Instructions:',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ..._currentExercise.instructions.map((instruction) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '• ',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.white.withOpacity(0.7),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      instruction,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.white.withOpacity(0.7),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  void _showWorkoutOverview() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.8,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  widget.workoutPlan.name,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close, color: Colors.white),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${widget.workoutPlan.exercises.length} exercises • ${widget.workoutPlan.duration}',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.white.withOpacity(0.7),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: ListView.builder(
+                itemCount: widget.workoutPlan.exercises.length,
+                itemBuilder: (context, index) {
+                  final exercise = widget.workoutPlan.exercises[index];
+                  final isActive = index == _currentExerciseIndex;
+                  final sets = (exercise.metadata['sets'] as int?) ?? 3;
+                  final reps = (exercise.metadata['reps'] as int?) ?? 12;
+                  final rest = (exercise.metadata['rest'] as int?) ?? 60;
+                  
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? AppTheme.primaryColor.withOpacity(0.2)
+                          : Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isActive
+                            ? AppTheme.primaryColor.withOpacity(0.5)
+                            : Colors.white.withOpacity(0.1),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isActive
+                                ? AppTheme.primaryColor
+                                : Colors.white.withOpacity(0.1),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${index + 1}',
+                              style: TextStyle(
+                                color: isActive ? Colors.white : Colors.white.withOpacity(0.7),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                exercise.name,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '$sets sets • $reps reps • ${rest}s rest',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white.withOpacity(0.6),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isActive)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'Set $_currentSet/$_totalSets',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  void _showCompletionDialog() {
+    _timer?.cancel();
+    
+    // Record the completed workout
+    _recordCompletedWorkout();
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Text(
+          '🎉 Workout Complete!',
+          style: TextStyle(color: Colors.white),
+          textAlign: TextAlign.center,
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Great job! You\'ve completed ${widget.workoutPlan.name}',
+              style: TextStyle(color: Colors.white.withOpacity(0.8)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Time: ${_formatTime(_secondsElapsed)}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Exercises: ${widget.workoutPlan.exercises.length}',
+              style: TextStyle(color: Colors.white.withOpacity(0.8)),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green.withOpacity(0.5)),
+              ),
+              child: Text(
+                'Recorded in your schedule ✓',
+                style: TextStyle(
+                  color: Colors.green.shade300,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
+            child: const Text(
+              'Finish',
+              style: TextStyle(color: AppTheme.primaryColor),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _recordCompletedWorkout() async {
+    try {
+      final workoutTrackingService = ref.read(workoutTrackingServiceProvider);
+      
+      await workoutTrackingService.recordCompletedWorkout(
+        workoutPlanId: widget.workoutPlan.id,
+        workoutName: widget.workoutPlan.name,
+        duration: Duration(seconds: _secondsElapsed),
+        exercises: widget.workoutPlan.exercises,
+        workoutType: 'manual', // Since user manually started this workout
+      );
+      
+      // Show feedback that workout was recorded
+      if (_audioEnabled) {
+        final userData = ref.read(userPreferencesProvider);
+        final coach = userData.selectedCoach;
+        await _ttsService.speakCoachMessage(
+          'Excellent work! Your workout has been recorded in your schedule.',
+          coach?.personality,
+        );
+      }
+    } catch (e) {
+      print('Error recording completed workout: $e');
+    }
+  }
+  
+  void _playSound(String soundType) {
+    try {
+      switch (soundType) {
+        case 'workout_start':
+        case 'exercise_complete':
+          HapticFeedback.mediumImpact();
+          SystemSound.play(SystemSoundType.click);
+          break;
+        case 'set_complete':
+          HapticFeedback.lightImpact();
+          SystemSound.play(SystemSoundType.click);
+          break;
+        case 'workout_complete':
+          HapticFeedback.heavyImpact();
+          SystemSound.play(SystemSoundType.click);
+          break;
+        case 'toggle':
+          HapticFeedback.selectionClick();
+          break;
+        default:
+          SystemSound.play(SystemSoundType.click);
+      }
+    } catch (e) {
+      print('Error playing sound: $e');
+    }
   }
 }

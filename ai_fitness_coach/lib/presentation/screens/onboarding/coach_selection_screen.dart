@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../widgets/glass_container.dart';
 import '../../../models/coach.dart';
+import '../../../providers/user_preferences_provider.dart';
 
 class CoachSelectionScreen extends ConsumerStatefulWidget {
   const CoachSelectionScreen({Key? key}) : super(key: key);
@@ -100,9 +101,10 @@ class _CoachSelectionScreenState extends ConsumerState<CoachSelectionScreen>
     });
   }
 
-  void _continueToApp() {
+  void _continueToApp() async {
     if (_selectedCoach != null) {
       // Save selected coach to state management
+      await ref.read(userPreferencesProvider.notifier).selectCoach(_selectedCoach!);
       context.go('/main');
     }
   }

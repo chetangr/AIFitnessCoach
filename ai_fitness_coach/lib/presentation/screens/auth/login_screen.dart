@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../widgets/glass_container.dart';
+import '../../widgets/glass_widgets.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -142,48 +143,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           ),
                           const Spacer(),
                           // Sign in button
-                          GlassContainer(
+                          GlassMorphicCard(
                             height: 60,
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: _handleGoogleSignIn,
-                                borderRadius: BorderRadius.circular(16),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 24,
-                                    vertical: 16,
+                            padding: EdgeInsets.zero,
+                            onTap: _handleGoogleSignIn,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 16,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Image.asset(
+                                      'assets/icons/google.png',
+                                      width: 24,
+                                      height: 24,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return const FaIcon(
+                                          FontAwesomeIcons.google,
+                                          size: 24,
+                                          color: Colors.red,
+                                        );
+                                      },
+                                    ),
                                   ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Image.asset(
-                                          'assets/icons/google.png',
-                                          width: 24,
-                                          height: 24,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            return const FaIcon(
-                                              FontAwesomeIcons.google,
-                                              size: 24,
-                                              color: Colors.red,
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Text(
-                                        'Continue with Google',
-                                        style: Theme.of(context).textTheme.titleLarge,
-                                      ),
-                                    ],
+                                  const SizedBox(width: 16),
+                                  Text(
+                                    'Continue with Google',
+                                    style: Theme.of(context).textTheme.titleLarge,
                                   ),
-                                ),
+                                ],
                               ),
                             ),
                           ),

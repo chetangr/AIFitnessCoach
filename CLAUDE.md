@@ -1,3 +1,91 @@
+# AI Fitness Coach - Project Documentation
+
+## Important Technical Notes
+
+### Data Storage Implementation
+- **Current**: Using SharedPreferences for all local storage (MVP approach)
+- **Location**: See platform-specific paths in `ai_fitness_coach/docs/data_storage_migration_guide.md`
+- **Migration Plan**: Will migrate to SQLite when app scales beyond 1000 messages or 100 coach swaps
+- **TODO**: Monitor storage performance metrics listed in migration guide
+
+### Recent Updates (Latest Session)
+- **✅ Dynamic AI Coaching System**: Implemented 150+ unique, personality-based coaching scripts that sound natural and human-like
+- **✅ Drag & Drop Workout Scheduling**: Full drag-and-drop functionality for moving workouts between days with visual feedback
+- **✅ Cross-Day Workout Tracking**: Support for completing workouts on different days than scheduled with original date tracking
+- **✅ Theme System Overhaul**: Complete dark/light mode implementation with proper color adaptation across all screens
+- **✅ UI/UX Improvements**: Fixed FAB positioning, enhanced glassmorphism effects, improved layout consistency
+- **✅ Workout Management**: Added WorkoutPlan copyWith method and moveWorkout functionality for scheduling
+- **✅ Enhanced Coach Personalities**: More conversational, natural coaching with contractions and personal connection
+- **✅ Theme-Aware Components**: All components now properly adapt to light/dark mode settings
+
+### Previous Updates
+- Coach selection now persists across app sessions
+- Added coach swap functionality with reason tracking
+- Profile page now shows real user data instead of mock data
+- All chat messages are persisted locally
+
+### Implementation Details (Latest Session)
+
+#### 1. Dynamic AI Coaching System
+**Files Modified:**
+- `lib/services/dynamic_coaching_service.dart` - Complete rewrite with natural, conversational scripts
+- `lib/services/text_to_speech_service.dart` - Integration with dynamic coaching
+
+**Key Features:**
+- 150+ unique coaching scripts across 3 personality types (Aggressive, Supportive, Steady Pace)
+- Natural language patterns with contractions ("you're", "don't", "I'm")
+- Personal connection phrases ("I can see", "I'm proud", "You're doing beautifully")
+- Exercise-specific guidance for Push-ups, Squats, Planks, and more
+- Contextual encouragement based on set progression
+
+#### 2. Drag & Drop Workout Scheduling
+**Files Created/Modified:**
+- `lib/services/workout_scheduling_service.dart` - New service for managing scheduled workouts
+- `lib/presentation/widgets/draggable_workout_card.dart` - Draggable workout cards with visual feedback
+- `lib/models/workout.dart` - Added copyWith method to WorkoutPlan
+- `lib/providers/workout_provider.dart` - Added moveWorkout method
+
+**Key Features:**
+- LongPressDraggable workout cards with haptic feedback
+- Visual drop zones with hover states
+- "MOVED" indicators for rescheduled workouts
+- Original date tracking for cross-day completion
+- Full persistence using SharedPreferences
+
+#### 3. Theme System Implementation
+**Files Modified:**
+- `lib/providers/theme_provider.dart` - Fixed JSON storage, proper defaults (darkMode = false)
+- `lib/presentation/screens/workouts/workouts_screen_v2.dart` - Theme-aware colors and gradients
+- `lib/presentation/widgets/draggable_workout_card.dart` - Dynamic color adaptation
+- `lib/main.dart` - Proper theme switching integration
+
+**Key Features:**
+- Light mode default with proper toggle functionality
+- Background gradients adapt to theme (dark vs light blue gradients)
+- All text colors dynamically change based on theme
+- Settings properly persist theme choice
+
+#### 4. UI/UX Enhancements
+**Files Modified:**
+- `lib/presentation/screens/main/main_screen.dart` - FAB positioning fix (centerFloat)
+- Multiple screens updated for glassmorphism consistency
+- Color theming across all components
+
+**Key Features:**
+- FloatingActionButton now floats above bottom navigation
+- Consistent glassmorphism effects
+- Theme-aware text and icon colors
+- Improved visual hierarchy
+
+#### 5. Technical Debt Resolution
+**Issues Fixed:**
+- Compilation errors in drag-drop implementation
+- Missing method signatures for theme parameters
+- Proper provider integration for scheduling service
+- Type safety improvements across components
+
+---
+
 # AI Fitness App Mega Prompt - Complete Documentation Generator
 
 You are an expert AI assistant specializing in mobile app development, fitness technology, and AI/LLM integration. Your task is to generate comprehensive documentation for building a superior AI fitness app that addresses the limitations of existing apps like Zing. 

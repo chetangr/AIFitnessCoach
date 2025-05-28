@@ -232,6 +232,40 @@ class WorkoutPlan {
     this.metadata = const {},
   });
 
+  WorkoutPlan copyWith({
+    String? id,
+    String? name,
+    String? description,
+    String? duration,
+    String? calories,
+    WorkoutDifficulty? difficulty,
+    WorkoutType? type,
+    String? imagePath,
+    bool? isCompleted,
+    DateTime? scheduledFor,
+    List<Exercise>? exercises,
+    String? subtitle,
+    bool? hasIssue,
+    Map<String, dynamic>? metadata,
+  }) {
+    return WorkoutPlan(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      duration: duration ?? this.duration,
+      calories: calories ?? this.calories,
+      difficulty: difficulty ?? this.difficulty,
+      type: type ?? this.type,
+      imagePath: imagePath ?? this.imagePath,
+      isCompleted: isCompleted ?? this.isCompleted,
+      scheduledFor: scheduledFor ?? this.scheduledFor,
+      exercises: exercises ?? this.exercises,
+      subtitle: subtitle ?? this.subtitle,
+      hasIssue: hasIssue ?? this.hasIssue,
+      metadata: metadata ?? this.metadata,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,

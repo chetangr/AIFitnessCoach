@@ -3,12 +3,90 @@ import 'dart:math' as math;
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/coach.dart';
+import '../models/workout.dart';
+
+class WorkoutSuggestion {
+  final String name;
+  final String description;
+  final List<ExerciseSuggestion> exercises;
+  final String difficulty;
+  final String type;
+  final Map<String, dynamic>? metadata;
+
+  WorkoutSuggestion({
+    required this.name,
+    required this.description,
+    required this.exercises,
+    required this.difficulty,
+    required this.type,
+    this.metadata,
+  });
+}
+
+class ExerciseSuggestion {
+  final String name;
+  final String description;
+  final List<String> muscleGroups;
+  final List<String> equipment;
+  final List<String> instructions;
+  final int sets;
+  final int reps;
+  final int restSeconds;
+
+  ExerciseSuggestion({
+    required this.name,
+    required this.description,
+    required this.muscleGroups,
+    required this.equipment,
+    required this.instructions,
+    this.sets = 3,
+    this.reps = 12,
+    this.restSeconds = 60,
+  });
+}
 
 class AICoachService {
   final Dio _dio = Dio();
   
   static const String _apiEndpoint = 'https://api.openai.com/v1/chat/completions';
   static String get _apiKey => dotenv.env['OPENAI_API_KEY'] ?? '';
+  
+  WorkoutSuggestion? parseWorkoutSuggestion(String response) {
+    try {
+      // Look for workout suggestion JSON in the response
+      final regex = RegExp(r'```workout_suggestion\s*\n?([\s\S]*?)\n?```');
+      final match = regex.firstMatch(response);
+      
+      if (match != null) {
+        final jsonStr = match.group(1)!;
+        final json = jsonDecode(jsonStr);
+        
+        // Parse exercises
+        final exercises = (json['exercises'] as List).map((e) => ExerciseSuggestion(
+          name: e['name'],
+          description: e['description'] ?? '',
+          muscleGroups: List<String>.from(e['muscleGroups'] ?? []),
+          equipment: List<String>.from(e['equipment'] ?? ['bodyweight']),
+          instructions: List<String>.from(e['instructions'] ?? []),
+          sets: e['sets'] ?? 3,
+          reps: e['reps'] ?? 12,
+          restSeconds: e['restSeconds'] ?? 60,
+        )).toList();
+        
+        return WorkoutSuggestion(
+          name: json['name'],
+          description: json['description'],
+          exercises: exercises,
+          difficulty: json['difficulty'],
+          type: json['type'],
+          metadata: json['metadata'],
+        );
+      }
+    } catch (e) {
+      print('Error parsing workout suggestion: $e');
+    }
+    return null;
+  }
   
   Future<String> getCoachResponse({
     required String userMessage,
@@ -60,6 +138,13 @@ class AICoachService {
       final aiResponse = response.data['choices'][0]['message']['content'];
       final previewLength = math.min<int>(50, aiResponse.length);
       print('✅ AI Response received: ${aiResponse.substring(0, previewLength)}...');
+      
+      // Check if response contains a workout suggestion
+      final workoutSuggestion = parseWorkoutSuggestion(aiResponse);
+      if (workoutSuggestion != null) {
+        print('🏋️ Workout suggestion detected: ${workoutSuggestion.name}');
+      }
+      
       return aiResponse;
       
     } catch (e) {
@@ -131,6 +216,34 @@ class AICoachService {
       buffer.writeln('- Recent Progress: ${userContext['recentProgress']}');
     }
     
+    buffer.writeln('\n\nIMPORTANT INSTRUCTIONS:');
+    buffer.writeln('- When the user asks for a workout suggestion, create a detailed workout plan');
+    buffer.writeln('- Format workout suggestions as JSON in this exact format:');
+    buffer.writeln('```workout_suggestion');
+    buffer.writeln('{');
+    buffer.writeln('  "name": "Workout Name",');
+    buffer.writeln('  "description": "Brief description",');
+    buffer.writeln('  "difficulty": "Easy|Medium|Hard|Extreme",');
+    buffer.writeln('  "type": "Strength|Cardio|HIIT|Yoga|Recovery|Flexibility|Sports",');
+    buffer.writeln('  "exercises": [');
+    buffer.writeln('    {');
+    buffer.writeln('      "name": "Exercise Name",');
+    buffer.writeln('      "description": "Exercise description",');
+    buffer.writeln('      "muscleGroups": ["primary", "secondary"],');
+    buffer.writeln('      "equipment": ["equipment needed"],');
+    buffer.writeln('      "sets": 3,');
+    buffer.writeln('      "reps": 12,');
+    buffer.writeln('      "restSeconds": 60,');
+    buffer.writeln('      "instructions": ["Step 1", "Step 2", "Step 3"]');
+    buffer.writeln('    }');
+    buffer.writeln('  ]');
+    buffer.writeln('}');
+    buffer.writeln('```');
+    buffer.writeln('- Always include at least 3-5 exercises in a workout');
+    buffer.writeln('- Provide clear, step-by-step instructions for each exercise');
+    buffer.writeln('- Match the difficulty and type to the user\'s fitness level and goals');
+    buffer.writeln('- After the JSON, provide a natural language explanation of the workout');
+    
     return buffer.toString();
   }
   
@@ -144,5 +257,4 @@ class AICoachService {
         return 0.5; // More consistent, measured responses
     }
   }
-  
 }

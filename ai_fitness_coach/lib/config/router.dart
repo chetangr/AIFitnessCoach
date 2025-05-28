@@ -8,6 +8,7 @@ import '../presentation/screens/onboarding/coach_selection_screen.dart';
 import '../presentation/screens/main/main_screen.dart';
 import '../presentation/screens/workouts/active_workout_screen.dart';
 import '../presentation/screens/performance/performance_screen.dart';
+import '../presentation/screens/settings/settings_screen.dart';
 import '../models/workout.dart';
 
 part 'router.g.dart';
@@ -58,6 +59,11 @@ GoRouter router(RouterRef ref) {
         path: '/performance',
         name: 'performance',
         builder: (context, state) => const PerformanceScreen(),
+      ),
+      GoRoute(
+        path: '/settings',
+        name: 'settings',
+        builder: (context, state) => const SettingsScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
