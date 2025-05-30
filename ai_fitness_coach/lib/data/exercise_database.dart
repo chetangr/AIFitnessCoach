@@ -238,7 +238,7 @@ class ExerciseDatabase {
       'isBase': isBase,
       'sets': _random.nextInt(3) + 2, // 2-4 sets
       'reps': _getRepRange(category),
-      'rest': _random.nextInt(60) + 30, // 30-90 seconds
+      'rest': _getRestTime(category, difficulty), // More realistic rest times
       'tempo': _getTempo(name),
       'rating': 4.0 + _random.nextDouble(), // 4.0-5.0
       'difficulty_score': difficulty.index + 1,
@@ -385,6 +385,44 @@ class ExerciseDatabase {
       return '4-0-4-0'; // Slow tempo
     }
     return '2-0-2-0'; // Standard tempo
+  }
+
+  static int _getRestTime(String category, WorkoutDifficulty difficulty) {
+    // Base rest times by category
+    Map<String, int> baseRest = {
+      'Chest': 60,
+      'Back': 60,
+      'Shoulders': 45,
+      'Arms': 45,
+      'Legs': 90,
+      'Core': 30,
+      'Glutes': 45,
+      'Full Body': 60,
+      'Cardio': 15,
+      'Olympic': 120,
+      'Powerlifting': 180,
+      'Calisthenics': 45,
+      'Stretching': 15,
+      'Mobility': 15,
+      'Balance': 30,
+      'Plyometric': 90,
+      'Pelvic Floor': 30,
+    };
+    
+    int rest = baseRest[category] ?? 60;
+    
+    // Adjust based on difficulty
+    if (difficulty == WorkoutDifficulty.easy) {
+      rest = (rest * 1.2).round(); // 20% more rest for beginners
+    } else if (difficulty == WorkoutDifficulty.hard || difficulty == WorkoutDifficulty.extreme) {
+      rest = (rest * 0.8).round(); // 20% less rest for advanced
+    }
+    
+    // Add some variation (+/- 15 seconds)
+    rest += _random.nextInt(31) - 15;
+    
+    // Ensure minimum rest time
+    return rest.clamp(15, 300);
   }
   
   static String _generateDescription(String name, String category, List<String> muscleGroups) {

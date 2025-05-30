@@ -466,6 +466,18 @@ class WorkoutNotifier extends StateNotifier<List<WorkoutPlan>> {
     }).toList();
     await _saveWorkouts();
   }
+
+  Future<void> addExerciseToWorkout(String workoutId, Exercise exercise) async {
+    state = state.map((workout) {
+      if (workout.id == workoutId) {
+        final updatedExercises = List<Exercise>.from(workout.exercises);
+        updatedExercises.add(exercise);
+        return workout.copyWith(exercises: updatedExercises);
+      }
+      return workout;
+    }).toList();
+    await _saveWorkouts();
+  }
 }
 
 // Provider

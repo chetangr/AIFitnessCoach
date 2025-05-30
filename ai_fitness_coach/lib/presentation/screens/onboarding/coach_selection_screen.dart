@@ -105,7 +105,8 @@ class _CoachSelectionScreenState extends ConsumerState<CoachSelectionScreen>
     if (_selectedCoach != null) {
       // Save selected coach to state management
       await ref.read(userPreferencesProvider.notifier).selectCoach(_selectedCoach!);
-      context.go('/main');
+      // Navigate to AI coach introduction chat
+      context.go('/coach-intro');
     }
   }
 

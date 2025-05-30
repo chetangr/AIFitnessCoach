@@ -27,7 +27,26 @@ mixin _$UserModel {
   String get fitnessLevel => throw _privateConstructorUsedError;
   List<String> get goals => throw _privateConstructorUsedError;
   List<String> get limitations => throw _privateConstructorUsedError;
-  Map<String, dynamic> get preferences => throw _privateConstructorUsedError;
+  Map<String, dynamic> get preferences =>
+      throw _privateConstructorUsedError; // Authentication fields
+  String? get username => throw _privateConstructorUsedError;
+  String? get passwordHash =>
+      throw _privateConstructorUsedError; // Never store plain passwords
+// Onboarding fields
+  String? get firstName => throw _privateConstructorUsedError;
+  String? get lastName => throw _privateConstructorUsedError;
+  String? get sex => throw _privateConstructorUsedError;
+  String? get trainingEquipment => throw _privateConstructorUsedError;
+  String? get dietPreference => throw _privateConstructorUsedError;
+  List<String> get mindsetActivities =>
+      throw _privateConstructorUsedError; // Stats fields
+  int get totalWorkoutsCompleted => throw _privateConstructorUsedError;
+  int get currentStreak => throw _privateConstructorUsedError;
+  int get longestStreak => throw _privateConstructorUsedError;
+  double get totalCaloriesBurned => throw _privateConstructorUsedError;
+  double? get currentWeight => throw _privateConstructorUsedError;
+  double? get targetWeight => throw _privateConstructorUsedError;
+  double? get height => throw _privateConstructorUsedError;
   DateTime? get createdAt => throw _privateConstructorUsedError;
   DateTime? get updatedAt => throw _privateConstructorUsedError;
 
@@ -55,6 +74,21 @@ abstract class $UserModelCopyWith<$Res> {
       List<String> goals,
       List<String> limitations,
       Map<String, dynamic> preferences,
+      String? username,
+      String? passwordHash,
+      String? firstName,
+      String? lastName,
+      String? sex,
+      String? trainingEquipment,
+      String? dietPreference,
+      List<String> mindsetActivities,
+      int totalWorkoutsCompleted,
+      int currentStreak,
+      int longestStreak,
+      double totalCaloriesBurned,
+      double? currentWeight,
+      double? targetWeight,
+      double? height,
       DateTime? createdAt,
       DateTime? updatedAt});
 }
@@ -82,6 +116,21 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
     Object? goals = null,
     Object? limitations = null,
     Object? preferences = null,
+    Object? username = freezed,
+    Object? passwordHash = freezed,
+    Object? firstName = freezed,
+    Object? lastName = freezed,
+    Object? sex = freezed,
+    Object? trainingEquipment = freezed,
+    Object? dietPreference = freezed,
+    Object? mindsetActivities = null,
+    Object? totalWorkoutsCompleted = null,
+    Object? currentStreak = null,
+    Object? longestStreak = null,
+    Object? totalCaloriesBurned = null,
+    Object? currentWeight = freezed,
+    Object? targetWeight = freezed,
+    Object? height = freezed,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
@@ -118,6 +167,66 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
           ? _value.preferences
           : preferences // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>,
+      username: freezed == username
+          ? _value.username
+          : username // ignore: cast_nullable_to_non_nullable
+              as String?,
+      passwordHash: freezed == passwordHash
+          ? _value.passwordHash
+          : passwordHash // ignore: cast_nullable_to_non_nullable
+              as String?,
+      firstName: freezed == firstName
+          ? _value.firstName
+          : firstName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      lastName: freezed == lastName
+          ? _value.lastName
+          : lastName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      sex: freezed == sex
+          ? _value.sex
+          : sex // ignore: cast_nullable_to_non_nullable
+              as String?,
+      trainingEquipment: freezed == trainingEquipment
+          ? _value.trainingEquipment
+          : trainingEquipment // ignore: cast_nullable_to_non_nullable
+              as String?,
+      dietPreference: freezed == dietPreference
+          ? _value.dietPreference
+          : dietPreference // ignore: cast_nullable_to_non_nullable
+              as String?,
+      mindsetActivities: null == mindsetActivities
+          ? _value.mindsetActivities
+          : mindsetActivities // ignore: cast_nullable_to_non_nullable
+              as List<String>,
+      totalWorkoutsCompleted: null == totalWorkoutsCompleted
+          ? _value.totalWorkoutsCompleted
+          : totalWorkoutsCompleted // ignore: cast_nullable_to_non_nullable
+              as int,
+      currentStreak: null == currentStreak
+          ? _value.currentStreak
+          : currentStreak // ignore: cast_nullable_to_non_nullable
+              as int,
+      longestStreak: null == longestStreak
+          ? _value.longestStreak
+          : longestStreak // ignore: cast_nullable_to_non_nullable
+              as int,
+      totalCaloriesBurned: null == totalCaloriesBurned
+          ? _value.totalCaloriesBurned
+          : totalCaloriesBurned // ignore: cast_nullable_to_non_nullable
+              as double,
+      currentWeight: freezed == currentWeight
+          ? _value.currentWeight
+          : currentWeight // ignore: cast_nullable_to_non_nullable
+              as double?,
+      targetWeight: freezed == targetWeight
+          ? _value.targetWeight
+          : targetWeight // ignore: cast_nullable_to_non_nullable
+              as double?,
+      height: freezed == height
+          ? _value.height
+          : height // ignore: cast_nullable_to_non_nullable
+              as double?,
       createdAt: freezed == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -147,6 +256,21 @@ abstract class _$$UserModelImplCopyWith<$Res>
       List<String> goals,
       List<String> limitations,
       Map<String, dynamic> preferences,
+      String? username,
+      String? passwordHash,
+      String? firstName,
+      String? lastName,
+      String? sex,
+      String? trainingEquipment,
+      String? dietPreference,
+      List<String> mindsetActivities,
+      int totalWorkoutsCompleted,
+      int currentStreak,
+      int longestStreak,
+      double totalCaloriesBurned,
+      double? currentWeight,
+      double? targetWeight,
+      double? height,
       DateTime? createdAt,
       DateTime? updatedAt});
 }
@@ -172,6 +296,21 @@ class __$$UserModelImplCopyWithImpl<$Res>
     Object? goals = null,
     Object? limitations = null,
     Object? preferences = null,
+    Object? username = freezed,
+    Object? passwordHash = freezed,
+    Object? firstName = freezed,
+    Object? lastName = freezed,
+    Object? sex = freezed,
+    Object? trainingEquipment = freezed,
+    Object? dietPreference = freezed,
+    Object? mindsetActivities = null,
+    Object? totalWorkoutsCompleted = null,
+    Object? currentStreak = null,
+    Object? longestStreak = null,
+    Object? totalCaloriesBurned = null,
+    Object? currentWeight = freezed,
+    Object? targetWeight = freezed,
+    Object? height = freezed,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
@@ -208,6 +347,66 @@ class __$$UserModelImplCopyWithImpl<$Res>
           ? _value._preferences
           : preferences // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>,
+      username: freezed == username
+          ? _value.username
+          : username // ignore: cast_nullable_to_non_nullable
+              as String?,
+      passwordHash: freezed == passwordHash
+          ? _value.passwordHash
+          : passwordHash // ignore: cast_nullable_to_non_nullable
+              as String?,
+      firstName: freezed == firstName
+          ? _value.firstName
+          : firstName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      lastName: freezed == lastName
+          ? _value.lastName
+          : lastName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      sex: freezed == sex
+          ? _value.sex
+          : sex // ignore: cast_nullable_to_non_nullable
+              as String?,
+      trainingEquipment: freezed == trainingEquipment
+          ? _value.trainingEquipment
+          : trainingEquipment // ignore: cast_nullable_to_non_nullable
+              as String?,
+      dietPreference: freezed == dietPreference
+          ? _value.dietPreference
+          : dietPreference // ignore: cast_nullable_to_non_nullable
+              as String?,
+      mindsetActivities: null == mindsetActivities
+          ? _value._mindsetActivities
+          : mindsetActivities // ignore: cast_nullable_to_non_nullable
+              as List<String>,
+      totalWorkoutsCompleted: null == totalWorkoutsCompleted
+          ? _value.totalWorkoutsCompleted
+          : totalWorkoutsCompleted // ignore: cast_nullable_to_non_nullable
+              as int,
+      currentStreak: null == currentStreak
+          ? _value.currentStreak
+          : currentStreak // ignore: cast_nullable_to_non_nullable
+              as int,
+      longestStreak: null == longestStreak
+          ? _value.longestStreak
+          : longestStreak // ignore: cast_nullable_to_non_nullable
+              as int,
+      totalCaloriesBurned: null == totalCaloriesBurned
+          ? _value.totalCaloriesBurned
+          : totalCaloriesBurned // ignore: cast_nullable_to_non_nullable
+              as double,
+      currentWeight: freezed == currentWeight
+          ? _value.currentWeight
+          : currentWeight // ignore: cast_nullable_to_non_nullable
+              as double?,
+      targetWeight: freezed == targetWeight
+          ? _value.targetWeight
+          : targetWeight // ignore: cast_nullable_to_non_nullable
+              as double?,
+      height: freezed == height
+          ? _value.height
+          : height // ignore: cast_nullable_to_non_nullable
+              as double?,
       createdAt: freezed == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -232,11 +431,27 @@ class _$UserModelImpl implements _UserModel {
       final List<String> goals = const [],
       final List<String> limitations = const [],
       final Map<String, dynamic> preferences = const {},
+      this.username,
+      this.passwordHash,
+      this.firstName,
+      this.lastName,
+      this.sex,
+      this.trainingEquipment,
+      this.dietPreference,
+      final List<String> mindsetActivities = const [],
+      this.totalWorkoutsCompleted = 0,
+      this.currentStreak = 0,
+      this.longestStreak = 0,
+      this.totalCaloriesBurned = 0,
+      this.currentWeight,
+      this.targetWeight,
+      this.height,
       this.createdAt,
       this.updatedAt})
       : _goals = goals,
         _limitations = limitations,
-        _preferences = preferences;
+        _preferences = preferences,
+        _mindsetActivities = mindsetActivities;
 
   factory _$UserModelImpl.fromJson(Map<String, dynamic> json) =>
       _$$UserModelImplFromJson(json);
@@ -278,6 +493,52 @@ class _$UserModelImpl implements _UserModel {
     return EqualUnmodifiableMapView(_preferences);
   }
 
+// Authentication fields
+  @override
+  final String? username;
+  @override
+  final String? passwordHash;
+// Never store plain passwords
+// Onboarding fields
+  @override
+  final String? firstName;
+  @override
+  final String? lastName;
+  @override
+  final String? sex;
+  @override
+  final String? trainingEquipment;
+  @override
+  final String? dietPreference;
+  final List<String> _mindsetActivities;
+  @override
+  @JsonKey()
+  List<String> get mindsetActivities {
+    if (_mindsetActivities is EqualUnmodifiableListView)
+      return _mindsetActivities;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_mindsetActivities);
+  }
+
+// Stats fields
+  @override
+  @JsonKey()
+  final int totalWorkoutsCompleted;
+  @override
+  @JsonKey()
+  final int currentStreak;
+  @override
+  @JsonKey()
+  final int longestStreak;
+  @override
+  @JsonKey()
+  final double totalCaloriesBurned;
+  @override
+  final double? currentWeight;
+  @override
+  final double? targetWeight;
+  @override
+  final double? height;
   @override
   final DateTime? createdAt;
   @override
@@ -285,7 +546,7 @@ class _$UserModelImpl implements _UserModel {
 
   @override
   String toString() {
-    return 'UserModel(id: $id, email: $email, displayName: $displayName, profileImageUrl: $profileImageUrl, fitnessLevel: $fitnessLevel, goals: $goals, limitations: $limitations, preferences: $preferences, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'UserModel(id: $id, email: $email, displayName: $displayName, profileImageUrl: $profileImageUrl, fitnessLevel: $fitnessLevel, goals: $goals, limitations: $limitations, preferences: $preferences, username: $username, passwordHash: $passwordHash, firstName: $firstName, lastName: $lastName, sex: $sex, trainingEquipment: $trainingEquipment, dietPreference: $dietPreference, mindsetActivities: $mindsetActivities, totalWorkoutsCompleted: $totalWorkoutsCompleted, currentStreak: $currentStreak, longestStreak: $longestStreak, totalCaloriesBurned: $totalCaloriesBurned, currentWeight: $currentWeight, targetWeight: $targetWeight, height: $height, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -306,6 +567,34 @@ class _$UserModelImpl implements _UserModel {
                 .equals(other._limitations, _limitations) &&
             const DeepCollectionEquality()
                 .equals(other._preferences, _preferences) &&
+            (identical(other.username, username) ||
+                other.username == username) &&
+            (identical(other.passwordHash, passwordHash) ||
+                other.passwordHash == passwordHash) &&
+            (identical(other.firstName, firstName) ||
+                other.firstName == firstName) &&
+            (identical(other.lastName, lastName) ||
+                other.lastName == lastName) &&
+            (identical(other.sex, sex) || other.sex == sex) &&
+            (identical(other.trainingEquipment, trainingEquipment) ||
+                other.trainingEquipment == trainingEquipment) &&
+            (identical(other.dietPreference, dietPreference) ||
+                other.dietPreference == dietPreference) &&
+            const DeepCollectionEquality()
+                .equals(other._mindsetActivities, _mindsetActivities) &&
+            (identical(other.totalWorkoutsCompleted, totalWorkoutsCompleted) ||
+                other.totalWorkoutsCompleted == totalWorkoutsCompleted) &&
+            (identical(other.currentStreak, currentStreak) ||
+                other.currentStreak == currentStreak) &&
+            (identical(other.longestStreak, longestStreak) ||
+                other.longestStreak == longestStreak) &&
+            (identical(other.totalCaloriesBurned, totalCaloriesBurned) ||
+                other.totalCaloriesBurned == totalCaloriesBurned) &&
+            (identical(other.currentWeight, currentWeight) ||
+                other.currentWeight == currentWeight) &&
+            (identical(other.targetWeight, targetWeight) ||
+                other.targetWeight == targetWeight) &&
+            (identical(other.height, height) || other.height == height) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
@@ -314,18 +603,34 @@ class _$UserModelImpl implements _UserModel {
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
-      runtimeType,
-      id,
-      email,
-      displayName,
-      profileImageUrl,
-      fitnessLevel,
-      const DeepCollectionEquality().hash(_goals),
-      const DeepCollectionEquality().hash(_limitations),
-      const DeepCollectionEquality().hash(_preferences),
-      createdAt,
-      updatedAt);
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        id,
+        email,
+        displayName,
+        profileImageUrl,
+        fitnessLevel,
+        const DeepCollectionEquality().hash(_goals),
+        const DeepCollectionEquality().hash(_limitations),
+        const DeepCollectionEquality().hash(_preferences),
+        username,
+        passwordHash,
+        firstName,
+        lastName,
+        sex,
+        trainingEquipment,
+        dietPreference,
+        const DeepCollectionEquality().hash(_mindsetActivities),
+        totalWorkoutsCompleted,
+        currentStreak,
+        longestStreak,
+        totalCaloriesBurned,
+        currentWeight,
+        targetWeight,
+        height,
+        createdAt,
+        updatedAt
+      ]);
 
   /// Create a copy of UserModel
   /// with the given fields replaced by the non-null parameter values.
@@ -353,6 +658,21 @@ abstract class _UserModel implements UserModel {
       final List<String> goals,
       final List<String> limitations,
       final Map<String, dynamic> preferences,
+      final String? username,
+      final String? passwordHash,
+      final String? firstName,
+      final String? lastName,
+      final String? sex,
+      final String? trainingEquipment,
+      final String? dietPreference,
+      final List<String> mindsetActivities,
+      final int totalWorkoutsCompleted,
+      final int currentStreak,
+      final int longestStreak,
+      final double totalCaloriesBurned,
+      final double? currentWeight,
+      final double? targetWeight,
+      final double? height,
       final DateTime? createdAt,
       final DateTime? updatedAt}) = _$UserModelImpl;
 
@@ -374,7 +694,38 @@ abstract class _UserModel implements UserModel {
   @override
   List<String> get limitations;
   @override
-  Map<String, dynamic> get preferences;
+  Map<String, dynamic> get preferences; // Authentication fields
+  @override
+  String? get username;
+  @override
+  String? get passwordHash; // Never store plain passwords
+// Onboarding fields
+  @override
+  String? get firstName;
+  @override
+  String? get lastName;
+  @override
+  String? get sex;
+  @override
+  String? get trainingEquipment;
+  @override
+  String? get dietPreference;
+  @override
+  List<String> get mindsetActivities; // Stats fields
+  @override
+  int get totalWorkoutsCompleted;
+  @override
+  int get currentStreak;
+  @override
+  int get longestStreak;
+  @override
+  double get totalCaloriesBurned;
+  @override
+  double? get currentWeight;
+  @override
+  double? get targetWeight;
+  @override
+  double? get height;
   @override
   DateTime? get createdAt;
   @override

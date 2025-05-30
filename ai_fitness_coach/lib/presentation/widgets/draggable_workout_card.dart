@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:ui';
+import 'dart:math' as math;
 import '../../models/workout.dart';
 import '../../services/workout_scheduling_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/theme_provider.dart';
 
-class DraggableWorkoutCard extends ConsumerWidget {
+class DraggableWorkoutCard extends ConsumerStatefulWidget {
   final ScheduledWorkout workout;
   final VoidCallback? onTap;
   final Function(String workoutId, DateTime newDate)? onMoved;
@@ -20,32 +21,347 @@ class DraggableWorkoutCard extends ConsumerWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DraggableWorkoutCard> createState() => _DraggableWorkoutCardState();
+}
+
+class _DraggableWorkoutCardState extends ConsumerState<DraggableWorkoutCard>
+    with TickerProviderStateMixin {
+  late AnimationController _hoverController;
+  late AnimationController _pulseController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _elevationAnimation;
+  late Animation<Color?> _glowAnimation;
+  bool _isHovered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    _hoverController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    
+    _pulseController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+    
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.05,
+    ).animate(CurvedAnimation(
+      parent: _hoverController,
+      curve: Curves.easeInOut,
+    ));
+    
+    _elevationAnimation = Tween<double>(
+      begin: 0.0,
+      end: 10.0,
+    ).animate(CurvedAnimation(
+      parent: _hoverController,
+      curve: Curves.easeInOut,
+    ));
+    
+    _glowAnimation = ColorTween(
+      begin: Colors.transparent,
+      end: widget.workout.difficulty.color.withOpacity(0.3),
+    ).animate(CurvedAnimation(
+      parent: _hoverController,
+      curve: Curves.easeInOut,
+    ));
+    
+    // Start pulse animation for incomplete workouts
+    // Note: ScheduledWorkout doesn't have isCompleted, so we'll pulse all workouts
+    _pulseController.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _hoverController.dispose();
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final settings = ref.watch(themeProvider);
     final theme = Theme.of(context);
-    return LongPressDraggable<ScheduledWorkout>(
-      data: workout,
-      dragAnchorStrategy: pointerDragAnchorStrategy,
-      feedback: _buildDragFeedback(settings, theme),
-      childWhenDragging: _buildDragPlaceholder(settings, theme),
-      onDragStarted: () {
-        HapticFeedback.mediumImpact();
+    return AnimatedBuilder(
+      animation: Listenable.merge([_hoverController, _pulseController]),
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _scaleAnimation.value,
+          child: LongPressDraggable<ScheduledWorkout>(
+            data: widget.workout,
+            dragAnchorStrategy: pointerDragAnchorStrategy,
+            feedback: _buildDragFeedback(settings, theme),
+            childWhenDragging: _buildDragPlaceholder(settings, theme),
+            onDragStarted: () {
+              HapticFeedback.mediumImpact();
+            },
+            onDragEnd: (details) {
+              // Handle drag completion feedback
+              if (details.wasAccepted) {
+                HapticFeedback.heavyImpact();
+              } else {
+                HapticFeedback.lightImpact();
+              }
+            },
+            child: _buildEnhancedWorkoutCard(settings, theme),
+          ),
+        );
       },
-      onDragEnd: (details) {
-        // Handle drag completion feedback
-        if (details.wasAccepted) {
-          HapticFeedback.heavyImpact();
-        } else {
+    );
+  }
+
+  Widget _buildEnhancedWorkoutCard(AppSettings settings, ThemeData theme) {
+    final pulseValue = _pulseController.value * 0.2;
+    
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() => _isHovered = true);
+        _hoverController.forward();
+      },
+      onExit: (_) {
+        setState(() => _isHovered = false);
+        _hoverController.reverse();
+      },
+      child: GestureDetector(
+        onTap: () {
           HapticFeedback.lightImpact();
-        }
-      },
-      child: _buildWorkoutCard(settings, theme),
+          widget.onTap?.call();
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: _glowAnimation.value ?? Colors.transparent,
+                blurRadius: 20 + (_elevationAnimation.value * 2),
+                spreadRadius: 3 + pulseValue * 10,
+                offset: Offset(0, _elevationAnimation.value / 2),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10 + _elevationAnimation.value,
+                offset: Offset(0, 5 + _elevationAnimation.value),
+              ),
+            ],
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: _getGradientColors(settings),
+                stops: [
+                  0.0,
+                  0.3 + pulseValue,
+                  1.0,
+                ],
+              ),
+              border: Border.all(
+                color: widget.workout.difficulty.color.withOpacity(
+                  0.3 + pulseValue * 0.5
+                ),
+                width: 1.5 + pulseValue * 2,
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(
+                      settings.darkMode ? 0.05 + pulseValue * 0.1 : 0.15 + pulseValue * 0.1
+                    ),
+                  ),
+                  child: _buildCardContent(settings, theme),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Color> _getGradientColors(AppSettings settings) {
+    final difficulty = widget.workout.difficulty;
+    final baseColor = difficulty.color;
+    
+    return [
+      baseColor.withOpacity(0.4),
+      baseColor.withOpacity(0.2),
+      Colors.transparent,
+    ];
+  }
+
+  Widget _buildCardContent(AppSettings settings, ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header with animated indicators
+        Row(
+          children: [
+            // Animated difficulty indicator
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: widget.workout.difficulty.color.withOpacity(
+                  _isHovered ? 0.8 : 0.6
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: _isHovered ? [
+                  BoxShadow(
+                    color: widget.workout.difficulty.color.withOpacity(0.4),
+                    blurRadius: 8,
+                    spreadRadius: 2,
+                  ),
+                ] : [],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    widget.workout.type.icon,
+                    size: 12,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    widget.workout.difficulty.name,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Spacer(),
+            // Completion status with animation - ScheduledWorkout doesn't have completion status
+            // So we'll skip this for now
+          ],
+        ),
+        const SizedBox(height: 12),
+        
+        // Workout title with shimmer effect
+        AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 200),
+          style: TextStyle(
+            fontSize: _isHovered ? 18 : 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+          child: Text(
+            widget.workout.workoutName,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        
+        const SizedBox(height: 8),
+        
+        // Workout details with enhanced styling
+        Row(
+          children: [
+            _buildInfoChip(
+              icon: Icons.timer,
+              label: widget.workout.duration,
+              color: Colors.blue,
+            ),
+            const SizedBox(width: 8),
+            _buildInfoChip(
+              icon: Icons.local_fire_department,
+              label: '${widget.workout.exercises.length} exercises',
+              color: Colors.orange,
+            ),
+          ],
+        ),
+        
+        if (widget.workout.originalDate != null) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.amber.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: Colors.amber.withOpacity(0.4),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.swap_horiz,
+                  size: 12,
+                  color: Colors.amber.shade700,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'MOVED',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.amber.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildInfoChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: color.withOpacity(0.4),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 12,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildWorkoutCard(AppSettings settings, ThemeData theme) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         child: ClipRRect(
@@ -64,10 +380,10 @@ class DraggableWorkoutCard extends ConsumerWidget {
                 ),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: workout.isUserModified 
+                  color: widget.workout.isUserModified 
                       ? Colors.orange.withOpacity(0.5)
                       : Colors.white.withOpacity(0.2),
-                  width: workout.isUserModified ? 2 : 1,
+                  width: widget.workout.isUserModified ? 2 : 1,
                 ),
               ),
               padding: const EdgeInsets.all(12),
@@ -77,14 +393,14 @@ class DraggableWorkoutCard extends ConsumerWidget {
                   Row(
                     children: [
                       Icon(
-                        workout.type.icon,
-                        color: workout.difficulty.color,
+                        widget.workout.type.icon,
+                        color: widget.workout.difficulty.color,
                         size: 20,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          workout.workoutName,
+                          widget.workout.workoutName,
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -94,7 +410,7 @@ class DraggableWorkoutCard extends ConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (workout.isUserModified)
+                      if (widget.workout.isUserModified)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
@@ -127,7 +443,7 @@ class DraggableWorkoutCard extends ConsumerWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        workout.duration,
+                        widget.workout.duration,
                         style: TextStyle(
                           fontSize: 12,
                           color: settings.darkMode 
@@ -145,7 +461,7 @@ class DraggableWorkoutCard extends ConsumerWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${workout.exercises.length} exercises',
+                        '${widget.workout.exercises.length} exercises',
                         style: TextStyle(
                           fontSize: 12,
                           color: settings.darkMode 
@@ -155,7 +471,7 @@ class DraggableWorkoutCard extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  if (workout.originalDate != null) ...[
+                  if (widget.workout.originalDate != null) ...[
                     const SizedBox(height: 4),
                     Row(
                       children: [
@@ -166,7 +482,7 @@ class DraggableWorkoutCard extends ConsumerWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'Originally ${_formatDate(workout.originalDate!)}',
+                          'Originally ${_formatDate(widget.workout.originalDate!)}',
                           style: TextStyle(
                             fontSize: 10,
                             color: Colors.orange.withOpacity(0.8),
@@ -213,14 +529,14 @@ class DraggableWorkoutCard extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              workout.type.icon,
+              widget.workout.type.icon,
               color: Colors.white,
               size: 20,
             ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                workout.workoutName,
+                widget.workout.workoutName,
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -269,7 +585,7 @@ class DraggableWorkoutCard extends ConsumerWidget {
               Row(
                 children: [
                   Icon(
-                    workout.type.icon,
+                    widget.workout.type.icon,
                     color: Colors.white.withOpacity(0.3),
                     size: 20,
                   ),

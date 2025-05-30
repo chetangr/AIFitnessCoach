@@ -153,23 +153,37 @@ class _MainScreenState extends ConsumerState<MainScreen>
             ),
             child: Stack(
               children: [
-                // Enhanced glass background
+                // Enhanced glass background with better visibility
                 Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(30),
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withOpacity(0.6),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.15),
-                      width: 1.5,
+                      color: Colors.white.withOpacity(0.3),
+                      width: 2,
                     ),
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
+                        Colors.white.withOpacity(0.15),
                         Colors.white.withOpacity(0.08),
-                        Colors.white.withOpacity(0.03),
+                        Colors.black.withOpacity(0.1),
                       ],
+                      stops: [0.0, 0.5, 1.0],
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.1),
+                        blurRadius: 5,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
                   ),
                 ),
                 
@@ -256,25 +270,32 @@ class _MainScreenState extends ConsumerState<MainScreen>
                       item.icon,
                       color: isSelected 
                           ? item.activeColor 
-                          : Colors.white.withOpacity(0.5),
+                          : Colors.white.withOpacity(0.9),
                       size: isSelected ? 26 : 22,
                     ),
                   ),
                 ),
                 
-                // Animated label
+                // Animated label with better visibility
                 AnimatedOpacity(
-                  opacity: isSelected ? 1.0 : 0.6,
+                  opacity: isSelected ? 1.0 : 0.9,
                   duration: const Duration(milliseconds: 200),
                   child: AnimatedDefaultTextStyle(
                     duration: const Duration(milliseconds: 200),
                     style: TextStyle(
                       fontSize: isSelected ? 13 : 11,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                       color: isSelected 
                           ? item.activeColor 
-                          : Colors.white.withOpacity(0.5),
+                          : Colors.white.withOpacity(0.9),
                       letterSpacing: isSelected ? 0.5 : 0,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black.withOpacity(0.3),
+                          offset: const Offset(0, 1),
+                          blurRadius: 2,
+                        ),
+                      ],
                     ),
                     child: Text(item.label),
                   ),

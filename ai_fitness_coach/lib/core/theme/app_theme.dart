@@ -161,10 +161,11 @@ class AppTheme {
     double borderRadius = 20,
     Color? borderColor,
     double borderWidth = 1,
+    bool isTextInput = false,
   }) {
     return BoxDecoration(
       borderRadius: BorderRadius.circular(borderRadius),
-      color: glassWhite,
+      color: isTextInput ? Colors.white.withOpacity(0.9) : glassWhite,
       border: Border.all(
         color: borderColor ?? glassBorder,
         width: borderWidth,

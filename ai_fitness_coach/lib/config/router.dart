@@ -3,8 +3,11 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../presentation/screens/splash/splash_screen.dart';
 import '../presentation/screens/auth/login_screen.dart';
+import '../presentation/screens/auth/registration_screen.dart';
 import '../presentation/screens/onboarding/onboarding_screen.dart';
+import '../presentation/screens/onboarding/onboarding_flow_screen.dart';
 import '../presentation/screens/onboarding/coach_selection_screen.dart';
+import '../presentation/screens/onboarding/coach_intro_chat_screen.dart';
 import '../presentation/screens/main/main_screen.dart';
 import '../presentation/screens/workouts/active_workout_screen.dart';
 import '../presentation/screens/performance/performance_screen.dart';
@@ -30,14 +33,29 @@ GoRouter router(RouterRef ref) {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
+        path: '/register',
+        name: 'register',
+        builder: (context, state) => const RegistrationScreen(),
+      ),
+      GoRoute(
         path: '/onboarding',
         name: 'onboarding',
-        builder: (context, state) => const OnboardingScreen(),
+        builder: (context, state) => const OnboardingFlowScreen(),
       ),
       GoRoute(
         path: '/coach-selection',
         name: 'coach-selection',
         builder: (context, state) => const CoachSelectionScreen(),
+      ),
+      GoRoute(
+        path: '/coach-intro',
+        name: 'coach-intro',
+        builder: (context, state) => const CoachIntroChatScreen(),
+      ),
+      GoRoute(
+        path: '/',
+        name: 'home',
+        builder: (context, state) => const MainScreen(),
       ),
       GoRoute(
         path: '/main',

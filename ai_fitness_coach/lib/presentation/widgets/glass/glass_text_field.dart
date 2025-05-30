@@ -131,8 +131,8 @@ class _GlassMorphicTextFieldState extends State<GlassMorphicTextField> with Tick
                     borderRadius: BorderRadius.circular(20),
                     gradient: LinearGradient(
                       colors: [
-                        Colors.white.withOpacity(0.1 + (0.05 * _focusAnimation.value)),
-                        Colors.white.withOpacity(0.05 + (0.03 * _focusAnimation.value)),
+                        Colors.white.withOpacity(0.85 + (0.1 * _focusAnimation.value)),
+                        Colors.white.withOpacity(0.8 + (0.1 * _focusAnimation.value)),
                       ],
                     ),
                     border: Border.all(
@@ -160,7 +160,7 @@ class _GlassMorphicTextFieldState extends State<GlassMorphicTextField> with Tick
                           focusNode: _focusNode,
                           onChanged: widget.onChanged,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: Colors.black87,
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
                           ),
@@ -184,7 +184,7 @@ class _GlassMorphicTextFieldState extends State<GlassMorphicTextField> with Tick
                                 ? Colors.red.withOpacity(0.7)
                                 : _isFocused 
                                     ? const Color(0xFF007AFF)
-                                    : Colors.white.withOpacity(0.5),
+                                    : Colors.black54,
                             fontSize: _isFocused || _hasText ? 12 : 16,
                             fontWeight: _isFocused || _hasText ? FontWeight.w600 : FontWeight.w500,
                           ),
@@ -202,7 +202,7 @@ class _GlassMorphicTextFieldState extends State<GlassMorphicTextField> with Tick
                                 ? Colors.red.withOpacity(0.7)
                                 : _isFocused
                                     ? const Color(0xFF007AFF)
-                                    : Colors.white.withOpacity(0.7),
+                                    : Colors.black54,
                             size: 24,
                           ),
                         ),

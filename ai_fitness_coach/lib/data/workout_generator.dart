@@ -1,5 +1,6 @@
 import 'dart:math';
 import '../models/workout.dart';
+import '../services/exercise_video_service.dart';
 
 class WorkoutGenerator {
   static final Random _random = Random();
@@ -246,16 +247,28 @@ class WorkoutGenerator {
     final exerciseCount = _random.nextInt(8) + 5; // 5-12 exercises
     final List<Exercise> exercises = [];
     
+    // Add warmup exercises first (except for yoga/flexibility)
+    if (type != WorkoutType.yoga && type != WorkoutType.flexibility) {
+      exercises.addAll(_generateWarmupExercises(bodyPart, type));
+    }
+    
+    // Generate main workout exercises
     final exerciseNames = _getExerciseNamesForType(type, bodyPart, equipment);
     
     for (int i = 0; i < exerciseCount; i++) {
+      final exerciseName = exerciseNames[_random.nextInt(exerciseNames.length)];
+      final videoUrl = ExerciseVideoService.generateVideoUrl(exerciseName);
+      final imageUrl = ExerciseVideoService.generateThumbnailUrl(videoUrl);
+      
       final exercise = Exercise(
         id: 'ex_${_random.nextInt(10000)}',
-        name: exerciseNames[_random.nextInt(exerciseNames.length)],
+        name: exerciseName,
         description: 'Target: $bodyPart',
         muscleGroups: [bodyPart],
         equipment: [equipment],
         difficulty: WorkoutDifficulty.values[_random.nextInt(WorkoutDifficulty.values.length)],
+        videoUrl: videoUrl,
+        imageUrl: imageUrl,
         instructions: [
           'Maintain proper form throughout',
           'Control the movement',
@@ -266,10 +279,14 @@ class WorkoutGenerator {
           'sets': _random.nextInt(3) + 3, // 3-5 sets
           'reps': _random.nextInt(12) + 8, // 8-20 reps
           'rest': _random.nextInt(60) + 30, // 30-90 seconds rest
+          'duration': ExerciseVideoService.getVideoDuration(exerciseName),
         },
       );
       exercises.add(exercise);
     }
+    
+    // Add cooldown/stretching exercises at the end
+    exercises.addAll(_generateCooldownExercises(bodyPart, type));
     
     return exercises;
   }
@@ -412,5 +429,331 @@ class WorkoutGenerator {
     return baseExercises.isNotEmpty ? baseExercises : [
       '$equipment Exercise', '$bodyPart Movement', 'Functional Exercise'
     ];
+  }
+  
+  static Exercise _createExerciseWithVideo({
+    required String id,
+    required String name,
+    required String description,
+    required List<String> muscleGroups,
+    required List<String> equipment,
+    required WorkoutDifficulty difficulty,
+    required List<String> instructions,
+    required Map<String, dynamic> metadata,
+  }) {
+    final videoUrl = ExerciseVideoService.generateVideoUrl(name);
+    return Exercise(
+      id: id,
+      name: name,
+      description: description,
+      muscleGroups: muscleGroups,
+      equipment: equipment,
+      difficulty: difficulty,
+      videoUrl: videoUrl,
+      imageUrl: ExerciseVideoService.generateThumbnailUrl(videoUrl),
+      instructions: instructions,
+      metadata: metadata,
+    );
+  }
+
+  static List<Exercise> _generateWarmupExercises(String bodyPart, WorkoutType type) {
+    final List<Exercise> warmupExercises = [];
+    
+    // General warmup exercises
+    final generalWarmups = [
+      _createExerciseWithVideo(
+        id: 'warmup_${_random.nextInt(1000)}',
+        name: 'Light Cardio',
+        description: 'Get your heart rate up and blood flowing',
+        muscleGroups: ['Full Body'],
+        equipment: ['Bodyweight'],
+        difficulty: WorkoutDifficulty.easy,
+        instructions: [
+          'Start with 2-3 minutes of light jogging in place',
+          'Keep movements controlled and comfortable',
+          'Gradually increase intensity',
+          'Focus on breathing rhythm',
+        ],
+        metadata: {
+          'duration': '3 minutes',
+          'intensity': 'Light',
+        },
+      ),
+      _createExerciseWithVideo(
+        id: 'warmup_${_random.nextInt(1000)}',
+        name: 'Dynamic Arm Circles',
+        description: 'Warm up shoulders and upper body',
+        muscleGroups: ['Shoulders', 'Arms'],
+        equipment: ['Bodyweight'],
+        difficulty: WorkoutDifficulty.easy,
+        instructions: [
+          'Stand with feet shoulder-width apart',
+          'Extend arms to the sides',
+          'Make small circles forward for 15 seconds',
+          'Reverse direction for 15 seconds',
+          'Gradually increase circle size',
+        ],
+        metadata: {
+          'sets': 2,
+          'duration': '30 seconds each',
+        },
+      ),
+    ];
+    
+    // Add general warmup
+    warmupExercises.add(generalWarmups[_random.nextInt(generalWarmups.length)]);
+    
+    // Add body part specific warmups
+    if (bodyPart.contains('Upper Body') || bodyPart.contains('Chest') || bodyPart.contains('Back')) {
+      warmupExercises.add(Exercise(
+        id: 'warmup_${_random.nextInt(1000)}',
+        name: 'Band Pull-Aparts',
+        description: 'Activate upper back and rear delts',
+        muscleGroups: ['Back', 'Shoulders'],
+        equipment: ['Resistance Band'],
+        difficulty: WorkoutDifficulty.easy,
+        instructions: [
+          'Hold band with arms extended in front',
+          'Pull band apart by squeezing shoulder blades',
+          'Control the return to starting position',
+          'Keep core engaged throughout',
+        ],
+        metadata: {
+          'sets': 2,
+          'reps': 15,
+          'rest': 30,
+        },
+      ));
+    }
+    
+    if (bodyPart.contains('Lower Body') || bodyPart.contains('Legs')) {
+      warmupExercises.add(Exercise(
+        id: 'warmup_${_random.nextInt(1000)}',
+        name: 'Leg Swings',
+        description: 'Dynamic hip and leg warmup',
+        muscleGroups: ['Hips', 'Legs'],
+        equipment: ['Bodyweight'],
+        difficulty: WorkoutDifficulty.easy,
+        instructions: [
+          'Hold onto something for balance',
+          'Swing one leg forward and back',
+          'Keep movement controlled',
+          'Switch legs after 15 swings',
+          'Then do side-to-side swings',
+        ],
+        metadata: {
+          'sets': 2,
+          'reps': 15,
+          'rest': 0,
+        },
+      ));
+    }
+    
+    if (bodyPart.contains('Core') || bodyPart.contains('Abs')) {
+      warmupExercises.add(Exercise(
+        id: 'warmup_${_random.nextInt(1000)}',
+        name: 'Cat-Cow Stretches',
+        description: 'Mobilize spine and activate core',
+        muscleGroups: ['Core', 'Back'],
+        equipment: ['Bodyweight'],
+        difficulty: WorkoutDifficulty.easy,
+        instructions: [
+          'Start on hands and knees',
+          'Arch back up like a cat',
+          'Then drop belly and lift chest',
+          'Move slowly between positions',
+          'Breathe deeply throughout',
+        ],
+        metadata: {
+          'sets': 2,
+          'reps': 10,
+          'rest': 0,
+        },
+      ));
+    }
+    
+    // Add movement-specific warmup
+    if (type == WorkoutType.hiit || type == WorkoutType.cardio) {
+      warmupExercises.add(Exercise(
+        id: 'warmup_${_random.nextInt(1000)}',
+        name: 'High Knees to Butt Kicks',
+        description: 'Dynamic lower body warmup',
+        muscleGroups: ['Legs', 'Cardio'],
+        equipment: ['Bodyweight'],
+        difficulty: WorkoutDifficulty.easy,
+        instructions: [
+          'Start with 30 seconds of high knees',
+          'Transition to 30 seconds of butt kicks',
+          'Keep core engaged',
+          'Land softly on balls of feet',
+        ],
+        metadata: {
+          'sets': 2,
+          'duration': '1 minute',
+          'rest': 30,
+        },
+      ));
+    }
+    
+    return warmupExercises;
+  }
+  
+  static List<Exercise> _generateCooldownExercises(String bodyPart, WorkoutType type) {
+    final List<Exercise> cooldownExercises = [];
+    
+    // General cooldown stretches
+    cooldownExercises.add(Exercise(
+      id: 'cooldown_${_random.nextInt(1000)}',
+      name: 'Deep Breathing',
+      description: 'Calm your nervous system and lower heart rate',
+      muscleGroups: ['Full Body'],
+      equipment: ['Bodyweight'],
+      difficulty: WorkoutDifficulty.easy,
+      instructions: [
+        'Sit or lie in a comfortable position',
+        'Inhale deeply through nose for 4 counts',
+        'Hold for 2 counts',
+        'Exhale slowly through mouth for 6 counts',
+        'Repeat for 2-3 minutes',
+      ],
+      metadata: {
+        'duration': '3 minutes',
+        'sets': 1,
+      },
+    ));
+    
+    // Body part specific stretches
+    if (bodyPart.contains('Upper Body') || bodyPart.contains('Chest')) {
+      cooldownExercises.add(Exercise(
+        id: 'cooldown_${_random.nextInt(1000)}',
+        name: 'Chest Doorway Stretch',
+        description: 'Stretch chest and front shoulders',
+        muscleGroups: ['Chest', 'Shoulders'],
+        equipment: ['Bodyweight'],
+        difficulty: WorkoutDifficulty.easy,
+        instructions: [
+          'Stand in doorway with arm at 90 degrees',
+          'Place forearm against door frame',
+          'Step forward until you feel stretch in chest',
+          'Hold for 30 seconds each side',
+          'Breathe deeply throughout',
+        ],
+        metadata: {
+          'duration': '30 seconds per side',
+          'sets': 2,
+        },
+      ));
+    }
+    
+    if (bodyPart.contains('Back') || bodyPart.contains('Upper Body')) {
+      cooldownExercises.add(Exercise(
+        id: 'cooldown_${_random.nextInt(1000)}',
+        name: 'Child\'s Pose',
+        description: 'Gentle back and shoulder stretch',
+        muscleGroups: ['Back', 'Shoulders'],
+        equipment: ['Bodyweight'],
+        difficulty: WorkoutDifficulty.easy,
+        instructions: [
+          'Kneel on floor with knees hip-width apart',
+          'Fold forward, extending arms in front',
+          'Rest forehead on floor if possible',
+          'Hold and breathe deeply',
+          'Can walk hands to each side for lat stretch',
+        ],
+        metadata: {
+          'duration': '60 seconds',
+          'sets': 1,
+        },
+      ));
+    }
+    
+    if (bodyPart.contains('Legs') || bodyPart.contains('Lower Body')) {
+      cooldownExercises.add(Exercise(
+        id: 'cooldown_${_random.nextInt(1000)}',
+        name: 'Standing Quad Stretch',
+        description: 'Stretch quadriceps and hip flexors',
+        muscleGroups: ['Quads', 'Hip Flexors'],
+        equipment: ['Bodyweight'],
+        difficulty: WorkoutDifficulty.easy,
+        instructions: [
+          'Stand on one leg, use wall for balance if needed',
+          'Grab opposite foot and pull heel to glutes',
+          'Keep knees together',
+          'Push hips slightly forward',
+          'Hold 30 seconds each leg',
+        ],
+        metadata: {
+          'duration': '30 seconds per leg',
+          'sets': 2,
+        },
+      ));
+      
+      cooldownExercises.add(Exercise(
+        id: 'cooldown_${_random.nextInt(1000)}',
+        name: 'Seated Forward Fold',
+        description: 'Stretch hamstrings and lower back',
+        muscleGroups: ['Hamstrings', 'Back'],
+        equipment: ['Bodyweight'],
+        difficulty: WorkoutDifficulty.easy,
+        instructions: [
+          'Sit with legs extended straight',
+          'Hinge at hips and reach for toes',
+          'Keep back as straight as possible',
+          'Hold where you feel a gentle stretch',
+          'Breathe deeply and relax into stretch',
+        ],
+        metadata: {
+          'duration': '45 seconds',
+          'sets': 2,
+        },
+      ));
+    }
+    
+    if (bodyPart.contains('Core') || bodyPart.contains('Abs')) {
+      cooldownExercises.add(Exercise(
+        id: 'cooldown_${_random.nextInt(1000)}',
+        name: 'Cobra Stretch',
+        description: 'Stretch abs and hip flexors',
+        muscleGroups: ['Abs', 'Hip Flexors'],
+        equipment: ['Bodyweight'],
+        difficulty: WorkoutDifficulty.easy,
+        instructions: [
+          'Lie face down with hands under shoulders',
+          'Press up, extending arms and arching back',
+          'Keep hips on ground',
+          'Hold comfortable stretch position',
+          'Breathe deeply throughout',
+        ],
+        metadata: {
+          'duration': '30 seconds',
+          'sets': 2,
+          'rest': 15,
+        },
+      ));
+    }
+    
+    // Add a final full-body stretch
+    cooldownExercises.add(Exercise(
+      id: 'cooldown_${_random.nextInt(1000)}',
+      name: 'Full Body Stretch',
+      description: 'Lengthen entire body',
+      muscleGroups: ['Full Body'],
+      equipment: ['Bodyweight'],
+      difficulty: WorkoutDifficulty.easy,
+      instructions: [
+        'Lie on back with arms overhead',
+        'Point toes and reach fingertips in opposite directions',
+        'Create length through entire body',
+        'Hold for 20 seconds, then relax',
+        'Repeat 2-3 times',
+      ],
+      metadata: {
+        'duration': '20 seconds',
+        'sets': 3,
+        'rest': 10,
+      },
+    ));
+    
+    return cooldownExercises;
   }
 }

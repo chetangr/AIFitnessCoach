@@ -1,2 +1,4 @@
 .env
 .claude
+test_images
+image*.png

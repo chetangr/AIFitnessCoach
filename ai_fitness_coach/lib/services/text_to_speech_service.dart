@@ -1,42 +1,29 @@
 import 'package:flutter_tts/flutter_tts.dart';
 import '../models/coach.dart';
 import 'dynamic_coaching_service.dart';
+import 'google_tts_service.dart';
 
 class TextToSpeechService {
   static final TextToSpeechService _instance = TextToSpeechService._internal();
   factory TextToSpeechService() => _instance;
   TextToSpeechService._internal();
 
-  final FlutterTts _flutterTts = FlutterTts();
+  final GoogleTtsService _googleTts = GoogleTtsService.instance;
   final DynamicCoachingService _coachingService = DynamicCoachingService();
   bool _isInitialized = false;
-  bool _isSpeaking = false;
+  bool _useGoogleTts = true; // Flag to switch between services
 
   Future<void> initialize() async {
     if (_isInitialized) return;
 
     try {
-      await _flutterTts.setLanguage("en-US");
-      await _flutterTts.setSpeechRate(0.8);
-      await _flutterTts.setVolume(0.8);
-      await _flutterTts.setPitch(1.0);
-      
-      _flutterTts.setStartHandler(() {
-        _isSpeaking = true;
-      });
-
-      _flutterTts.setCompletionHandler(() {
-        _isSpeaking = false;
-      });
-
-      _flutterTts.setErrorHandler((msg) {
-        _isSpeaking = false;
-        print('TTS Error: $msg');
-      });
-
+      if (_useGoogleTts) {
+        await _googleTts.initialize();
+      }
       _isInitialized = true;
     } catch (e) {
       print('TTS initialization error: $e');
+      _useGoogleTts = false; // Fallback to basic TTS
     }
   }
 
@@ -45,32 +32,39 @@ class TextToSpeechService {
     
     await stop(); // Stop any current speech
     
-    // Adjust voice parameters based on coach personality
-    await _configureVoiceForPersonality(personality);
-    
-    try {
-      await _flutterTts.speak(message);
-    } catch (e) {
-      print('TTS speak error: $e');
+    if (_useGoogleTts) {
+      // Use Google TTS with natural voice
+      await _googleTts.setCoachPersonalityVoice(personality?.name ?? 'steadyPace');
+      await _googleTts.speak(message, priority: true);
+    } else {
+      // Fallback to basic TTS
+      await _configureVoiceForPersonality(personality);
+      try {
+        final FlutterTts basicTts = FlutterTts();
+        await basicTts.speak(message);
+      } catch (e) {
+        print('TTS speak error: $e');
+      }
     }
   }
 
   Future<void> speakExerciseInstruction(String instruction, {bool isBreathingTip = false}) async {
     if (!_isInitialized) await initialize();
     
-    // Configure voice for instructions (slower, clearer)
-    await _flutterTts.setSpeechRate(0.6);
-    await _flutterTts.setPitch(1.0);
-    
-    if (isBreathingTip) {
-      // Slower for breathing instructions
-      await _flutterTts.setSpeechRate(0.5);
-    }
-    
-    try {
-      await _flutterTts.speak(instruction);
-    } catch (e) {
-      print('TTS instruction error: $e');
+    if (_useGoogleTts) {
+      // Use slower rate for instructions
+      await _googleTts.speak(instruction, priority: false);
+    } else {
+      // Fallback to basic TTS
+      final FlutterTts basicTts = FlutterTts();
+      await basicTts.setSpeechRate(isBreathingTip ? 0.5 : 0.6);
+      await basicTts.setPitch(1.0);
+      
+      try {
+        await basicTts.speak(instruction);
+      } catch (e) {
+        print('TTS instruction error: $e');
+      }
     }
   }
 
@@ -102,34 +96,37 @@ class TextToSpeechService {
   }
 
   Future<void> _configureVoiceForPersonality(CoachPersonality? personality) async {
+    final FlutterTts basicTts = FlutterTts();
     switch (personality) {
       case CoachPersonality.aggressive:
-        await _flutterTts.setSpeechRate(0.9); // Faster, more energetic
-        await _flutterTts.setPitch(1.1); // Slightly higher pitch
-        await _flutterTts.setVolume(0.9); // Louder
+        await basicTts.setSpeechRate(0.9); // Faster, more energetic
+        await basicTts.setPitch(1.1); // Slightly higher pitch
+        await basicTts.setVolume(0.9); // Louder
         break;
       case CoachPersonality.supportive:
-        await _flutterTts.setSpeechRate(0.7); // Slower, more gentle
-        await _flutterTts.setPitch(0.9); // Slightly lower pitch
-        await _flutterTts.setVolume(0.7); // Softer
+        await basicTts.setSpeechRate(0.7); // Slower, more gentle
+        await basicTts.setPitch(0.9); // Slightly lower pitch
+        await basicTts.setVolume(0.7); // Softer
         break;
       case CoachPersonality.steadyPace:
-        await _flutterTts.setSpeechRate(0.8); // Normal pace
-        await _flutterTts.setPitch(1.0); // Normal pitch
-        await _flutterTts.setVolume(0.8); // Normal volume
+        await basicTts.setSpeechRate(0.8); // Normal pace
+        await basicTts.setPitch(1.0); // Normal pitch
+        await basicTts.setVolume(0.8); // Normal volume
         break;
       default:
-        await _flutterTts.setSpeechRate(0.8);
-        await _flutterTts.setPitch(1.0);
-        await _flutterTts.setVolume(0.8);
+        await basicTts.setSpeechRate(0.8);
+        await basicTts.setPitch(1.0);
+        await basicTts.setVolume(0.8);
     }
   }
 
   Future<void> stop() async {
-    if (_isSpeaking) {
+    if (_useGoogleTts) {
+      await _googleTts.stop();
+    } else {
       try {
-        await _flutterTts.stop();
-        _isSpeaking = false;
+        final FlutterTts basicTts = FlutterTts();
+        await basicTts.stop();
       } catch (e) {
         print('TTS stop error: $e');
       }
@@ -137,16 +134,21 @@ class TextToSpeechService {
   }
 
   Future<void> pause() async {
-    try {
-      await _flutterTts.pause();
-    } catch (e) {
-      print('TTS pause error: $e');
+    if (_useGoogleTts) {
+      await _googleTts.pause();
+    } else {
+      try {
+        final FlutterTts basicTts = FlutterTts();
+        await basicTts.pause();
+      } catch (e) {
+        print('TTS pause error: $e');
+      }
     }
   }
 
-  bool get isSpeaking => _isSpeaking;
+  bool get isSpeaking => _useGoogleTts ? _googleTts.isSpeaking : false;
 
   void dispose() {
-    _flutterTts.stop();
+    stop();
   }
 }

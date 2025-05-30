@@ -5,6 +5,9 @@ import '../../../core/theme/app_theme.dart';
 import '../../widgets/glass_container.dart';
 import '../../../models/workout.dart';
 import '../../../data/exercise_database.dart';
+import '../../../providers/workout_provider.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/database_service.dart';
 
 // Provider for exercise library
 final exerciseLibraryProvider = StateNotifierProvider<ExerciseLibraryNotifier, ExerciseLibraryState>((ref) {
@@ -14,43 +17,55 @@ final exerciseLibraryProvider = StateNotifierProvider<ExerciseLibraryNotifier, E
 class ExerciseLibraryState {
   final List<Exercise> allExercises;
   final List<Exercise> filteredExercises;
+  final List<Exercise> displayedExercises;
   final bool isLoading;
   final String? selectedCategory;
   final String? selectedMuscleGroup;
   final String? selectedEquipment;
   final WorkoutDifficulty? selectedDifficulty;
   final String searchQuery;
+  final int pageSize;
+  final int currentPage;
 
   ExerciseLibraryState({
     this.allExercises = const [],
     this.filteredExercises = const [],
+    this.displayedExercises = const [],
     this.isLoading = false,
     this.selectedCategory,
     this.selectedMuscleGroup,
     this.selectedEquipment,
     this.selectedDifficulty,
     this.searchQuery = '',
+    this.pageSize = 100,
+    this.currentPage = 0,
   });
 
   ExerciseLibraryState copyWith({
     List<Exercise>? allExercises,
     List<Exercise>? filteredExercises,
+    List<Exercise>? displayedExercises,
     bool? isLoading,
     String? selectedCategory,
     String? selectedMuscleGroup,
     String? selectedEquipment,
     WorkoutDifficulty? selectedDifficulty,
     String? searchQuery,
+    int? pageSize,
+    int? currentPage,
   }) {
     return ExerciseLibraryState(
       allExercises: allExercises ?? this.allExercises,
       filteredExercises: filteredExercises ?? this.filteredExercises,
+      displayedExercises: displayedExercises ?? this.displayedExercises,
       isLoading: isLoading ?? this.isLoading,
       selectedCategory: selectedCategory ?? this.selectedCategory,
       selectedMuscleGroup: selectedMuscleGroup ?? this.selectedMuscleGroup,
       selectedEquipment: selectedEquipment ?? this.selectedEquipment,
       selectedDifficulty: selectedDifficulty ?? this.selectedDifficulty,
       searchQuery: searchQuery ?? this.searchQuery,
+      pageSize: pageSize ?? this.pageSize,
+      currentPage: currentPage ?? this.currentPage,
     );
   }
 }
@@ -76,15 +91,35 @@ class ExerciseLibraryNotifier extends StateNotifier<ExerciseLibraryState> {
     
     state = state.copyWith(
       allExercises: exercises,
-      filteredExercises: exercises.take(100).toList(), // Show first 100 by default
+      filteredExercises: exercises,
+      displayedExercises: exercises.take(state.pageSize).toList(),
       isLoading: false,
+      currentPage: 0,
     );
   }
 
   void searchExercises(String query) {
-    state = state.copyWith(searchQuery: query);
+    state = state.copyWith(searchQuery: query, currentPage: 0);
     _applyFilters();
   }
+
+  void loadMore() {
+    final nextPage = state.currentPage + 1;
+    final startIndex = nextPage * state.pageSize;
+    final endIndex = (startIndex + state.pageSize).clamp(0, state.filteredExercises.length);
+    
+    if (startIndex < state.filteredExercises.length) {
+      final newExercises = state.filteredExercises.sublist(startIndex, endIndex);
+      final updatedDisplayed = [...state.displayedExercises, ...newExercises];
+      
+      state = state.copyWith(
+        displayedExercises: updatedDisplayed,
+        currentPage: nextPage,
+      );
+    }
+  }
+
+  bool get hasMore => (state.currentPage + 1) * state.pageSize < state.filteredExercises.length;
 
   void filterByCategory(String? category) {
     state = state.copyWith(selectedCategory: category);
@@ -113,20 +148,42 @@ class ExerciseLibraryNotifier extends StateNotifier<ExerciseLibraryState> {
       selectedEquipment: null,
       selectedDifficulty: null,
       searchQuery: '',
-      filteredExercises: state.allExercises.take(100).toList(),
     );
+    _applyFilters();
   }
 
   void _applyFilters() {
     var filtered = state.allExercises;
 
-    // Apply search query
+    // Apply search query with partial matching
     if (state.searchQuery.isNotEmpty) {
-      final query = state.searchQuery.toLowerCase();
-      filtered = filtered.where((exercise) =>
-        exercise.name.toLowerCase().contains(query) ||
-        exercise.description.toLowerCase().contains(query)
-      ).toList();
+      final query = state.searchQuery.toLowerCase().trim();
+      filtered = filtered.where((exercise) {
+        final name = exercise.name.toLowerCase();
+        final description = exercise.description.toLowerCase();
+        
+        // Check if query matches any part of the name or description
+        if (name.contains(query) || description.contains(query)) {
+          return true;
+        }
+        
+        // Also check if query matches individual words
+        final queryWords = query.split(' ');
+        for (final word in queryWords) {
+          if (word.isNotEmpty && (name.contains(word) || description.contains(word))) {
+            return true;
+          }
+        }
+        
+        // Check muscle groups
+        for (final muscle in exercise.muscleGroups) {
+          if (muscle.toLowerCase().contains(query)) {
+            return true;
+          }
+        }
+        
+        return false;
+      }).toList();
     }
 
     // Apply category filter
@@ -157,15 +214,26 @@ class ExerciseLibraryNotifier extends StateNotifier<ExerciseLibraryState> {
       ).toList();
     }
 
-    // Limit results for performance
+    // Update filtered exercises and reset pagination
+    final displayedExercises = filtered.take(state.pageSize).toList();
+    
     state = state.copyWith(
-      filteredExercises: filtered.take(200).toList(),
+      filteredExercises: filtered,
+      displayedExercises: displayedExercises,
+      currentPage: 0,
     );
   }
 }
 
 class ExerciseLibraryScreen extends ConsumerStatefulWidget {
-  const ExerciseLibraryScreen({Key? key}) : super(key: key);
+  final bool addToWorkoutMode;
+  final String? workoutId;
+  
+  const ExerciseLibraryScreen({
+    Key? key,
+    this.addToWorkoutMode = false,
+    this.workoutId,
+  }) : super(key: key);
 
   @override
   ConsumerState<ExerciseLibraryScreen> createState() => _ExerciseLibraryScreenState();
@@ -196,6 +264,41 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen>
     Future.microtask(() {
       ref.read(exerciseLibraryProvider.notifier).loadExercises();
     });
+  }
+
+  void _addExerciseToWorkout(Exercise exercise) async {
+    if (widget.workoutId == null) return;
+    
+    try {
+      final workoutNotifier = ref.read(workoutProvider.notifier);
+      await workoutNotifier.addExerciseToWorkout(widget.workoutId!, exercise);
+      
+      HapticFeedback.lightImpact();
+      
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${exercise.name} added to workout'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      HapticFeedback.heavyImpact();
+      
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add exercise: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -261,11 +364,11 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen>
             ),
           ),
           const SizedBox(width: 16),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Exercise Library',
                   style: TextStyle(
                     fontSize: 24,
@@ -274,13 +377,30 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen>
                   ),
                 ),
                 Text(
-                  '10,000+ exercises',
-                  style: TextStyle(
+                  '${ref.watch(exerciseLibraryProvider).allExercises.length}+ exercises',
+                  style: const TextStyle(
                     fontSize: 14,
                     color: Colors.white70,
                   ),
                 ),
               ],
+            ),
+          ),
+          IconButton(
+            onPressed: () {
+              _showCreateCustomExerciseDialog(context);
+            },
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.add,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
           ),
           IconButton(
@@ -297,17 +417,17 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen>
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: Container(
         height: 50,
-        decoration: AppTheme.glassDecoration(borderRadius: 25),
+        decoration: AppTheme.glassDecoration(borderRadius: 25, isTextInput: true),
         child: TextField(
           controller: _searchController,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: Colors.black87),
           decoration: InputDecoration(
             hintText: 'Search exercises...',
-            hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
-            prefixIcon: const Icon(Icons.search, color: Colors.white70),
+            hintStyle: TextStyle(color: Colors.black54),
+            prefixIcon: const Icon(Icons.search, color: Colors.black54),
             suffixIcon: _searchController.text.isNotEmpty
                 ? IconButton(
-                    icon: const Icon(Icons.clear, color: Colors.white70),
+                    icon: const Icon(Icons.clear, color: Colors.black54),
                     onPressed: () {
                       _searchController.clear();
                       ref.read(exerciseLibraryProvider.notifier).searchExercises('');
@@ -399,13 +519,13 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen>
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(20),
-        itemCount: state.filteredExercises.length + 1,
+        itemCount: state.displayedExercises.length + 2, // +1 for header, +1 for load more button
         itemBuilder: (context, index) {
           if (index == 0) {
             return Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: Text(
-                '${state.filteredExercises.length} exercises found',
+                '${state.filteredExercises.length} exercises found (showing ${state.displayedExercises.length})',
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.white.withOpacity(0.7),
@@ -414,7 +534,43 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen>
             );
           }
           
-          final exercise = state.filteredExercises[index - 1];
+          // Load more button
+          if (index == state.displayedExercises.length + 1) {
+            final notifier = ref.read(exerciseLibraryProvider.notifier);
+            if (notifier.hasMore) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: ElevatedButton(
+                    onPressed: () => notifier.loadMore(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    ),
+                    child: Text(
+                      'Load More (${state.filteredExercises.length - state.displayedExercises.length} remaining)',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+              );
+            } else {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: Text(
+                    'All exercises loaded',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              );
+            }
+          }
+          
+          final exercise = state.displayedExercises[index - 1];
           return _buildExerciseCard(exercise, index - 1);
         },
       ),
@@ -513,11 +669,21 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen>
               ),
             ),
             
-            // Arrow
-            Icon(
-              Icons.chevron_right,
-              color: Colors.white.withOpacity(0.3),
-            ),
+            // Add to workout button or arrow
+            if (widget.addToWorkoutMode)
+              IconButton(
+                onPressed: () => _addExerciseToWorkout(exercise),
+                icon: Icon(
+                  Icons.add_circle,
+                  color: Colors.green,
+                  size: 32,
+                ),
+              )
+            else
+              Icon(
+                Icons.chevron_right,
+                color: Colors.white.withOpacity(0.3),
+              ),
           ],
         ),
       ),
@@ -611,8 +777,9 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) => Container(
-        height: 500,
+        height: MediaQuery.of(context).size.height * 0.8,
         margin: const EdgeInsets.all(16),
         padding: const EdgeInsets.all(20),
         decoration: AppTheme.glassDecoration(borderRadius: 20),
@@ -630,15 +797,35 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen>
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Filter Exercises',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Filter Exercises',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    ref.read(exerciseLibraryProvider.notifier).clearFilters();
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    'Clear All',
+                    style: TextStyle(color: Colors.blue),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
             
             // Muscle groups filter
             const Text(
@@ -747,15 +934,125 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen>
               }).toList(),
             ),
             
-            const Spacer(),
+            const SizedBox(height: 24),
             
-            // Clear filters button
+            // Difficulty filter
+            const Text(
+              'Difficulty',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: WorkoutDifficulty.values.map((difficulty) {
+                final state = ref.watch(exerciseLibraryProvider);
+                final isSelected = state.selectedDifficulty == difficulty;
+                
+                return GestureDetector(
+                  onTap: () {
+                    if (isSelected) {
+                      ref.read(exerciseLibraryProvider.notifier).filterByDifficulty(null);
+                    } else {
+                      ref.read(exerciseLibraryProvider.notifier).filterByDifficulty(difficulty);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? difficulty.color
+                          : Colors.white.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected
+                            ? difficulty.color
+                            : Colors.white.withOpacity(0.2),
+                      ),
+                    ),
+                    child: Text(
+                      difficulty.name,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.white70,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // Category filter
+            const Text(
+              'Exercise Category',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                'Bodyweight', 'Strength', 'Cardio', 'Olympic', 
+                'Powerlifting', 'Calisthenics', 'Stretching', 
+                'Mobility', 'Balance', 'Plyometric', 'Kegels'
+              ].map((category) {
+                final state = ref.watch(exerciseLibraryProvider);
+                final isSelected = state.selectedCategory == category;
+                
+                return GestureDetector(
+                  onTap: () {
+                    if (isSelected) {
+                      ref.read(exerciseLibraryProvider.notifier).filterByCategory(null);
+                    } else {
+                      ref.read(exerciseLibraryProvider.notifier).filterByCategory(category);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppTheme.primaryColor
+                          : Colors.white.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected
+                            ? AppTheme.primaryColor
+                            : Colors.white.withOpacity(0.2),
+                      ),
+                    ),
+                    child: Text(
+                      category,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.white70,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+                  ],
+                ),
+              ),
+            ),
+            
+            // Apply filters button
             SizedBox(
               width: double.infinity,
               child: GlassButton(
-                text: 'Clear All Filters',
+                text: 'Apply Filters',
+                isPrimary: true,
                 onPressed: () {
-                  ref.read(exerciseLibraryProvider.notifier).clearFilters();
                   Navigator.pop(context);
                 },
               ),
@@ -958,9 +1255,33 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen>
                             child: GlassButton(
                               text: 'Add to Workout',
                               isPrimary: true,
-                              onPressed: () {
+                              onPressed: () async {
                                 Navigator.pop(context);
-                                // Add to current workout
+                                // Get the current day's workout
+                                final now = DateTime.now();
+                                final workouts = ref.read(workoutProvider);
+                                final todayWorkout = workouts.firstWhere(
+                                  (w) => w.scheduledFor.year == now.year &&
+                                        w.scheduledFor.month == now.month &&
+                                        w.scheduledFor.day == now.day,
+                                  orElse: () => workouts.isNotEmpty ? workouts.first : throw Exception('No workouts available'),
+                                );
+                                
+                                // Add exercise to today's workout
+                                final updatedExercises = [...todayWorkout.exercises, exercise];
+                                final updatedWorkout = todayWorkout.copyWith(
+                                  exercises: updatedExercises,
+                                );
+                                
+                                // Update the workout in the provider
+                                await ref.read(workoutProvider.notifier).updateWorkout(todayWorkout.id, updatedWorkout);
+                                
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Added ${exercise.name} to today\'s workout'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
                               },
                             ),
                           ),
@@ -1039,6 +1360,184 @@ class _ExerciseLibraryScreenState extends ConsumerState<ExerciseLibraryScreen>
           ),
         ),
       ],
+    );
+  }
+
+  void _showCreateCustomExerciseDialog(BuildContext context) {
+    final nameController = TextEditingController();
+    final descriptionController = TextEditingController();
+    String selectedMuscleGroup = 'Chest';
+    String selectedEquipment = 'None';
+    WorkoutDifficulty selectedDifficulty = WorkoutDifficulty.easy;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.9,
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1F2E),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        ),
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Create Custom Exercise',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      // Exercise Name
+                      GlassContainer(
+                        child: TextField(
+                          controller: nameController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: const InputDecoration(
+                            labelText: 'Exercise Name',
+                            labelStyle: TextStyle(color: Colors.white70),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.all(16),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Description
+                      GlassContainer(
+                        child: TextField(
+                          controller: descriptionController,
+                          style: const TextStyle(color: Colors.white),
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            labelText: 'Description',
+                            labelStyle: TextStyle(color: Colors.white70),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.all(16),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      // Muscle Group Selection
+                      const Text(
+                        'Primary Muscle Group',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: ['Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Core', 'Glutes']
+                            .map((muscle) => GestureDetector(
+                                  onTap: () {
+                                    selectedMuscleGroup = muscle;
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: selectedMuscleGroup == muscle
+                                          ? Colors.blue
+                                          : Colors.white.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      muscle,
+                                      style: const TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                ))
+                            .toList(),
+                      ),
+                      const SizedBox(height: 32),
+                      
+                      // Save Button
+                      GlassButton(
+                        text: 'Create Exercise',
+                        isPrimary: true,
+                        onPressed: () async {
+                          if (nameController.text.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please enter an exercise name'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          
+                          // Create the custom exercise
+                          final customExercise = Exercise(
+                            id: DateTime.now().millisecondsSinceEpoch.toString(),
+                            name: nameController.text,
+                            description: descriptionController.text,
+                            muscleGroups: [selectedMuscleGroup],
+                            equipment: [selectedEquipment],
+                            difficulty: selectedDifficulty,
+                            instructions: ['Custom exercise created by user'],
+                            metadata: {
+                              'sets': 3,
+                              'reps': 12,
+                              'rest': 60,
+                              'isCustom': true,
+                            },
+                          );
+                          
+                          // Save to database
+                          final authService = AuthService();
+                          final user = await authService.getCurrentUser();
+                          if (user != null) {
+                            final databaseService = DatabaseService();
+                            await databaseService.saveCustomExercise(user.id, customExercise.toJson());
+                          }
+                          
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Custom exercise created successfully!'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

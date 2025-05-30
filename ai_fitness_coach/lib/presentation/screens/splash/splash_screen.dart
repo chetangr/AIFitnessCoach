@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../services/auth_service.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -47,8 +48,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   Future<void> _navigateToNext() async {
     await Future.delayed(const Duration(seconds: 3));
     if (mounted) {
-      // TODO: Check if user is logged in
-      context.go('/login');
+      final authService = AuthService();
+      final isLoggedIn = await authService.isLoggedIn();
+      
+      if (isLoggedIn) {
+        final user = await authService.getCurrentUser();
+        if (user != null && user.firstName != null && user.goals.isNotEmpty) {
+          context.go('/');
+        } else {
+          context.go('/onboarding');
+        }
+      } else {
+        context.go('/login');
+      }
     }
   }
 

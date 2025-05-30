@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
+import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../widgets/glass_container.dart';
@@ -10,9 +11,12 @@ import '../workout_player/workout_player_screen.dart';
 import '../../../providers/workout_provider.dart';
 import '../../../services/workout_tracking_service.dart';
 import '../../../services/workout_scheduling_service.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/database_service.dart';
 import '../../../providers/user_preferences_provider.dart';
 import '../../../providers/theme_provider.dart';
 import '../../widgets/draggable_workout_card.dart';
+import '../../widgets/workout_of_the_day_card.dart';
 import 'package:go_router/go_router.dart';
 
 class WorkoutsScreenV2 extends ConsumerStatefulWidget {
@@ -22,7 +26,53 @@ class WorkoutsScreenV2 extends ConsumerStatefulWidget {
   ConsumerState<WorkoutsScreenV2> createState() => _WorkoutsScreenV2State();
 }
 
-class _WorkoutsScreenV2State extends ConsumerState<WorkoutsScreenV2> {
+class _WorkoutsScreenV2State extends ConsumerState<WorkoutsScreenV2>
+    with TickerProviderStateMixin {
+  late AnimationController _backgroundController;
+  late AnimationController _headerController;
+  late Animation<double> _headerSlideAnimation;
+  late Animation<double> _headerFadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    _backgroundController = AnimationController(
+      duration: const Duration(seconds: 8),
+      vsync: this,
+    );
+    
+    _headerController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+    
+    _headerSlideAnimation = Tween<double>(
+      begin: -100.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _headerController,
+      curve: Curves.elasticOut,
+    ));
+    
+    _headerFadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _headerController,
+      curve: Curves.easeOut,
+    ));
+    
+    _backgroundController.repeat();
+    _headerController.forward();
+  }
+
+  @override
+  void dispose() {
+    _backgroundController.dispose();
+    _headerController.dispose();
+    super.dispose();
+  }
   @override
   Widget build(BuildContext context) {
     final workouts = ref.watch(workoutProvider);
@@ -54,38 +104,86 @@ class _WorkoutsScreenV2State extends ConsumerState<WorkoutsScreenV2> {
     return Scaffold(
       extendBody: true,
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: settings.darkMode 
-            ? const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF0A0F1C),
-                  Color(0xFF1A1F2E),
-                  Color(0xFF0A0F1C),
-                ],
-              )
-            : LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.blue.shade50,
-                  Colors.indigo.shade50,
-                  Colors.purple.shade50,
-                ],
-              ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: _buildWeeklySchedule(weeklySchedule),
-              ),
-            ],
-          ),
-        ),
+      body: AnimatedBuilder(
+        animation: _backgroundController,
+        builder: (context, child) {
+          return Container(
+            decoration: BoxDecoration(
+              gradient: settings.darkMode 
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFF0A0F1C),
+                      Color.lerp(const Color(0xFF1A1F2E), const Color(0xFF2A1F3E), 
+                        math.sin(_backgroundController.value * 2 * math.pi) * 0.3 + 0.5) ?? const Color(0xFF1A1F2E),
+                      const Color(0xFF0A0F1C),
+                    ],
+                    stops: [
+                      0.0,
+                      0.5 + math.sin(_backgroundController.value * 2 * math.pi) * 0.2,
+                      1.0,
+                    ],
+                  )
+                : LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.blue.shade50,
+                      Color.lerp(Colors.indigo.shade50, Colors.purple.shade100, 
+                        math.sin(_backgroundController.value * 2 * math.pi) * 0.3 + 0.5) ?? Colors.indigo.shade50,
+                      Colors.purple.shade50,
+                    ],
+                    stops: [
+                      0.0,
+                      0.5 + math.sin(_backgroundController.value * 2 * math.pi) * 0.2,
+                      1.0,
+                    ],
+                  ),
+            ),
+            child: Stack(
+              children: [
+                // Floating background elements
+                ...List.generate(5, (index) {
+                  final offset = (index * 0.3) % 1.0;
+                  return Positioned(
+                    left: (MediaQuery.of(context).size.width * 0.2 * index) % MediaQuery.of(context).size.width,
+                    top: 50 + math.sin((_backgroundController.value + offset) * 2 * math.pi) * 30,
+                    child: Container(
+                      width: 80 + (index * 20),
+                      height: 80 + (index * 20),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: settings.darkMode 
+                          ? Colors.white.withOpacity(0.03)
+                          : Colors.blue.withOpacity(0.05),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.white.withOpacity(0.05),
+                            blurRadius: 20,
+                            spreadRadius: 5,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+                
+                // Main content
+                SafeArea(
+                  child: Column(
+                    children: [
+                      _buildEnhancedHeader(),
+                      Expanded(
+                        child: _buildWeeklySchedule(weeklySchedule),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -103,29 +201,95 @@ class _WorkoutsScreenV2State extends ConsumerState<WorkoutsScreenV2> {
     }
   }
 
+  Widget _buildEnhancedHeader() {
+    return AnimatedBuilder(
+      animation: _headerController,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, _headerSlideAnimation.value),
+          child: FadeTransition(
+            opacity: _headerFadeAnimation,
+            child: _buildHeader(),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildHeader() {
     final settings = ref.watch(themeProvider);
     final theme = Theme.of(context);
+    final authService = AuthService();
     
     return Container(
       margin: const EdgeInsets.all(20),
-      child: GlassMorphicCard(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        blur: 20,
-        borderRadius: BorderRadius.circular(20),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Your Weekly Schedule',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: settings.darkMode ? Colors.white : theme.colorScheme.onSurface,
+      child: FutureBuilder(
+        future: authService.getCurrentUser(),
+        builder: (context, snapshot) {
+          final user = snapshot.data;
+          final streak = user?.currentStreak ?? 0;
+          
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Your Weekly Schedule',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: settings.darkMode ? Colors.white : theme.colorScheme.onSurface,
+                ),
               ),
-            ),
-          ],
-        ),
+              if (streak > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.orange.shade400,
+                        Colors.orange.shade600,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.orange.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.local_fire_department,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '$streak',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Day${streak > 1 ? 's' : ''}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -151,140 +315,9 @@ class _WorkoutsScreenV2State extends ConsumerState<WorkoutsScreenV2> {
   }
 
   Widget _buildTodayWorkout(WorkoutPlan workout) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        image: DecorationImage(
-          image: AssetImage(workout.imagePath.isNotEmpty 
-              ? workout.imagePath 
-              : 'assets/images/default_workout.jpg'),
-          fit: BoxFit.cover,
-        ),
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.transparent,
-              Colors.black.withOpacity(0.7),
-            ],
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              margin: const EdgeInsets.all(12),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.6),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                'TODAY',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: 40),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    workout.name,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    workout.description,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.white.withOpacity(0.8),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      if (workout.metadata?['trainer'] != null) ...[
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundImage: AssetImage(
-                            'assets/images/trainer_${workout.metadata!['trainer'].toString().toLowerCase().replaceAll(' ', '_')}.jpg',
-                          ),
-                          backgroundColor: Colors.grey,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          workout.metadata!['trainer'],
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.8),
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                      ],
-                      Icon(
-                        Icons.timer,
-                        size: 16,
-                        color: Colors.white.withOpacity(0.8),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        workout.duration,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 14,
-                        ),
-                      ),
-                      if (workout.metadata?['equipment'] != null) ...[
-                        const SizedBox(width: 16),
-                        Icon(
-                          Icons.fitness_center,
-                          size: 16,
-                          color: Colors.white.withOpacity(0.8),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          workout.metadata!['equipment'],
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.8),
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: GlassMorphicButton(
-                      text: 'View Workout',
-                      onPressed: () {
-                        _showWorkoutDetails(context, workout);
-                      },
-                      isPrimary: true,
-                      icon: Icons.arrow_forward,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    return WorkoutOfTheDayCard(
+      workout: workout,
+      onTap: () => _showWorkoutDetails(context, workout),
     );
   }
 
@@ -529,19 +562,21 @@ class _WorkoutsScreenV2State extends ConsumerState<WorkoutsScreenV2> {
                     // Workout Header
                     GlassMorphicCard(
                       padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Stack(
                         children: [
-                          Row(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(
-                                workout.type.icon,
-                                color: workout.difficulty.color,
-                                size: 32,
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
+                              Row(
+                                children: [
+                                  Icon(
+                                    workout.type.icon,
+                                    color: workout.difficulty.color,
+                                    size: 32,
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
@@ -575,19 +610,76 @@ class _WorkoutsScreenV2State extends ConsumerState<WorkoutsScreenV2> {
                               _buildInfoChip(Icons.local_fire_department, workout.calories ?? '0 cal'),
                             ],
                           ),
+                            ],
+                          ),
+                          // Play button in top right
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.pop(context);
+                                context.push('/active-workout', extra: workout);
+                              },
+                              child: Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: workout.difficulty.color,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: workout.difficulty.color.withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.play_arrow,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 20),
                     
                     // Exercises List
-                    const Text(
-                      'Exercises',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Exercises',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            // Navigate to exercise library with workout context
+                            context.push('/exercises', extra: workout);
+                          },
+                          icon: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.add,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     ...workout.exercises.map((exercise) => Padding(
@@ -662,10 +754,22 @@ class _WorkoutsScreenV2State extends ConsumerState<WorkoutsScreenV2> {
                         const SizedBox(width: 12),
                         GlassMorphicButton(
                           text: '',
-                          onPressed: () {
-                            // Add to schedule or edit
+                          onPressed: () async {
+                            final authService = AuthService();
+                            final user = await authService.getCurrentUser();
+                            if (user != null) {
+                              final databaseService = DatabaseService();
+                              await databaseService.saveWorkoutToUser(user.id, workout);
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Workout saved to your profile!'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            }
                           },
-                          icon: Icons.edit,
+                          icon: Icons.bookmark_outline,
                           width: 56,
                         ),
                       ],
