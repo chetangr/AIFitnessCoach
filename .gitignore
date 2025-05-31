@@ -2,3 +2,9 @@
 .claude
 test_images
 image*.png
+node_modules
+# Ignore all log files
+*.log
+# Ignore all temporary files
+*.tmp
+# Ignore all backup files   
