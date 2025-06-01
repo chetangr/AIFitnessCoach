@@ -5,14 +5,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { AppLogger } from '../../utils/logger';
-
-const { width } = Dimensions.get('window');
+// Logger temporarily removed - was causing import errors
 
 const ActiveWorkoutScreen = ({ route, navigation }: any) => {
   const { workout } = route.params || {};
@@ -20,6 +17,9 @@ const ActiveWorkoutScreen = ({ route, navigation }: any) => {
   const [isResting, setIsResting] = useState(false);
   const [restTimer, setRestTimer] = useState(60);
   const [workoutTimer, setWorkoutTimer] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [volumeEnabled, setVolumeEnabled] = useState(true);
+  const [musicEnabled, setMusicEnabled] = useState(true);
 
   const exercises = [
     { name: 'Push-ups', sets: 3, reps: 12, rest: 60 },
@@ -34,12 +34,14 @@ const ActiveWorkoutScreen = ({ route, navigation }: any) => {
   const progress = ((currentExerciseIndex + 1) / exercises.length) * 100;
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setWorkoutTimer((prev) => prev + 1);
-    }, 1000);
+    if (!isPaused) {
+      const timer = setInterval(() => {
+        setWorkoutTimer((prev) => prev + 1);
+      }, 1000);
 
-    return () => clearInterval(timer);
-  }, []);
+      return () => clearInterval(timer);
+    }
+  }, [isPaused]);
 
   useEffect(() => {
     if (isResting && restTimer > 0) {
@@ -64,7 +66,7 @@ const ActiveWorkoutScreen = ({ route, navigation }: any) => {
     if (currentExerciseIndex < exercises.length - 1) {
       setCurrentExerciseIndex(currentExerciseIndex + 1);
       setIsResting(true);
-      AppLogger.workout('Exercise Completed', { 
+      console.log('Exercise Completed', { 
         exercise: currentExercise.name,
         index: currentExerciseIndex 
       });
@@ -74,7 +76,7 @@ const ActiveWorkoutScreen = ({ route, navigation }: any) => {
   };
 
   const handleFinishWorkout = () => {
-    AppLogger.workout('Workout Completed', { 
+    console.log('Workout Completed', { 
       duration: workoutTimer,
       exercisesCompleted: currentExerciseIndex + 1 
     });
@@ -150,7 +152,14 @@ const ActiveWorkoutScreen = ({ route, navigation }: any) => {
                 <Icon name="checkmark-circle" size={24} color="white" />
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.helpButton}>
+              <TouchableOpacity 
+                style={styles.helpButton}
+                onPress={() => {
+                  // Show exercise instructions
+                  console.log('Show instructions for:', currentExercise.name);
+                  // Could implement a modal with exercise instructions
+                }}
+              >
                 <Icon name="help-circle" size={24} color="white" />
                 <Text style={styles.helpButtonText}>View Instructions</Text>
               </TouchableOpacity>
@@ -187,17 +196,34 @@ const ActiveWorkoutScreen = ({ route, navigation }: any) => {
 
       {/* Bottom Controls */}
       <BlurView intensity={80} tint="dark" style={styles.bottomControls}>
-        <TouchableOpacity style={styles.controlButton}>
-          <Icon name="volume-high" size={28} color="white" />
+        <TouchableOpacity 
+          style={styles.controlButton}
+          onPress={() => setVolumeEnabled(!volumeEnabled)}
+        >
+          <Icon 
+            name={volumeEnabled ? "volume-high" : "volume-mute"} 
+            size={28} 
+            color={volumeEnabled ? "white" : "rgba(255,255,255,0.5)"} 
+          />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.controlButton}>
-          <Icon name="musical-notes" size={28} color="white" />
+        <TouchableOpacity 
+          style={styles.controlButton}
+          onPress={() => setMusicEnabled(!musicEnabled)}
+        >
+          <Icon 
+            name={musicEnabled ? "musical-notes" : "musical-notes-outline"} 
+            size={28} 
+            color={musicEnabled ? "white" : "rgba(255,255,255,0.5)"} 
+          />
         </TouchableOpacity>
         <TouchableOpacity 
           style={styles.pauseButton}
-          onPress={() => AppLogger.workout('Workout Paused')}
+          onPress={() => {
+            setIsPaused(!isPaused);
+            console.log('Workout', isPaused ? 'Resumed' : 'Paused');
+          }}
         >
-          <Icon name="pause" size={32} color="white" />
+          <Icon name={isPaused ? "play" : "pause"} size={32} color="white" />
         </TouchableOpacity>
       </BlurView>
     </LinearGradient>

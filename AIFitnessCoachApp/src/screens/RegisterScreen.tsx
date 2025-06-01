@@ -13,7 +13,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useAuthStore } from '../store/authStore';
-import { AppLogger } from '../../utils/logger';
+// Logger temporarily removed - was causing import errors
 
 const RegisterScreen = ({ navigation }: any) => {
   const [name, setName] = useState('');
@@ -40,7 +40,7 @@ const RegisterScreen = ({ navigation }: any) => {
     }
 
     setLoading(true);
-    AppLogger.userAction('Register Attempt', { email, name });
+    console.log('Register Attempt', { email, name });
 
     try {
       // For demo, auto-login after registration
@@ -50,9 +50,9 @@ const RegisterScreen = ({ navigation }: any) => {
         name,
         token: 'demo-token',
       });
-      AppLogger.info('Registration Successful', { email });
+      console.log('Registration Successful', { email });
     } catch (error) {
-      AppLogger.error('Registration Failed', error);
+      console.error('Registration Failed', error);
       Alert.alert('Error', 'Registration failed. Please try again.');
     } finally {
       setLoading(false);

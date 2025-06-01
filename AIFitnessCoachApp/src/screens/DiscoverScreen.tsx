@@ -8,15 +8,12 @@ import {
   TextInput,
   ActivityIndicator,
   FlatList,
-  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { AppLogger } from '../../utils/logger';
+// Logger temporarily removed - was causing import errors
 import { exerciseService } from '../services/exerciseService';
-
-const { width } = Dimensions.get('window');
 
 interface Exercise {
   id: string;
@@ -71,7 +68,7 @@ const DiscoverScreen = ({ navigation }: any) => {
         setExercises([...exercises, ...data]);
       }
     } catch (error) {
-      AppLogger.error('Failed to load exercises', error);
+      console.error('Failed to load exercises', error);
       // Use sample data as fallback
       setExercises(getSampleExercises());
     } finally {
@@ -95,14 +92,14 @@ const DiscoverScreen = ({ navigation }: any) => {
   };
 
   const handleSearch = () => {
-    AppLogger.userAction('Exercise Search', { query: searchQuery });
+    console.log('Exercise Search', { query: searchQuery });
     // Implement search functionality
   };
 
   const renderExerciseCard = ({ item }: { item: Exercise }) => (
     <TouchableOpacity
       onPress={() => {
-        AppLogger.workout('Exercise Selected', item);
+        console.log('Exercise Selected', item);
         navigation.navigate('ExerciseDetail', { exercise: item });
       }}
     >
@@ -186,7 +183,7 @@ const DiscoverScreen = ({ navigation }: any) => {
             onPress={() => {
               setSelectedMuscle(muscle);
               setPage(1);
-              AppLogger.userAction('Muscle Group Selected', { muscle });
+              console.log('Muscle Group Selected', { muscle });
             }}
           >
             <BlurView

@@ -35,16 +35,57 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   checkAuth: async () => {
+    console.log('checkAuth called - starting auth check...');
+    
     try {
-      const userJson = await AsyncStorage.getItem('user');
-      if (userJson) {
-        const user = JSON.parse(userJson);
-        set({ user, isAuthenticated: true, isLoading: false });
-      } else {
-        set({ isLoading: false });
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => {
+          console.log('Auth check timeout reached (3000ms)');
+          reject(new Error('Auth check timeout'));
+        }, 3000)
+      );
+      
+      const checkPromise = (async () => {
+        console.log('Attempting to read user from AsyncStorage...');
+        const userJson = await AsyncStorage.getItem('user');
+        console.log('AsyncStorage read complete. User found:', !!userJson);
+        
+        if (userJson) {
+          const user = JSON.parse(userJson);
+          console.log('User parsed successfully:', { email: user.email, name: user.name });
+          return { user, isAuthenticated: true };
+        }
+        console.log('No user found in AsyncStorage');
+        return { user: null, isAuthenticated: false };
+      })();
+      
+      console.log('Racing auth check with timeout...');
+      const result = await Promise.race([checkPromise, timeoutPromise])
+        .catch((error) => {
+          console.error('Auth check race failed:', error);
+          return { user: null, isAuthenticated: false };
+        }) as { user: User | null, isAuthenticated: boolean };
+      
+      console.log('Setting auth state:', { 
+        hasUser: !!result.user,
+        isAuthenticated: result.isAuthenticated 
+      });
+      
+      set({ 
+        user: result.user || null, 
+        isAuthenticated: result.isAuthenticated || false, 
+        isLoading: false 
+      });
+      
+      console.log('Auth state updated successfully');
+    } catch (error) {
+      console.error('checkAuth error:', error);
+      if (error instanceof Error) {
+        console.error('Error stack:', error.stack);
       }
-    } catch {
       set({ isLoading: false });
+      console.log('isLoading set to false after error');
     }
   },
 }));

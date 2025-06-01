@@ -5,14 +5,14 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
   Switch,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuthStore } from '../store/authStore';
-import { AppLogger } from '../../utils/logger';
+// Logger temporarily removed - was causing import errors
 
 const ProfileScreen = ({ navigation }: any) => {
   const { user, logout } = useAuthStore();
@@ -36,12 +36,12 @@ const ProfileScreen = ({ navigation }: any) => {
   ];
 
   const handleMenuAction = (action: string) => {
-    AppLogger.userAction('Profile Menu Action', { action });
+    console.log('Profile Menu Action', { action });
     // Handle navigation based on action
   };
 
   const handleLogout = async () => {
-    AppLogger.userAction('Logout');
+    console.log('Logout');
     await logout();
   };
 
@@ -148,7 +148,8 @@ const ProfileScreen = ({ navigation }: any) => {
           </BlurView>
         </TouchableOpacity>
 
-        <View style={{ height: 100 }} />
+        {/* Bottom spacing for floating tab bar */}
+        <View style={{ height: Platform.OS === 'ios' ? 90 : 80 }} />
       </ScrollView>
     </LinearGradient>
   );

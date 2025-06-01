@@ -5,20 +5,20 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuthStore } from '../store/authStore';
-import { AppLogger } from '../../utils/logger';
+// Logger removed - causing import errors
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation }: any) => {
   const { user } = useAuthStore();
-  const [todayWorkout, setTodayWorkout] = useState({
+  const [todayWorkout] = useState({
     name: 'Upper Body Strength',
     duration: '45 min',
     exercises: 6,
@@ -40,11 +40,11 @@ const HomeScreen = ({ navigation }: any) => {
   ];
 
   useEffect(() => {
-    AppLogger.info('Home Screen Loaded', { user: user?.email });
+    console.log('Home Screen Loaded', { user: user?.email });
   }, []);
 
   const handleQuickAction = (action: string) => {
-    AppLogger.userAction('Quick Action Pressed', { action });
+    console.log('Quick Action Pressed', { action });
     switch (action) {
       case 'Start Workout':
         navigation.navigate('ActiveWorkout');
@@ -113,7 +113,7 @@ const HomeScreen = ({ navigation }: any) => {
           <TouchableOpacity
             style={styles.startButton}
             onPress={() => {
-              AppLogger.workout('Start Today Workout', todayWorkout);
+              console.log('Start Today Workout', todayWorkout);
               navigation.navigate('ActiveWorkout');
             }}
           >
@@ -157,7 +157,8 @@ const HomeScreen = ({ navigation }: any) => {
           </View>
         </BlurView>
 
-        <View style={{ height: 100 }} />
+        {/* Bottom spacing for floating tab bar */}
+        <View style={{ height: Platform.OS === 'ios' ? 90 : 80 }} />
       </ScrollView>
     </LinearGradient>
   );

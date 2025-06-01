@@ -13,7 +13,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useAuthStore } from '../store/authStore';
-import { AppLogger } from '../../utils/logger';
+// Logger removed - causing import errors
 
 const LoginScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
@@ -28,7 +28,7 @@ const LoginScreen = ({ navigation }: any) => {
     }
 
     setLoading(true);
-    AppLogger.userAction('Login Attempt', { email });
+    console.log('Login Attempt', { email });
 
     try {
       // For demo purposes
@@ -39,13 +39,13 @@ const LoginScreen = ({ navigation }: any) => {
           name: 'Demo User',
           token: 'demo-token',
         });
-        AppLogger.info('Login Successful', { email });
+        console.log('Login Successful', { email });
       } else {
         // Real API call would go here
         Alert.alert('Error', 'Invalid credentials. Try demo@fitness.com / demo123');
       }
     } catch (error) {
-      AppLogger.error('Login Failed', error);
+      console.log('Login Failed', error);
       Alert.alert('Error', 'Login failed. Please try again.');
     } finally {
       setLoading(false);
@@ -55,7 +55,7 @@ const LoginScreen = ({ navigation }: any) => {
   const handleDemoLogin = () => {
     setEmail('demo@fitness.com');
     setPassword('demo123');
-    AppLogger.userAction('Demo Login Button Pressed');
+    console.log('Demo Login Button Pressed');
   };
 
   return (

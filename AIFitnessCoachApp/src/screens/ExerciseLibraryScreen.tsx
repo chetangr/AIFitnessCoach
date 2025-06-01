@@ -8,13 +8,12 @@ import {
   TextInput,
   ActivityIndicator,
   FlatList,
-  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { exerciseService } from '../services/exerciseService';
-import { AppLogger } from '../../utils/logger';
+// Logger temporarily removed - was causing import errors
 
 interface Exercise {
   id: string;
@@ -70,9 +69,9 @@ const ExerciseLibraryScreen = ({ navigation }: any) => {
 
       setPage(currentPage);
       setHasMore(result.length === 20);
-      AppLogger.info('Exercises Loaded', { count: result.length });
+      console.log('Exercises Loaded', { count: result.length });
     } catch (error) {
-      AppLogger.error('Failed to load exercises', error);
+      console.error('Failed to load exercises', error);
     } finally {
       setLoading(false);
     }
@@ -132,7 +131,13 @@ const ExerciseLibraryScreen = ({ navigation }: any) => {
           <Icon name="arrow-back" size={28} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Exercise Library</Text>
-        <TouchableOpacity>
+        <TouchableOpacity 
+          onPress={() => {
+            console.log('Add new exercise');
+            // Could navigate to add exercise screen or show modal
+            // navigation.navigate('AddExercise');
+          }}
+        >
           <Icon name="add-circle" size={28} color="white" />
         </TouchableOpacity>
       </View>

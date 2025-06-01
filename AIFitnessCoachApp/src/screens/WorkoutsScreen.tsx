@@ -10,7 +10,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { AppLogger } from '../../utils/logger';
+// Logger temporarily removed - was causing import errors
 
 const { width } = Dimensions.get('window');
 
@@ -121,7 +121,7 @@ const WorkoutsScreen = ({ navigation }: any) => {
   };
 
   const handleWorkoutPress = (workout: Workout) => {
-    AppLogger.workout('Workout Selected', workout);
+    console.log('Workout Selected', workout);
     navigation.navigate('ActiveWorkout', { workout });
   };
 
@@ -167,7 +167,7 @@ const WorkoutsScreen = ({ navigation }: any) => {
             key={category}
             onPress={() => {
               setSelectedCategory(category);
-              AppLogger.userAction('Category Selected', { category });
+              console.log('Category Selected', { category });
             }}
           >
             <BlurView

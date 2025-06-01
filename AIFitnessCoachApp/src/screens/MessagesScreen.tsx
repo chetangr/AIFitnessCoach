@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
-import { AppLogger } from '../../utils/logger';
+// Logger temporarily removed - was causing import errors
 import { aiCoachService } from '../services/aiCoachService';
 
 interface Message {
@@ -41,7 +41,7 @@ const MessagesScreen = () => {
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    AppLogger.info('AI Coach Chat Opened');
+    console.log('AI Coach Chat Opened');
   }, []);
 
   const pickImage = async () => {
@@ -79,7 +79,7 @@ const MessagesScreen = () => {
     setInputText('');
     setIsTyping(true);
 
-    AppLogger.aiCoach('User Message Sent', { message: messageText, hasImage: !!imageUri });
+    console.log('User Message Sent', { message: messageText, hasImage: !!imageUri });
 
     try {
       // Call AI service
@@ -93,9 +93,9 @@ const MessagesScreen = () => {
       };
 
       setMessages((prev) => [...prev, aiMessage]);
-      AppLogger.aiCoach('AI Response Received', { response });
+      console.log('AI Response Received', { response });
     } catch (error) {
-      AppLogger.error('AI Chat Error', error);
+      console.error('AI Chat Error', error);
       // Fallback response
       const fallbackMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -118,7 +118,7 @@ const MessagesScreen = () => {
 
   const handleSuggestedPrompt = (prompt: string) => {
     setInputText(prompt);
-    AppLogger.userAction('Suggested Prompt Selected', { prompt });
+    console.log('Suggested Prompt Selected', { prompt });
   };
 
   return (

@@ -5,15 +5,11 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
-  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { AppLogger } from '../../utils/logger';
-
-const { width } = Dimensions.get('window');
+// Logger temporarily removed - was causing import errors
 
 const ExerciseDetailScreen = ({ route, navigation }: any) => {
   const { exercise } = route.params || {};
@@ -23,7 +19,7 @@ const ExerciseDetailScreen = ({ route, navigation }: any) => {
   }
 
   const handleAddToWorkout = () => {
-    AppLogger.workout('Exercise Added to Workout', exercise);
+    console.log('Exercise Added to Workout', exercise);
     // Add to workout logic
   };
 
