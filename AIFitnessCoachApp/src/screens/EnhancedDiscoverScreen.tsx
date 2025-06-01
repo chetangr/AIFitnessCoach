@@ -14,6 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { BlurView } from 'expo-blur';
+import { searchExercises, comprehensiveExerciseDatabase, Exercise } from '../data/comprehensiveExerciseDatabase';
 
 const { width } = Dimensions.get('window');
 
@@ -63,6 +64,29 @@ const EnhancedDiscoverScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState('programs');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMuscle, setSelectedMuscle] = useState('all');
+  const [searchResults, setSearchResults] = useState<Exercise[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Search exercises when query or filters change
+  React.useEffect(() => {
+    if (activeTab === 'exercises') {
+      handleExerciseSearch();
+    }
+  }, [searchQuery, selectedMuscle, activeTab]);
+
+  const handleExerciseSearch = () => {
+    setIsSearching(true);
+    
+    const filters: any = {};
+    if (selectedMuscle !== 'all') {
+      filters.muscleGroup = selectedMuscle;
+    }
+
+    const results = searchExercises(searchQuery, filters);
+    // Limit results to first 50 for performance
+    setSearchResults(results.slice(0, 50));
+    setIsSearching(false);
+  };
 
   const renderProgram = ({ item }: any) => (
     <TouchableOpacity 
@@ -105,6 +129,52 @@ const EnhancedDiscoverScreen = ({ navigation }: any) => {
     </TouchableOpacity>
   );
 
+  const renderExercise = ({ item }: { item: Exercise }) => (
+    <TouchableOpacity 
+      style={styles.exerciseCard}
+      onPress={() => navigation.navigate('ExerciseDetail', { exercise: item })}
+    >
+      <BlurView intensity={80} tint="light" style={styles.exerciseContent}>
+        <View style={styles.exerciseHeader}>
+          <View style={styles.exerciseIcon}>
+            <Icon name="fitness" size={24} color="#667eea" />
+          </View>
+          <View style={styles.exerciseInfo}>
+            <Text style={styles.exerciseName} numberOfLines={2}>{item.name}</Text>
+            <Text style={styles.exerciseCategory}>{item.category}</Text>
+          </View>
+          <View style={styles.exerciseMeta}>
+            <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor(item.difficulty) }]}>
+              <Text style={styles.difficultyText}>{item.difficulty[0]}</Text>
+            </View>
+          </View>
+        </View>
+        
+        <View style={styles.exerciseDetails}>
+          <View style={styles.exerciseDetailRow}>
+            <Icon name="body" size={14} color="rgba(0,0,0,0.6)" />
+            <Text style={styles.exerciseDetailText}>
+              {item.primaryMuscles.slice(0, 2).join(', ')}
+            </Text>
+          </View>
+          <View style={styles.exerciseDetailRow}>
+            <Icon name="barbell" size={14} color="rgba(0,0,0,0.6)" />
+            <Text style={styles.exerciseDetailText}>{item.equipment}</Text>
+          </View>
+        </View>
+      </BlurView>
+    </TouchableOpacity>
+  );
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'Beginner': return '#4CAF50';
+      case 'Intermediate': return '#FF9800';
+      case 'Advanced': return '#F44336';
+      default: return '#667eea';
+    }
+  };
+
   return (
     <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
       <View style={styles.header}>
@@ -114,22 +184,24 @@ const EnhancedDiscoverScreen = ({ navigation }: any) => {
 
       {/* Tab Selector */}
       <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'programs' && styles.activeTab]}
-          onPress={() => setActiveTab('programs')}
-        >
-          <Text style={[styles.tabText, activeTab === 'programs' && styles.activeTabText]}>
-            Programs
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'exercises' && styles.activeTab]}
-          onPress={() => setActiveTab('exercises')}
-        >
-          <Text style={[styles.tabText, activeTab === 'exercises' && styles.activeTabText]}>
-            Exercises
-          </Text>
-        </TouchableOpacity>
+        <BlurView intensity={20} tint="light" style={styles.tabBlurContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'programs' && styles.activeTab]}
+            onPress={() => setActiveTab('programs')}
+          >
+            <Text style={[styles.tabText, activeTab === 'programs' && styles.activeTabText]}>
+              Programs
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'exercises' && styles.activeTab]}
+            onPress={() => setActiveTab('exercises')}
+          >
+            <Text style={[styles.tabText, activeTab === 'exercises' && styles.activeTabText]}>
+              Exercises
+            </Text>
+          </TouchableOpacity>
+        </BlurView>
       </View>
 
       {/* Search Bar */}
@@ -170,12 +242,9 @@ const EnhancedDiscoverScreen = ({ navigation }: any) => {
                     console.log(`Filter by category: ${category}`);
                   }}
                 >
-                  <LinearGradient
-                    colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
-                    style={styles.categoryGradient}
-                  >
+                  <BlurView intensity={25} tint="light" style={styles.categoryGradient}>
                     <Text style={styles.categoryText}>{category}</Text>
-                  </LinearGradient>
+                  </BlurView>
                 </TouchableOpacity>
               ))}
             </View>
@@ -184,46 +253,61 @@ const EnhancedDiscoverScreen = ({ navigation }: any) => {
           <>
             <Text style={styles.sectionTitle}>Filter by Muscle Group</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.muscleFilter}>
-              <TouchableOpacity
-                style={[styles.muscleChip, selectedMuscle === 'all' && styles.muscleChipActive]}
-                onPress={() => setSelectedMuscle('all')}
-              >
-                <Text style={[styles.muscleChipText, selectedMuscle === 'all' && styles.muscleChipTextActive]}>
-                  All
-                </Text>
+              <TouchableOpacity onPress={() => setSelectedMuscle('all')}>
+                <BlurView
+                  intensity={selectedMuscle === 'all' ? 40 : 20}
+                  tint="light"
+                  style={[styles.muscleChip, selectedMuscle === 'all' && styles.muscleChipActive]}
+                >
+                  <Text style={[styles.muscleChipText, selectedMuscle === 'all' && styles.muscleChipTextActive]}>
+                    All
+                  </Text>
+                </BlurView>
               </TouchableOpacity>
               {muscleGroups.map((muscle) => (
                 <TouchableOpacity
                   key={muscle.id}
-                  style={[styles.muscleChip, selectedMuscle === muscle.id && styles.muscleChipActive]}
                   onPress={() => setSelectedMuscle(muscle.id)}
                 >
-                  <Text style={styles.muscleIcon}>{muscle.icon}</Text>
-                  <Text style={[styles.muscleChipText, selectedMuscle === muscle.id && styles.muscleChipTextActive]}>
-                    {muscle.name}
-                  </Text>
+                  <BlurView
+                    intensity={selectedMuscle === muscle.id ? 40 : 20}
+                    tint="light"
+                    style={[styles.muscleChip, selectedMuscle === muscle.id && styles.muscleChipActive]}
+                  >
+                    <Text style={styles.muscleIcon}>{muscle.icon}</Text>
+                    <Text style={[styles.muscleChipText, selectedMuscle === muscle.id && styles.muscleChipTextActive]}>
+                      {muscle.name}
+                    </Text>
+                  </BlurView>
                 </TouchableOpacity>
               ))}
             </ScrollView>
 
-            <Text style={styles.sectionTitle}>Exercise Library</Text>
-            <View style={styles.exerciseGrid}>
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <TouchableOpacity 
-                  key={i} 
-                  style={styles.exerciseCard}
-                  onPress={() => navigation.navigate('ExerciseLibrary')}
-                >
-                  <BlurView intensity={80} tint="light" style={styles.exerciseContent}>
-                    <View style={styles.exerciseIcon}>
-                      <Icon name="fitness" size={30} color="#667eea" />
-                    </View>
-                    <Text style={styles.exerciseName}>Exercise {i}</Text>
-                    <Text style={styles.exerciseMuscle}>Primary muscle</Text>
-                  </BlurView>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <Text style={styles.sectionTitle}>
+              Exercise Library ({searchResults.length} exercises)
+            </Text>
+            {isSearching ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>Searching exercises...</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={searchResults}
+                renderItem={renderExercise}
+                keyExtractor={(item) => item.id}
+                numColumns={2}
+                columnWrapperStyle={styles.exerciseRow}
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={
+                  <View style={styles.emptyContainer}>
+                    <Icon name="search" size={60} color="rgba(255,255,255,0.5)" />
+                    <Text style={styles.emptyText}>
+                      {searchQuery ? 'No exercises found' : 'Start typing to search exercises'}
+                    </Text>
+                  </View>
+                }
+              />
+            )}
           </>
         )}
         {/* Bottom spacing for floating tab bar */}
@@ -253,10 +337,12 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   tabContainer: {
-    flexDirection: 'row',
     marginHorizontal: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 15,
+    overflow: 'hidden',
+  },
+  tabBlurContainer: {
+    flexDirection: 'row',
     padding: 4,
   },
   tab: {
@@ -266,7 +352,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   activeTab: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 2,
+    borderColor: 'white',
   },
   tabText: {
     color: 'rgba(255,255,255,0.6)',
@@ -391,11 +478,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
     marginRight: 10,
   },
   muscleChipActive: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderWidth: 2,
+    borderColor: 'white',
   },
   muscleIcon: {
     fontSize: 16,
@@ -418,30 +505,89 @@ const styles = StyleSheet.create({
   },
   exerciseCard: {
     width: '48%',
-    height: 120,
     marginBottom: 15,
     borderRadius: 15,
     overflow: 'hidden',
   },
   exerciseContent: {
-    flex: 1,
     padding: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
+  },
+  exerciseHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 10,
   },
   exerciseIcon: {
-    marginBottom: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  exerciseInfo: {
+    flex: 1,
   },
   exerciseName: {
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
-    textAlign: 'center',
+    marginBottom: 2,
   },
-  exerciseMuscle: {
+  exerciseCategory: {
     fontSize: 12,
     color: '#666',
-    marginTop: 2,
+  },
+  exerciseMeta: {
+    alignItems: 'center',
+  },
+  difficultyBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  difficultyText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  exerciseDetails: {
+    gap: 6,
+  },
+  exerciseDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  exerciseDetailText: {
+    fontSize: 12,
+    color: 'rgba(0,0,0,0.7)',
+    flex: 1,
+  },
+  exerciseRow: {
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 16,
+  },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 12,
   },
 });
 

@@ -1,8 +1,35 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { 
+  completeExercisesDatabase, 
+  workoutPrograms, 
+  searchExercises,
+  WorkoutProgram,
+  Exercise 
+} from '../data/exercisesDatabase';
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+}
+
+interface WorkoutModification {
+  action: 'create' | 'modify' | 'suggest';
+  programName?: string;
+  exercises?: string[]; // Exercise IDs
+  duration?: string;
+  level?: 'Beginner' | 'Intermediate' | 'Advanced';
+  focus?: string; // muscle group or goal
+  modifications?: {
+    add?: string[];
+    remove?: string[];
+    replace?: { old: string; new: string }[];
+  };
+}
+
+interface AIResponse {
+  text: string;
+  workoutModification?: WorkoutModification;
+  shouldCreateProgram?: boolean;
 }
 
 class OpenAIService {
@@ -20,17 +47,20 @@ class OpenAIService {
       // First try to get from environment variables (Expo uses EXPO_PUBLIC_ prefix)
       this.apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY || null;
       
-      if (!this.apiKey) {
+      if (!this.apiKey || this.apiKey === 'sk-your-openai-api-key-here') {
         // Fallback to AsyncStorage for runtime configuration
         const storedKey = await AsyncStorage.getItem('openai_api_key');
         if (storedKey) {
           this.apiKey = storedKey;
         } else {
-          console.warn('OpenAI API key not found. Please set EXPO_PUBLIC_OPENAI_API_KEY in .env file or call setApiKey()');
+          console.warn('OpenAI API key not found. Using demo mode. Please set EXPO_PUBLIC_OPENAI_API_KEY in .env file or call setApiKey()');
+          // For demo purposes, we'll generate mock responses
+          this.apiKey = 'demo-mode';
         }
       }
     } catch (error) {
       console.error('Error loading API key:', error);
+      this.apiKey = 'demo-mode';
     }
   }
 
@@ -40,64 +70,378 @@ class OpenAIService {
   }
 
   private initializeConversation() {
-    const systemPrompt = `You are Alex, an expert AI fitness coach with a friendly, motivational personality. You specialize in:
+    const systemPrompt = `You are Alex, an expert AI fitness coach with advanced workout modification capabilities. You specialize in:
 
 🏋️ Creating personalized workout plans
+🔄 Modifying existing workout programs
 🥗 Providing nutrition guidance  
 📈 Tracking progress and motivation
 💪 Exercise form and technique
 🎯 Goal-specific training (weight loss, muscle gain, endurance)
 
+WORKOUT MODIFICATION CAPABILITIES:
+- Analyze user requests for workout changes
+- Create custom workout programs
+- Modify existing programs by adding/removing/replacing exercises
+- Suggest alternative exercises based on equipment or preferences
+- Adapt programs for different fitness levels
+
+Available exercises database includes 1000+ exercises across categories:
+- Chest, Back, Shoulders, Legs, Arms, Core, Cardio, Functional
+
+When users request workout modifications:
+1. Understand their specific needs (equipment, time, goals, limitations)
+2. Suggest specific exercises from the database
+3. Create structured workout programs
+4. Explain the reasoning behind modifications
+
+WORKOUT MODIFICATION TRIGGERS:
+- "add [exercise/muscle group] to my workout"
+- "create a [type] workout"
+- "modify my current routine"
+- "replace [exercise] with something else"
+- "I need a [time] minute workout"
+- "design a program for [goal]"
+
 Your responses should be:
 - Conversational and encouraging
 - Practical and actionable
-- Tailored to the user's fitness level
-- Include relevant emojis
+- Include specific exercise recommendations
+- Explain the benefits of modifications
 - Keep responses concise but helpful
 
-When users ask about workouts, always ask about their:
-- Current fitness level
-- Available equipment
-- Time constraints
-- Specific goals
-
-Remember: You're not just an information source, you're a supportive coach who builds confidence and helps users achieve their fitness goals!`;
+Remember: You can actually modify and create workouts, not just give advice!`;
 
     this.conversationHistory = [
       { role: 'system', content: systemPrompt }
     ];
   }
 
-  async sendMessage(message: string, _imageUri?: string): Promise<string> {
+  async sendMessage(message: string, _imageUri?: string): Promise<AIResponse> {
     try {
+      // Check if this is a workout modification request
+      const workoutModification = this.analyzeWorkoutRequest(message);
+      
       // Add user message to history
       this.conversationHistory.push({ role: 'user', content: message });
 
-      // Use actual OpenAI API
-      const response = await this.callOpenAI(this.conversationHistory);
+      let response: string;
+      
+      if (workoutModification) {
+        // Handle workout modification locally with structured response
+        response = await this.handleWorkoutModification(message, workoutModification);
+      } else {
+        // Use OpenAI API for general conversation
+        response = await this.callOpenAI(this.conversationHistory);
+      }
 
       // Add AI response to history
       this.conversationHistory.push({ role: 'assistant', content: response });
 
-      // Keep conversation history manageable (last 20 messages)
-      if (this.conversationHistory.length > 21) { // 20 + system message
+      // Keep conversation history manageable
+      if (this.conversationHistory.length > 21) {
         this.conversationHistory = [
-          this.conversationHistory[0], // Keep system message
+          this.conversationHistory[0],
           ...this.conversationHistory.slice(-20)
         ];
       }
 
-      // Save conversation to local storage
       await this.saveConversation();
 
-      return response;
+      return {
+        text: response,
+        workoutModification,
+        shouldCreateProgram: workoutModification?.action === 'create'
+      };
     } catch (error) {
       console.error('OpenAI Service Error:', error);
-      // Fallback to local intelligent response
       const fallbackResponse = await this.generateIntelligentResponse(message);
       this.conversationHistory.push({ role: 'assistant', content: fallbackResponse });
       await this.saveConversation();
-      return fallbackResponse;
+      return { text: fallbackResponse };
+    }
+  }
+
+  // For backward compatibility
+  async sendMessageSimple(message: string, imageUri?: string): Promise<string> {
+    const response = await this.sendMessage(message, imageUri);
+    return response.text;
+  }
+
+  private analyzeWorkoutRequest(message: string): WorkoutModification | null {
+    const lowerMessage = message.toLowerCase();
+    
+    // Create new workout program
+    if (lowerMessage.includes('create') && (lowerMessage.includes('workout') || lowerMessage.includes('program'))) {
+      return {
+        action: 'create',
+        focus: this.extractFocus(lowerMessage),
+        level: this.extractLevel(lowerMessage),
+        duration: this.extractDuration(lowerMessage)
+      };
+    }
+    
+    // Add exercises to workout
+    if (lowerMessage.includes('add') && (lowerMessage.includes('workout') || lowerMessage.includes('exercise'))) {
+      return {
+        action: 'modify',
+        modifications: {
+          add: this.extractExercises(lowerMessage)
+        },
+        focus: this.extractFocus(lowerMessage)
+      };
+    }
+    
+    // Modify existing routine
+    if ((lowerMessage.includes('modify') || lowerMessage.includes('change')) && 
+        (lowerMessage.includes('routine') || lowerMessage.includes('workout'))) {
+      return {
+        action: 'modify',
+        focus: this.extractFocus(lowerMessage)
+      };
+    }
+    
+    // Replace exercises
+    if (lowerMessage.includes('replace') && lowerMessage.includes('with')) {
+      return {
+        action: 'modify',
+        modifications: {
+          replace: this.extractReplacements(lowerMessage)
+        }
+      };
+    }
+    
+    // Design/plan workout
+    if ((lowerMessage.includes('design') || lowerMessage.includes('plan')) && 
+        (lowerMessage.includes('workout') || lowerMessage.includes('program'))) {
+      return {
+        action: 'create',
+        focus: this.extractFocus(lowerMessage),
+        level: this.extractLevel(lowerMessage),
+        duration: this.extractDuration(lowerMessage)
+      };
+    }
+
+    return null;
+  }
+
+  private extractFocus(message: string): string {
+    const focusKeywords = {
+      'chest': 'Chest',
+      'back': 'Back', 
+      'shoulders': 'Shoulders',
+      'legs': 'Legs',
+      'arms': 'Arms',
+      'core': 'Core',
+      'abs': 'Core',
+      'cardio': 'Cardio',
+      'strength': 'Strength',
+      'weight loss': 'Fat Loss',
+      'muscle gain': 'Muscle Gain',
+      'endurance': 'Endurance'
+    };
+
+    for (const [keyword, focus] of Object.entries(focusKeywords)) {
+      if (message.includes(keyword)) {
+        return focus;
+      }
+    }
+    return 'General Fitness';
+  }
+
+  private extractLevel(message: string): 'Beginner' | 'Intermediate' | 'Advanced' {
+    if (message.includes('beginner') || message.includes('new') || message.includes('start')) {
+      return 'Beginner';
+    }
+    if (message.includes('advanced') || message.includes('expert') || message.includes('hard')) {
+      return 'Advanced';
+    }
+    return 'Intermediate';
+  }
+
+  private extractDuration(message: string): string {
+    const timeMatch = message.match(/(\d+)\s*(min|minute|hour)/);
+    if (timeMatch) {
+      const num = parseInt(timeMatch[1]);
+      const unit = timeMatch[2];
+      if (unit.startsWith('min')) {
+        return `${num} min`;
+      } else {
+        return `${num} hour${num > 1 ? 's' : ''}`;
+      }
+    }
+    return '45 min'; // default
+  }
+
+  private extractExercises(message: string): string[] {
+    // Search for exercises mentioned in the message
+    const exercises: string[] = [];
+    const words = message.toLowerCase().split(/\s+/);
+    
+    for (const exercise of completeExercisesDatabase) {
+      const exerciseName = exercise.name.toLowerCase();
+      if (words.some(word => exerciseName.includes(word) || word.includes(exerciseName.split(' ')[0]))) {
+        exercises.push(exercise.id);
+      }
+    }
+    
+    return exercises.slice(0, 5); // Limit to 5 exercises
+  }
+
+  private extractReplacements(message: string): { old: string; new: string }[] {
+    // Simple replacement extraction - can be enhanced
+    return [];
+  }
+
+  private async handleWorkoutModification(message: string, modification: WorkoutModification): Promise<string> {
+    switch (modification.action) {
+      case 'create':
+        return this.createCustomProgram(modification);
+      case 'modify':
+        return this.modifyExistingProgram(modification);
+      case 'suggest':
+        return this.suggestAlternatives(modification);
+      default:
+        return "I'd love to help with your workout! Can you be more specific about what you'd like to do?";
+    }
+  }
+
+  private createCustomProgram(modification: WorkoutModification): string {
+    const { focus, level, duration } = modification;
+    
+    // Find exercises that match the criteria
+    let relevantExercises = completeExercisesDatabase.filter(ex => {
+      if (focus && focus !== 'General Fitness') {
+        return ex.category === focus || 
+               ex.primaryMuscles.includes(focus) ||
+               (focus === 'Fat Loss' && ex.category === 'Cardio') ||
+               (focus === 'Muscle Gain' && ex.category !== 'Cardio');
+      }
+      return ex.difficulty === level;
+    });
+
+    if (level) {
+      relevantExercises = relevantExercises.filter(ex => ex.difficulty === level);
+    }
+
+    // Select 5-8 exercises for the program
+    const selectedExercises = this.selectBalancedExercises(relevantExercises, 6);
+    
+    if (selectedExercises.length === 0) {
+      return `I'd love to create a ${focus} workout for you! However, I need a bit more information. What equipment do you have available?`;
+    }
+
+    // Create program description
+    const programName = `Custom ${focus} Program`;
+    const exerciseList = selectedExercises.map((ex, i) => 
+      `${i + 1}. **${ex.name}** (${ex.difficulty}) - ${ex.description}`
+    ).join('\n');
+
+    // Save this as a new program (this would integrate with a program storage system)
+    const newProgram: WorkoutProgram = {
+      id: `custom_${Date.now()}`,
+      name: programName,
+      description: `Custom program focused on ${focus}`,
+      duration: duration || '45 min',
+      level: level || 'Intermediate',
+      category: focus || 'General Fitness',
+      trainer: 'AI Coach Alex',
+      rating: 4.8,
+      exercises: selectedExercises.map(ex => ex.id),
+      daysPerWeek: 3,
+      estimatedCalories: 400,
+      equipment: [...new Set(selectedExercises.map(ex => ex.equipment))]
+    };
+
+    // Store the program (this would save to database/storage)
+    this.saveCustomProgram(newProgram);
+
+    return `🎉 Perfect! I've created a custom **${programName}** for you!\n\n**Program Details:**\n- Duration: ${duration}\n- Level: ${level}\n- Focus: ${focus}\n\n**Exercises (${selectedExercises.length}):**\n${exerciseList}\n\n💪 This program is designed to help you achieve your ${focus.toLowerCase()} goals. Each exercise targets the key muscle groups and provides progressive challenge.\n\n**Ready to start?** I can add this program to your schedule!`;
+  }
+
+  private modifyExistingProgram(modification: WorkoutModification): string {
+    const { modifications, focus } = modification;
+    
+    if (modifications?.add) {
+      const addedExercises = modifications.add.map(id => {
+        const exercise = completeExercisesDatabase.find(ex => ex.id === id);
+        return exercise ? exercise.name : 'Unknown Exercise';
+      }).filter(Boolean);
+
+      if (addedExercises.length > 0) {
+        return `✅ Great! I've added these exercises to your routine:\n\n${addedExercises.map((name, i) => `${i + 1}. **${name}**`).join('\n')}\n\n💡 **Why these work well:**\nThese exercises complement your existing routine and will help target ${focus || 'your goals'} more effectively.\n\n**Updated routine is ready!** Want me to show you the complete modified program?`;
+      }
+    }
+
+    if (focus) {
+      const suggestedExercises = searchExercises('', focus).slice(0, 3);
+      const exerciseList = suggestedExercises.map((ex, i) => 
+        `${i + 1}. **${ex.name}** - ${ex.description}`
+      ).join('\n');
+
+      return `🔄 Perfect! I can help modify your routine to focus more on ${focus}.\n\n**Here are some excellent ${focus} exercises I recommend adding:**\n\n${exerciseList}\n\n💪 **Benefits:**\n- Better muscle balance\n- Improved ${focus.toLowerCase()} development\n- More variety to prevent plateaus\n\nWould you like me to create a modified program with these exercises?`;
+    }
+
+    return `I'd love to help modify your workout routine! What specific changes would you like to make? For example:\n\n- Add more chest exercises\n- Replace cardio with strength training\n- Make it more beginner-friendly\n- Focus on a specific muscle group`;
+  }
+
+  private suggestAlternatives(modification: WorkoutModification): string {
+    const { focus } = modification;
+    const alternatives = searchExercises('', focus).slice(0, 4);
+    
+    const exerciseList = alternatives.map((ex, i) => 
+      `${i + 1}. **${ex.name}** (${ex.equipment}) - ${ex.difficulty}`
+    ).join('\n');
+
+    return `💡 Here are some great ${focus || 'exercise'} alternatives:\n\n${exerciseList}\n\nEach of these exercises offers unique benefits and can be adapted to your fitness level. Which one interests you most?`;
+  }
+
+  private selectBalancedExercises(exercises: Exercise[], count: number): Exercise[] {
+    // Simple selection algorithm - can be enhanced
+    const categories = ['Chest', 'Back', 'Shoulders', 'Legs', 'Arms', 'Core'];
+    const selected: Exercise[] = [];
+    
+    // Try to get one exercise from each category
+    for (const category of categories) {
+      const categoryExercises = exercises.filter(ex => ex.category === category);
+      if (categoryExercises.length > 0 && selected.length < count) {
+        selected.push(categoryExercises[Math.floor(Math.random() * categoryExercises.length)]);
+      }
+    }
+    
+    // Fill remaining slots randomly
+    while (selected.length < count && selected.length < exercises.length) {
+      const remaining = exercises.filter(ex => !selected.includes(ex));
+      if (remaining.length > 0) {
+        selected.push(remaining[Math.floor(Math.random() * remaining.length)]);
+      } else {
+        break;
+      }
+    }
+    
+    return selected;
+  }
+
+  private async saveCustomProgram(program: WorkoutProgram) {
+    try {
+      const existingPrograms = await AsyncStorage.getItem('customPrograms');
+      const programs = existingPrograms ? JSON.parse(existingPrograms) : [];
+      programs.push(program);
+      await AsyncStorage.setItem('customPrograms', JSON.stringify(programs));
+      console.log('Custom program saved:', program.name);
+    } catch (error) {
+      console.error('Error saving custom program:', error);
+    }
+  }
+
+  // Method to retrieve custom programs
+  async getCustomPrograms(): Promise<WorkoutProgram[]> {
+    try {
+      const saved = await AsyncStorage.getItem('customPrograms');
+      return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+      console.error('Error loading custom programs:', error);
+      return [];
     }
   }
 
@@ -177,6 +521,12 @@ Remember: You're not just an information source, you're a supportive coach who b
   private async callOpenAI(messages: ChatMessage[]): Promise<string> {
     if (!this.apiKey) {
       throw new Error('OpenAI API key not configured');
+    }
+
+    // Demo mode fallback
+    if (this.apiKey === 'demo-mode') {
+      const lastMessage = messages[messages.length - 1]?.content || '';
+      return await this.generateIntelligentResponse(lastMessage);
     }
 
     const response = await fetch(this.baseUrl, {

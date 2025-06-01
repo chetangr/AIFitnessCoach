@@ -11,6 +11,8 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Animated,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -28,7 +30,7 @@ interface Message {
   image?: string;
 }
 
-const SimpleMessagesScreen = () => {
+const SimpleMessagesScreen = ({ route }: any) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -39,17 +41,92 @@ const SimpleMessagesScreen = () => {
   ]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  
+  // Animation values
+  const sendButtonScale = useRef(new Animated.Value(1)).current;
+  const quickActionsSlide = useRef(new Animated.Value(0)).current;
+  const messageSlide = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     console.log('AI Coach Chat Opened');
     // Load previous conversation
     openaiService.loadConversation();
+    
+    // Animate messages in
+    Animated.timing(messageSlide, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+    
+    // Handle auto-message from route params (from workout completion, etc.)
+    if (route?.params?.autoMessage) {
+      setTimeout(() => {
+        sendMessage(route.params.autoMessage);
+      }, 1000);
+    }
   }, []);
+
+  // Quick action buttons
+  const quickActions = [
+    { 
+      id: 'workout', 
+      text: 'Add a workout', 
+      icon: 'fitness', 
+      action: () => sendQuickMessage("I'd like to add a new workout to my schedule") 
+    },
+    { 
+      id: 'nutrition', 
+      text: 'Nutrition advice', 
+      icon: 'nutrition', 
+      action: () => sendQuickMessage("Can you give me some nutrition advice?") 
+    },
+    { 
+      id: 'progress', 
+      text: 'Check progress', 
+      icon: 'trending-up', 
+      action: () => sendQuickMessage("How am I progressing with my fitness goals?") 
+    },
+    { 
+      id: 'modify', 
+      text: 'Modify routine', 
+      icon: 'create', 
+      action: () => sendQuickMessage("I'd like to modify my current workout routine") 
+    },
+  ];
+
+  const sendQuickMessage = (message: string) => {
+    setShowQuickActions(false);
+    sendMessage(message);
+  };
+
+  const toggleQuickActions = () => {
+    setShowQuickActions(!showQuickActions);
+    Animated.spring(quickActionsSlide, {
+      toValue: showQuickActions ? 0 : 1,
+      useNativeDriver: true,
+    }).start();
+  };
 
   const sendMessage = async (messageText?: string, imageUri?: string) => {
     const textToSend = messageText || inputText.trim();
     if (!textToSend && !imageUri) return;
+
+    // Send button animation
+    Animated.sequence([
+      Animated.timing(sendButtonScale, {
+        toValue: 0.8,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sendButtonScale, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -63,10 +140,17 @@ const SimpleMessagesScreen = () => {
     setInputText('');
     setIsTyping(true);
 
+    // Animate new message
+    Animated.timing(messageSlide, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+
     try {
       console.log('User Message Sent', { message: textToSend, hasImage: !!imageUri });
       
-      const response = await openaiService.sendMessage(textToSend, imageUri);
+      const response = await openaiService.sendMessageSimple(textToSend, imageUri);
       
       console.log('AI Response Received', { response });
 
@@ -127,58 +211,137 @@ const SimpleMessagesScreen = () => {
   };
 
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>AI Coach</Text>
-        <Text style={styles.subtitle}>Your personal fitness assistant</Text>
+    <LinearGradient colors={['#667eea', '#764ba2', '#f093fb']} style={styles.container}>
+      {/* Compact Header */}
+      <View style={styles.compactHeader}>
+        <Text style={styles.compactTitle}>AI Coach</Text>
       </View>
 
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.messagesContainer}
-        contentContainerStyle={styles.messagesContent}
-        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+      {/* Wrap content in KeyboardAvoidingView */}
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        {messages.map((message) => (
-          <View key={message.id}>{renderMessage({ item: message })}</View>
+        {/* Chat Messages */}
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.chatContainer}
+          contentContainerStyle={styles.chatContent}
+          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+          showsVerticalScrollIndicator={false}
+        >
+        {messages.map((message, index) => (
+          <Animated.View 
+            key={message.id}
+            style={{
+              opacity: messageSlide,
+              transform: [{
+                translateY: messageSlide.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [50, 0]
+                })
+              }]
+            }}
+          >
+            {renderMessage({ item: message })}
+          </Animated.View>
         ))}
         
         {isTyping && (
-          <View style={styles.typingIndicator}>
+          <Animated.View style={styles.typingIndicator}>
             <BlurView intensity={80} tint="dark" style={styles.typingBubble}>
               <ActivityIndicator size="small" color="#667eea" />
               <Text style={styles.typingText}>AI Coach is typing...</Text>
             </BlurView>
-          </View>
+          </Animated.View>
         )}
-      </ScrollView>
+        </ScrollView>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.inputContainer}
+      {/* Quick Actions Modal */}
+      <Modal
+        visible={showQuickActions}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => setShowQuickActions(false)}
       >
-        <BlurView intensity={90} tint="light" style={styles.inputWrapper}>
-          <TouchableOpacity onPress={pickImage} style={styles.attachButton}>
-            <Icon name="image-outline" size={24} color="#667eea" />
-          </TouchableOpacity>
-          
-          <TextInput
-            style={styles.input}
-            placeholder="Ask your AI coach anything..."
-            placeholderTextColor="rgba(0,0,0,0.4)"
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-          />
-          
-          <TouchableOpacity
-            onPress={() => sendMessage()}
-            style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
-            disabled={!inputText.trim()}
+        <TouchableOpacity 
+          style={styles.quickActionsOverlay}
+          activeOpacity={1}
+          onPress={() => setShowQuickActions(false)}
+        >
+          <Animated.View
+            style={[
+              styles.quickActionsContainer,
+              {
+                transform: [{
+                  translateY: quickActionsSlide.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [200, 0]
+                  })
+                }],
+                opacity: quickActionsSlide,
+              }
+            ]}
           >
-            <Icon name="send" size={24} color={inputText.trim() ? '#667eea' : '#ccc'} />
-          </TouchableOpacity>
-        </BlurView>
+            <BlurView intensity={95} tint="light" style={styles.quickActionsContent}>
+              <Text style={styles.quickActionsTitle}>Quick Actions</Text>
+              <View style={styles.quickActionsGrid}>
+                {quickActions.map((action) => (
+                  <TouchableOpacity
+                    key={action.id}
+                    style={styles.quickActionButton}
+                    onPress={action.action}
+                  >
+                    <Icon name={action.icon} size={24} color="#667eea" />
+                    <Text style={styles.quickActionText}>{action.text}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </BlurView>
+          </Animated.View>
+        </TouchableOpacity>
+      </Modal>
+
+        {/* Enhanced Input Area */}
+        <View style={styles.inputArea}>
+        <View style={styles.inputBackground}>
+          <BlurView intensity={95} tint="light" style={styles.inputContainer}>
+            <View style={styles.inputRow}>
+              {/* Quick Actions Button */}
+              <TouchableOpacity onPress={toggleQuickActions} style={styles.quickActionsButton}>
+                <Icon name="flash" size={18} color="#667eea" />
+              </TouchableOpacity>
+              
+              <TouchableOpacity onPress={pickImage} style={styles.attachButton}>
+                <Icon name="image-outline" size={18} color="#667eea" />
+              </TouchableOpacity>
+              
+              <TextInput
+                style={styles.input}
+                placeholder="Ask your AI coach anything..."
+                placeholderTextColor="rgba(0,0,0,0.5)"
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+                maxLength={500}
+                returnKeyType="send"
+                onSubmitEditing={() => sendMessage()}
+              />
+              
+              <Animated.View style={{ transform: [{ scale: sendButtonScale }] }}>
+                <TouchableOpacity
+                  onPress={() => sendMessage()}
+                  style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
+                  disabled={!inputText.trim()}
+                >
+                  <Icon name="send" size={18} color={inputText.trim() ? '#667eea' : '#ccc'} />
+                </TouchableOpacity>
+              </Animated.View>
+            </View>
+          </BlurView>
+        </View>
+        </View>
       </KeyboardAvoidingView>
     </LinearGradient>
   );
@@ -187,28 +350,26 @@ const SimpleMessagesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingBottom: Platform.OS === 'ios' ? 90 : 80,
   },
-  header: {
-    paddingTop: 60,
+  compactHeader: {
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 10,
+    alignItems: 'center',
   },
-  title: {
-    fontSize: 32,
+  compactTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
   },
-  subtitle: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 5,
-  },
-  messagesContainer: {
+  chatContainer: {
     flex: 1,
+    paddingHorizontal: 20,
   },
-  messagesContent: {
-    padding: 20,
-    paddingBottom: Platform.OS === 'ios' ? 140 : 130, // Extra padding for input container + tab bar
+  chatContent: {
+    paddingBottom: 10,
+    flexGrow: 1,
   },
   messageRow: {
     marginVertical: 8,
@@ -258,38 +419,99 @@ const styles = StyleSheet.create({
     color: '#333',
     fontSize: 14,
   },
-  inputContainer: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 90 : 80, // Position above tab bar
-    left: 0,
-    right: 0,
+  inputArea: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingVertical: 10,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.3)',
   },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  inputBackground: {
     borderRadius: 25,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  inputContainer: {
+    overflow: 'hidden',
+    minHeight: 50,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  quickActionsButton: {
+    padding: 10,
+    marginRight: 5,
   },
   attachButton: {
-    padding: 8,
+    padding: 10,
+    marginRight: 5,
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
+    color: '#000',
     maxHeight: 100,
     paddingHorizontal: 12,
     paddingVertical: 8,
+    fontWeight: '500',
   },
   sendButton: {
-    padding: 8,
+    padding: 10,
+    marginLeft: 5,
   },
   sendButtonDisabled: {
     opacity: 0.5,
+  },
+  quickActionsOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  quickActionsContainer: {
+    margin: 20,
+    marginBottom: Platform.OS === 'ios' ? 100 : 80,
+  },
+  quickActionsContent: {
+    borderRadius: 20,
+    padding: 20,
+    overflow: 'hidden',
+  },
+  quickActionsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  quickActionButton: {
+    width: '48%',
+    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+    borderRadius: 15,
+    padding: 15,
+    alignItems: 'center',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(102, 126, 234, 0.2)',
+  },
+  quickActionText: {
+    color: '#333',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
 

@@ -393,10 +393,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ringsCard: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 24,
     padding: 20,
     marginBottom: 20,
+    overflow: 'hidden',
   },
   cardTitle: {
     color: 'white',
@@ -565,7 +565,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 20,
     marginBottom: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
   },
   statHeader: {
     flexDirection: 'row',
@@ -595,11 +595,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   quoteCard: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
     alignItems: 'center',
+    overflow: 'hidden',
   },
   quoteIcon: {
     marginBottom: 12,

@@ -12,8 +12,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
-// Logger temporarily removed - was causing import errors
 import { exerciseService } from '../services/exerciseService';
+import { WorkoutProgram } from '../data/exercisesDatabase';
 
 interface Exercise {
   id: string;
@@ -27,9 +27,11 @@ interface Exercise {
 const DiscoverScreen = ({ navigation }: any) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [programs, setPrograms] = useState<WorkoutProgram[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedMuscle, setSelectedMuscle] = useState('All');
   const [page, setPage] = useState(1);
+  const [activeTab, setActiveTab] = useState<'Programs' | 'Exercises'>('Programs');
 
   const muscleGroups = [
     'All',
@@ -50,8 +52,12 @@ const DiscoverScreen = ({ navigation }: any) => {
   ];
 
   useEffect(() => {
-    loadExercises();
-  }, [selectedMuscle, page]);
+    if (activeTab === 'Exercises') {
+      loadExercises();
+    } else {
+      loadPrograms();
+    }
+  }, [selectedMuscle, page, activeTab, searchQuery]);
 
   const loadExercises = async () => {
     setLoading(true);
@@ -60,6 +66,7 @@ const DiscoverScreen = ({ navigation }: any) => {
         muscle: selectedMuscle === 'All' ? undefined : selectedMuscle,
         page,
         limit: 20,
+        search: searchQuery,
       });
       
       if (page === 1) {
@@ -69,8 +76,28 @@ const DiscoverScreen = ({ navigation }: any) => {
       }
     } catch (error) {
       console.error('Failed to load exercises', error);
-      // Use sample data as fallback
-      setExercises(getSampleExercises());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadPrograms = async () => {
+    setLoading(true);
+    try {
+      const data = await exerciseService.getPrograms({
+        category: selectedMuscle === 'All' ? undefined : selectedMuscle,
+        page,
+        limit: 20,
+        search: searchQuery,
+      });
+      
+      if (page === 1) {
+        setPrograms(data);
+      } else {
+        setPrograms([...programs, ...data]);
+      }
+    } catch (error) {
+      console.error('Failed to load programs', error);
     } finally {
       setLoading(false);
     }
@@ -92,8 +119,23 @@ const DiscoverScreen = ({ navigation }: any) => {
   };
 
   const handleSearch = () => {
-    console.log('Exercise Search', { query: searchQuery });
-    // Implement search functionality
+    setPage(1);
+    if (activeTab === 'Exercises') {
+      loadExercises();
+    } else {
+      loadPrograms();
+    }
+  };
+
+  const resetAndLoad = () => {
+    setPage(1);
+    setExercises([]);
+    setPrograms([]);
+    if (activeTab === 'Exercises') {
+      loadExercises();
+    } else {
+      loadPrograms();
+    }
   };
 
   const renderExerciseCard = ({ item }: { item: Exercise }) => (
@@ -123,27 +165,95 @@ const DiscoverScreen = ({ navigation }: any) => {
     </TouchableOpacity>
   );
 
+  const renderProgramCard = ({ item }: { item: WorkoutProgram }) => (
+    <TouchableOpacity
+      onPress={() => {
+        console.log('Program Selected', item);
+        navigation.navigate('ProgramDetail', { program: item });
+      }}
+    >
+      <BlurView intensity={20} tint="light" style={styles.programCard}>
+        <View style={styles.programHeader}>
+          <View style={styles.programInfo}>
+            <Text style={styles.programName}>{item.name}</Text>
+            <Text style={styles.programDescription} numberOfLines={2}>
+              {item.description}
+            </Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.playButton}
+            onPress={() => {
+              console.log('Play Program', item);
+              navigation.navigate('ActiveWorkout', { program: item });
+            }}
+          >
+            <LinearGradient colors={['#FF6B6B', '#ff5722']} style={styles.playGradient}>
+              <Icon name="play" size={20} color="white" />
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.programDetails}>
+          <View style={styles.programTag}>
+            <Icon name="time" size={14} color="white" />
+            <Text style={styles.programTagText}>{item.duration}</Text>
+          </View>
+          <View style={styles.programTag}>
+            <Icon name="fitness" size={14} color="white" />
+            <Text style={styles.programTagText}>{item.exercises.length} exercises</Text>
+          </View>
+          <View style={styles.programTag}>
+            <Icon name="flame" size={14} color="white" />
+            <Text style={styles.programTagText}>{item.estimatedCalories} cal</Text>
+          </View>
+        </View>
+        
+        <View style={styles.programMeta}>
+          <View style={[styles.levelBadge, { backgroundColor: getDifficultyColor(item.level) }]}>
+            <Text style={styles.levelText}>{item.level}</Text>
+          </View>
+          <View style={styles.ratingContainer}>
+            <Icon name="star" size={14} color="#FFD700" />
+            <Text style={styles.ratingText}>{item.rating}</Text>
+          </View>
+        </View>
+      </BlurView>
+    </TouchableOpacity>
+  );
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'Beginner': return '#4CAF50';
+      case 'Intermediate': return '#FF9800';
+      case 'Advanced': return '#F44336';
+      default: return '#667eea';
+    }
+  };
+
   return (
     <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Discover</Text>
-          <Text style={styles.headerSubtitle}>10,000+ Exercises</Text>
-        </View>
-        <TouchableOpacity onPress={() => navigation.navigate('ExerciseLibrary')}>
-          <BlurView intensity={20} tint="light" style={styles.libraryButton}>
-            <Icon name="library-outline" size={20} color="white" />
-            <Text style={styles.libraryButtonText}>Full Library</Text>
-          </BlurView>
-        </TouchableOpacity>
-      </View>
+      <FlatList
+        ListHeaderComponent={
+          <>
+            <View style={styles.header}>
+              <View>
+                <Text style={styles.headerTitle}>Discover</Text>
+                <Text style={styles.headerSubtitle}>10,000+ Exercises</Text>
+              </View>
+              <TouchableOpacity onPress={() => navigation.navigate('ExerciseLibrary')}>
+                <BlurView intensity={20} tint="light" style={styles.libraryButton}>
+                  <Icon name="library-outline" size={20} color="white" />
+                  <Text style={styles.libraryButtonText}>Full Library</Text>
+                </BlurView>
+              </TouchableOpacity>
+            </View>
 
-      {/* Search Bar */}
-      <BlurView intensity={30} tint="light" style={styles.searchContainer}>
+            {/* Search Bar */}
+            <BlurView intensity={30} tint="light" style={styles.searchContainer}>
         <Icon name="search" size={20} color="rgba(255,255,255,0.6)" />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search exercises..."
+          placeholder={`Search ${activeTab.toLowerCase()}...`}
           placeholderTextColor="rgba(255,255,255,0.5)"
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -151,73 +261,133 @@ const DiscoverScreen = ({ navigation }: any) => {
         />
       </BlurView>
 
-      {/* Popular Workouts */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Popular Workouts</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {popularWorkouts.map((workout, index) => (
-            <TouchableOpacity key={index}>
-              <BlurView intensity={25} tint="light" style={styles.popularCard}>
-                <LinearGradient
-                  colors={[workout.color, workout.color + 'aa']}
-                  style={styles.popularIcon}
-                >
-                  <Icon name={workout.icon} size={28} color="white" />
-                </LinearGradient>
-                <Text style={styles.popularName}>{workout.name}</Text>
-              </BlurView>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Muscle Groups */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.muscleGroupsContainer}
-      >
-        {muscleGroups.map((muscle) => (
-          <TouchableOpacity
-            key={muscle}
-            onPress={() => {
-              setSelectedMuscle(muscle);
-              setPage(1);
-              console.log('Muscle Group Selected', { muscle });
-            }}
+      {/* Programs/Exercises Toggle */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          onPress={() => {
+            setActiveTab('Programs');
+            resetAndLoad();
+          }}
+        >
+          <BlurView
+            intensity={activeTab === 'Programs' ? 40 : 20}
+            tint="light"
+            style={[
+              styles.tabButton,
+              activeTab === 'Programs' && styles.activeTab,
+            ]}
           >
-            <BlurView
-              intensity={selectedMuscle === muscle ? 40 : 20}
-              tint="light"
-              style={[
-                styles.muscleChip,
-                selectedMuscle === muscle && styles.selectedMuscleChip,
-              ]}
-            >
-              <Text style={styles.muscleText}>{muscle}</Text>
-            </BlurView>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Exercises List */}
-      <View style={styles.exercisesList}>
-        {loading && page === 1 ? (
-          <ActivityIndicator size="large" color="white" style={styles.loader} />
-        ) : (
-          <FlatList
-            data={exercises}
-            renderItem={renderExerciseCard}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            onEndReached={() => setPage(page + 1)}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={() =>
-              loading && page > 1 ? <ActivityIndicator color="white" /> : null
-            }
-          />
-        )}
+            <Text style={[
+              styles.tabText,
+              activeTab === 'Programs' && styles.activeTabText
+            ]}>
+              Programs
+            </Text>
+          </BlurView>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          onPress={() => {
+            setActiveTab('Exercises');
+            resetAndLoad();
+          }}
+        >
+          <BlurView
+            intensity={activeTab === 'Exercises' ? 40 : 20}
+            tint="light"
+            style={[
+              styles.tabButton,
+              activeTab === 'Exercises' && styles.activeTab,
+            ]}
+          >
+            <Text style={[
+              styles.tabText,
+              activeTab === 'Exercises' && styles.activeTabText
+            ]}>
+              Exercises
+            </Text>
+          </BlurView>
+        </TouchableOpacity>
       </View>
+
+            {/* Popular Workouts */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Popular Workouts</Text>
+              <FlatList
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                data={popularWorkouts}
+                renderItem={({ item, index }) => (
+                  <TouchableOpacity key={index}>
+                    <BlurView intensity={25} tint="light" style={styles.popularCard}>
+                      <LinearGradient
+                        colors={[item.color, item.color + 'aa']}
+                        style={styles.popularIcon}
+                      >
+                        <Icon name={item.icon} size={28} color="white" />
+                      </LinearGradient>
+                      <Text style={styles.popularName}>{item.name}</Text>
+                    </BlurView>
+                  </TouchableOpacity>
+                )}
+                keyExtractor={(item, index) => index.toString()}
+              />
+            </View>
+
+            {/* Muscle Groups */}
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.muscleGroupsContainer}
+              data={muscleGroups}
+              renderItem={({ item: muscle }) => (
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedMuscle(muscle);
+                    setPage(1);
+                    console.log('Muscle Group Selected', { muscle });
+                  }}
+                >
+                  <BlurView
+                    intensity={selectedMuscle === muscle ? 40 : 20}
+                    tint="light"
+                    style={[
+                      styles.muscleChip,
+                      selectedMuscle === muscle && styles.selectedMuscleChip,
+                    ]}
+                  >
+                    <Text style={styles.muscleText}>{muscle}</Text>
+                  </BlurView>
+                </TouchableOpacity>
+              )}
+              keyExtractor={(item) => item}
+            />
+          </>
+        }
+        data={activeTab === 'Exercises' ? exercises : programs}
+        renderItem={activeTab === 'Exercises' ? renderExerciseCard : renderProgramCard}
+        keyExtractor={(item) => item.id}
+        showsVerticalScrollIndicator={false}
+        onEndReached={() => setPage(page + 1)}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={() =>
+          loading && page > 1 ? <ActivityIndicator color="white" /> : null
+        }
+        ListEmptyComponent={
+          !loading ? (
+            <View style={styles.emptyContainer}>
+              <Icon 
+                name={activeTab === 'Exercises' ? "barbell-outline" : "list-outline"} 
+                size={60} 
+                color="rgba(255,255,255,0.5)" 
+              />
+              <Text style={styles.emptyText}>
+                No {activeTab.toLowerCase()} found
+              </Text>
+            </View>
+          ) : null
+        }
+      />
     </LinearGradient>
   );
 };
@@ -310,9 +480,128 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  exercisesList: {
+  tabContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 20,
+    borderRadius: 25,
+    overflow: 'hidden',
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  activeTab: {
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  tabText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  activeTabText: {
+    color: 'white',
+  },
+  contentList: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  programCard: {
+    padding: 20,
+    marginBottom: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  programHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  programInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  programName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 8,
+  },
+  programDescription: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    lineHeight: 20,
+  },
+  playButton: {
+    borderRadius: 25,
+    overflow: 'hidden',
+  },
+  playGradient: {
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  programDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  programTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 6,
+  },
+  programTagText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  programMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  levelBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  levelText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  ratingText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 100,
+  },
+  emptyText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 16,
+    marginTop: 12,
   },
   exerciseCard: {
     padding: 20,

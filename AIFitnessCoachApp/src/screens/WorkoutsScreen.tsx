@@ -125,7 +125,15 @@ const WorkoutsScreen = ({ navigation }: any) => {
     navigation.navigate('ActiveWorkout', { workout });
   };
 
-  const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const weekDays = [
+    { name: 'Mon', isRest: false },
+    { name: 'Tue', isRest: false },
+    { name: 'Wed', isRest: false },
+    { name: 'Thu', isRest: false },
+    { name: 'Fri', isRest: false },
+    { name: 'Sat', isRest: true },  // Active recovery
+    { name: 'Sun', isRest: true }   // Full rest
+  ];
   const currentDay = new Date().getDay();
 
   return (
@@ -142,13 +150,25 @@ const WorkoutsScreen = ({ navigation }: any) => {
         {weekDays.map((day, index) => {
           const isToday = (index + 1) % 7 === currentDay;
           return (
-            <TouchableOpacity key={day}>
+            <TouchableOpacity key={day.name}>
               <BlurView
                 intensity={isToday ? 40 : 20}
                 tint="light"
-                style={[styles.dayCard, isToday && styles.todayCard]}
+                style={[
+                  styles.dayCard, 
+                  isToday && styles.todayCard,
+                  day.isRest && styles.restDayCard
+                ]}
               >
-                <Text style={styles.dayText}>{day}</Text>
+                <Text style={[
+                  styles.dayText,
+                  day.isRest && styles.restDayText
+                ]}>
+                  {day.name}
+                </Text>
+                {day.isRest && (
+                  <Icon name="bed-outline" size={12} color="rgba(255,255,255,0.6)" />
+                )}
                 {isToday && <View style={styles.todayDot} />}
               </BlurView>
             </TouchableOpacity>
@@ -288,10 +308,16 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'white',
   },
+  restDayCard: {
+    backgroundColor: 'rgba(128,128,128,0.3)',
+  },
   dayText: {
     color: 'white',
     fontSize: 12,
     fontWeight: '600',
+  },
+  restDayText: {
+    color: 'rgba(255,255,255,0.6)',
   },
   todayDot: {
     width: 6,

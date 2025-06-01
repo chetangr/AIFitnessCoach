@@ -15,6 +15,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuthStore } from '../store/authStore';
+import { workoutTrackingService } from '../services/workoutTrackingService';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 
 const ImprovedProfileScreen = ({ navigation }: any) => {
   const { user, logout } = useAuthStore();
@@ -43,9 +46,11 @@ const ImprovedProfileScreen = ({ navigation }: any) => {
   const menuItems = [
     { label: 'Edit Profile', icon: 'person-outline', action: () => setShowEditModal(true) },
     { label: 'Fitness Goals', icon: 'target-outline', action: () => setShowGoalsModal(true) },
+    { label: 'Change AI Coach', icon: 'chatbubble-ellipses-outline', action: () => navigation.navigate('TrainerSelection') },
     { label: 'Workout History', icon: 'time-outline', action: () => navigation.navigate('WorkoutHistory') },
     { label: 'Progress Photos', icon: 'camera-outline', action: () => navigation.navigate('ProgressPhotos') },
     { label: 'Measurements', icon: 'resize-outline', action: () => navigation.navigate('Measurements') },
+    { label: 'Download Workouts', icon: 'cloud-download-outline', action: () => navigation.navigate('WorkoutDownloads') },
     { label: 'Export Data', icon: 'download-outline', action: () => handleExportData() },
   ];
 
@@ -69,15 +74,49 @@ const ImprovedProfileScreen = ({ navigation }: any) => {
   const handleExportData = () => {
     Alert.alert(
       'Export Data',
-      'Export your workout data, progress, and statistics?',
+      'Choose export format:',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Export', onPress: () => {
-          // TODO: Implement data export
-          Alert.alert('Success', 'Data exported successfully!');
-        }}
+        { text: 'Hevy Format', onPress: () => exportToHevy() },
+        { text: 'JSON Format', onPress: () => exportToJSON() },
       ]
     );
+  };
+
+  const exportToHevy = async () => {
+    try {
+      const csvData = await workoutTrackingService.exportToHevyFormat();
+      const fileName = `fitness_data_hevy_${new Date().toISOString().split('T')[0]}.csv`;
+      const fileUri = FileSystem.documentDirectory + fileName;
+      
+      await FileSystem.writeAsStringAsync(fileUri, csvData);
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+      } else {
+        Alert.alert('Success', 'Data exported to device storage');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to export data');
+    }
+  };
+
+  const exportToJSON = async () => {
+    try {
+      const data = await workoutTrackingService.exportWorkoutData();
+      const fileName = `fitness_data_${new Date().toISOString().split('T')[0]}.json`;
+      const fileUri = FileSystem.documentDirectory + fileName;
+      
+      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(data, null, 2));
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+      } else {
+        Alert.alert('Success', 'Data exported to device storage');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to export data');
+    }
   };
 
   const handleLogout = () => {
@@ -338,7 +377,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
     marginBottom: 30,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
   },
   profileHeader: {
     flexDirection: 'row',
@@ -393,8 +432,8 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     marginBottom: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   statIcon: {
     marginBottom: 8,
@@ -416,7 +455,7 @@ const styles = StyleSheet.create({
   menuItem: {
     borderRadius: 12,
     marginBottom: 8,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
   },
   menuItemContent: {
     flexDirection: 'row',
@@ -435,7 +474,7 @@ const styles = StyleSheet.create({
   settingItem: {
     borderRadius: 12,
     marginBottom: 8,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
   },
   settingContent: {
     flexDirection: 'row',

@@ -17,7 +17,7 @@ import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 // Logger temporarily removed - was causing import errors
-import { aiCoachService } from '../services/aiCoachService';
+import { openaiService } from '../services/openaiService';
 
 interface Message {
   id: string;
@@ -42,7 +42,18 @@ const MessagesScreen = () => {
 
   useEffect(() => {
     console.log('AI Coach Chat Opened');
+    // Load conversation history
+    loadConversation();
   }, []);
+
+  const loadConversation = async () => {
+    try {
+      await openaiService.loadConversation();
+      console.log('Conversation history loaded');
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+    }
+  };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -83,7 +94,7 @@ const MessagesScreen = () => {
 
     try {
       // Call AI service
-      const response = await aiCoachService.sendMessage(messageText, imageUri);
+      const response = await openaiService.sendMessageSimple(messageText, imageUri);
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
