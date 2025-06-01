@@ -6,5 +6,9 @@
     "paths": {
       "@/*": ["./*"]
     }
-  }
+  },
+  "exclude": [
+    "legacy_backup/**/*",
+    "node_modules/**/*"
+  ]
 }

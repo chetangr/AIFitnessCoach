@@ -9,7 +9,7 @@ interface GlassViewProps {
   intensity?: number;
   tint?: 'light' | 'dark' | 'default';
   gradient?: boolean;
-  gradientColors?: string[];
+  gradientColors?: readonly [string, string, ...string[]];
   borderWidth?: number;
   borderColor?: string;
 }
@@ -20,7 +20,7 @@ export const GlassView: React.FC<GlassViewProps> = ({
   intensity = 20,
   tint = 'light',
   gradient = true,
-  gradientColors = ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)'],
+  gradientColors = ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)'] as const,
   borderWidth = 1,
   borderColor = 'rgba(255,255,255,0.2)',
 }) => {

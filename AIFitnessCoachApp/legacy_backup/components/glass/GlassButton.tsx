@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { GlassContainer } from './GlassContainer';
 import { useThemeStore } from '@/store/themeStore';
-import HapticFeedback from 'react-native-haptic-feedback';
+import * as Haptics from 'expo-haptics';
 
 interface GlassButtonProps extends TouchableOpacityProps {
   title: string;
@@ -40,7 +40,7 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
 
   const handlePress = () => {
     if (haptic && !disabled && !loading) {
-      HapticFeedback.trigger('impactLight');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     onPress();
   };
