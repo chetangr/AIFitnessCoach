@@ -248,9 +248,10 @@ const ImprovedProfileScreen = ({ navigation }: any) => {
       {/* Edit Profile Modal */}
       <Modal visible={showEditModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <BlurView intensity={80} style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Edit Profile</Text>
+          <View style={styles.modalContainer}>
+            <BlurView intensity={100} tint="dark" style={styles.modalBlur}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Edit Profile</Text>
               
               <TextInput
                 style={styles.input}
@@ -288,15 +289,17 @@ const ImprovedProfileScreen = ({ navigation }: any) => {
               </View>
             </View>
           </BlurView>
+          </View>
         </View>
       </Modal>
 
       {/* Goals Modal */}
       <Modal visible={showGoalsModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <BlurView intensity={80} style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Fitness Goals</Text>
+          <View style={styles.modalContainer}>
+            <BlurView intensity={100} tint="dark" style={styles.modalBlur}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Fitness Goals</Text>
               <Text style={styles.modalSubtitle}>Select your fitness goals</Text>
               
               <View style={styles.goalsGrid}>
@@ -341,6 +344,7 @@ const ImprovedProfileScreen = ({ navigation }: any) => {
               </View>
             </View>
           </BlurView>
+          </View>
         </View>
       </Modal>
     </LinearGradient>
@@ -501,6 +505,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     marginVertical: 40,
+    backgroundColor: '#1a1a2e',
+  },
+  modalBlur: {
+    flex: 1,
   },
   modalContent: {
     padding: 24,

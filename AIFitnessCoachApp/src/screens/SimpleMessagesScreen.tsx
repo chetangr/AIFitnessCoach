@@ -13,6 +13,7 @@ import {
   Dimensions,
   Animated,
   Modal,
+  Keyboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -42,6 +43,7 @@ const SimpleMessagesScreen = ({ route }: any) => {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
   
   // Animation values
@@ -67,6 +69,21 @@ const SimpleMessagesScreen = ({ route }: any) => {
         sendMessage(route.params.autoMessage);
       }, 1000);
     }
+
+    // Keyboard listeners
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+
+    return () => {
+      keyboardDidShowListener?.remove();
+      keyboardDidHideListener?.remove();
+    };
   }, []);
 
   // Quick action buttons
@@ -162,6 +179,11 @@ const SimpleMessagesScreen = ({ route }: any) => {
       };
 
       setMessages((prev) => [...prev, aiMessage]);
+      
+      // Scroll to bottom after AI response
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     } catch (error) {
       console.error('AI Chat Error', error);
       Alert.alert('Error', 'Failed to send message. Please try again.');
@@ -195,74 +217,90 @@ const SimpleMessagesScreen = ({ route }: any) => {
     return (
       <View style={[styles.messageRow, isUser && styles.userMessageRow]}>
         <BlurView
-          intensity={isUser ? 100 : 80}
-          tint={isUser ? 'light' : 'dark'}
+          intensity={isUser ? 30 : 40}
+          tint="dark"
           style={[styles.messageBubble, isUser ? styles.userMessage : styles.aiMessage]}
         >
-          <Text style={[styles.messageText, isUser && styles.userMessageText]}>
-            {item.text}
-          </Text>
-          <Text style={styles.timestamp}>
-            {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
+          {!isUser && (
+            <LinearGradient
+              colors={['#f093fb', '#667eea']}
+              style={styles.aiAvatar}
+            >
+              <Icon name="flash" size={16} color="white" />
+            </LinearGradient>
+          )}
+          <View style={styles.messageContent}>
+            <Text style={[styles.messageText, isUser && styles.userMessageText]}>
+              {item.text}
+            </Text>
+            <Text style={styles.timestamp}>
+              {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          </View>
         </BlurView>
       </View>
     );
   };
 
   return (
-    <LinearGradient colors={['#667eea', '#764ba2', '#f093fb']} style={styles.container}>
-      {/* Compact Header */}
-      <View style={styles.compactHeader}>
-        <Text style={styles.compactTitle}>AI Coach</Text>
-      </View>
-
-      {/* Wrap content in KeyboardAvoidingView */}
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+    <LinearGradient colors={['#0f0c29', '#302b63', '#24243e']} style={styles.container}>
+      {/* Enhanced Header with Glow Effect */}
+      <LinearGradient
+        colors={['rgba(102, 126, 234, 0.1)', 'transparent']}
+        style={styles.compactHeader}
       >
-        {/* Chat Messages */}
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.chatContainer}
-          contentContainerStyle={styles.chatContent}
-          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-          showsVerticalScrollIndicator={false}
+        <View style={styles.headerContent}>
+          <Icon name="flash" size={24} color="#f093fb" />
+          <Text style={styles.compactTitle}>AI Coach</Text>
+          <View style={styles.onlineIndicator}>
+            <View style={styles.onlineDot} />
+          </View>
+        </View>
+      </LinearGradient>
+
+      {/* Chat Messages */}
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.chatContainer}
+        contentContainerStyle={[
+          styles.chatContent,
+          { paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : (Platform.OS === 'ios' ? 180 : 170) }
+        ]}
+        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+        showsVerticalScrollIndicator={false}
+      >
+      {messages.map((message, index) => (
+        <Animated.View 
+          key={message.id}
+          style={{
+            opacity: messageSlide,
+            transform: [{
+              translateY: messageSlide.interpolate({
+                inputRange: [0, 1],
+                outputRange: [50, 0]
+              })
+            }]
+          }}
         >
-        {messages.map((message, index) => (
-          <Animated.View 
-            key={message.id}
-            style={{
-              opacity: messageSlide,
-              transform: [{
-                translateY: messageSlide.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [50, 0]
-                })
-              }]
-            }}
-          >
-            {renderMessage({ item: message })}
-          </Animated.View>
-        ))}
-        
-        {isTyping && (
-          <Animated.View style={styles.typingIndicator}>
-            <BlurView intensity={80} tint="dark" style={styles.typingBubble}>
-              <ActivityIndicator size="small" color="#667eea" />
-              <Text style={styles.typingText}>AI Coach is typing...</Text>
-            </BlurView>
-          </Animated.View>
-        )}
-        </ScrollView>
+          {renderMessage({ item: message })}
+        </Animated.View>
+      ))}
+      
+      {isTyping && (
+        <Animated.View style={styles.typingIndicator}>
+          <BlurView intensity={40} tint="dark" style={styles.typingBubble}>
+            <ActivityIndicator size="small" color="#667eea" />
+            <Text style={styles.typingText}>AI Coach is typing...</Text>
+          </BlurView>
+        </Animated.View>
+      )}
+      </ScrollView>
 
       {/* Quick Actions Modal */}
       <Modal
         visible={showQuickActions}
         transparent={true}
-        animationType="none"
+        animationType="fade"
         onRequestClose={() => setShowQuickActions(false)}
       >
         <TouchableOpacity 
@@ -284,7 +322,7 @@ const SimpleMessagesScreen = ({ route }: any) => {
               }
             ]}
           >
-            <BlurView intensity={95} tint="light" style={styles.quickActionsContent}>
+            <View style={styles.quickActionsContent}>
               <Text style={styles.quickActionsTitle}>Quick Actions</Text>
               <View style={styles.quickActionsGrid}>
                 {quickActions.map((action) => (
@@ -298,23 +336,35 @@ const SimpleMessagesScreen = ({ route }: any) => {
                   </TouchableOpacity>
                 ))}
               </View>
-            </BlurView>
+            </View>
           </Animated.View>
         </TouchableOpacity>
       </Modal>
 
-        {/* Enhanced Input Area */}
-        <View style={styles.inputArea}>
+      {/* Enhanced Input Area */}
+      <View style={[
+        styles.inputArea,
+        {
+          bottom: keyboardHeight > 0 
+            ? keyboardHeight + 10 
+            : (Platform.OS === 'ios' ? 95 : 85)
+        }
+      ]}>
         <View style={styles.inputBackground}>
           <BlurView intensity={95} tint="light" style={styles.inputContainer}>
             <View style={styles.inputRow}>
               {/* Quick Actions Button */}
               <TouchableOpacity onPress={toggleQuickActions} style={styles.quickActionsButton}>
-                <Icon name="flash" size={18} color="#667eea" />
+                <LinearGradient
+                  colors={['#f093fb', '#667eea']}
+                  style={styles.iconGradient}
+                >
+                  <Icon name="flash" size={18} color="white" />
+                </LinearGradient>
               </TouchableOpacity>
               
               <TouchableOpacity onPress={pickImage} style={styles.attachButton}>
-                <Icon name="image-outline" size={18} color="#667eea" />
+                <Icon name="image-outline" size={18} color="#f093fb" />
               </TouchableOpacity>
               
               <TextInput
@@ -335,14 +385,18 @@ const SimpleMessagesScreen = ({ route }: any) => {
                   style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
                   disabled={!inputText.trim()}
                 >
-                  <Icon name="send" size={18} color={inputText.trim() ? '#667eea' : '#ccc'} />
+                  <LinearGradient
+                    colors={inputText.trim() ? ['#f093fb', '#667eea'] : ['#444', '#555']}
+                    style={styles.sendButtonGradient}
+                  >
+                    <Icon name="send" size={18} color="white" />
+                  </LinearGradient>
                 </TouchableOpacity>
               </Animated.View>
             </View>
           </BlurView>
         </View>
-        </View>
-      </KeyboardAvoidingView>
+      </View>
     </LinearGradient>
   );
 };
@@ -350,25 +404,46 @@ const SimpleMessagesScreen = ({ route }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingBottom: Platform.OS === 'ios' ? 90 : 80,
   },
   compactHeader: {
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingHorizontal: 20,
     paddingBottom: 10,
+  },
+  headerContent: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   compactTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
+    textShadowColor: '#f093fb',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+  },
+  onlineIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: 'rgba(76, 175, 80, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  onlineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#4CAF50',
   },
   chatContainer: {
     flex: 1,
     paddingHorizontal: 20,
   },
   chatContent: {
-    paddingBottom: 10,
+    paddingBottom: 20,
     flexGrow: 1,
   },
   messageRow: {
@@ -383,17 +458,40 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 20,
     overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(240, 147, 251, 0.2)',
   },
   userMessage: {
     marginLeft: 40,
+    backgroundColor: 'rgba(102, 126, 234, 0.3)',
+    borderColor: 'rgba(102, 126, 234, 0.5)',
   },
   aiMessage: {
     marginRight: 40,
+    backgroundColor: 'rgba(36, 36, 62, 0.8)',
+  },
+  aiAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#f093fb',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+  },
+  messageContent: {
+    flex: 1,
   },
   messageText: {
     fontSize: 16,
     color: 'white',
     marginBottom: 4,
+    lineHeight: 22,
   },
   userMessageText: {
     color: 'white',
@@ -420,12 +518,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   inputArea: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    paddingBottom: Platform.OS === 'ios' ? 10 : 10,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'transparent',
+    zIndex: 1000,
   },
   inputBackground: {
     borderRadius: 25,
@@ -450,6 +549,13 @@ const styles = StyleSheet.create({
     padding: 10,
     marginRight: 5,
   },
+  iconGradient: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   attachButton: {
     padding: 10,
     marginRight: 5,
@@ -464,15 +570,22 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   sendButton: {
-    padding: 10,
+    padding: 5,
     marginLeft: 5,
+  },
+  sendButtonGradient: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sendButtonDisabled: {
     opacity: 0.5,
   },
   quickActionsOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.9)',
     justifyContent: 'flex-end',
   },
   quickActionsContainer: {
@@ -482,12 +595,14 @@ const styles = StyleSheet.create({
   quickActionsContent: {
     borderRadius: 20,
     padding: 20,
-    overflow: 'hidden',
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   quickActionsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: 'white',
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -498,16 +613,16 @@ const styles = StyleSheet.create({
   },
   quickActionButton: {
     width: '48%',
-    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 15,
     padding: 15,
     alignItems: 'center',
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: 'rgba(102, 126, 234, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   quickActionText: {
-    color: '#333',
+    color: 'white',
     fontSize: 12,
     fontWeight: '600',
     marginTop: 8,

@@ -1,17 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
+  ScrollView,
   Dimensions,
   Animated,
+  Platform,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { workoutPrograms } from '../data/exercisesDatabase';
+import moment from 'moment';
+import { useThemeStore } from '../store/themeStore';
+import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
+import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
 
@@ -20,436 +25,509 @@ interface WorkoutEvent {
   title: string;
   time: string;
   duration: string;
-  type: 'workout' | 'rest' | 'active';
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  type: 'workout' | 'rest';
   calories: number;
-  completed?: boolean;
+  completed: boolean;
+  originalDate?: Date;
 }
 
-interface DayData {
+interface DaySchedule {
   date: Date;
   dayName: string;
-  dayNumber: number;
+  dayNumber: string;
   isToday: boolean;
   workouts: WorkoutEvent[];
 }
 
 const TimelineScreen = ({ navigation }: any) => {
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [weekDays, setWeekDays] = useState<DayData[]>([]);
-  const [selectedWeek, setSelectedWeek] = useState(0);
-
-  // Animation values
-  const fadeAnim = new Animated.Value(1);
-  const slideAnim = new Animated.Value(0);
-  const fabPulse = new Animated.Value(1);
+  const { isDarkMode } = useThemeStore();
+  const [currentWeek, setCurrentWeek] = useState(moment());
+  const [weekDays, setWeekDays] = useState<DaySchedule[]>([]);
+  const [draggedWorkout, setDraggedWorkout] = useState<WorkoutEvent | null>(null);
+  const [draggedFromDay, setDraggedFromDay] = useState<Date | null>(null);
+  const [dropTargetDay, setDropTargetDay] = useState<Date | null>(null);
+  
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const dragPositionY = useRef(new Animated.Value(0)).current;
+  const dragOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    generateWeekData();
-    
-    // Start FAB pulse animation
-    const pulseAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(fabPulse, {
-          toValue: 1.1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fabPulse, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    pulseAnimation.start();
-    
-    return () => pulseAnimation.stop();
-  }, [selectedWeek]);
+    generateWeekSchedule();
+  }, [currentWeek]);
 
-  const generateWeekData = () => {
-    const today = new Date();
-    const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - today.getDay() + (selectedWeek * 7));
+  const generateWeekSchedule = () => {
+    const startOfWeek = currentWeek.clone().startOf('week');
+    const days: DaySchedule[] = [];
 
-    const weekData: DayData[] = [];
-    
     for (let i = 0; i < 7; i++) {
-      const date = new Date(startOfWeek);
-      date.setDate(startOfWeek.getDate() + i);
+      const date = startOfWeek.clone().add(i, 'days');
+      const isToday = date.isSame(moment(), 'day');
       
-      const isToday = date.toDateString() === today.toDateString();
+      // Generate workouts based on the day
+      const dayWorkouts: WorkoutEvent[] = [];
       
-      const dayData: DayData = {
-        date,
-        dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
-        dayNumber: date.getDate(),
-        isToday,
-        workouts: generateWorkoutsForDay(date, i),
-      };
-      
-      weekData.push(dayData);
-    }
-    
-    setWeekDays(weekData);
-    
-    // If today is in this week, select it
-    const todayInWeek = weekData.find(day => day.isToday);
-    if (todayInWeek) {
-      setSelectedDate(todayInWeek.date);
-    }
-  };
-
-  const generateWorkoutsForDay = (date: Date, dayIndex: number): WorkoutEvent[] => {
-    const workouts: WorkoutEvent[] = [];
-    const dayOfWeek = date.getDay();
-    
-    // Generate different workout patterns based on day
-    if (dayOfWeek === 0) { // Sunday - Rest day
-      workouts.push({
-        id: `rest-${date.getTime()}`,
-        title: 'Rest Day',
-        time: 'All Day',
-        duration: 'Recovery',
-        type: 'rest',
-        difficulty: 'Beginner',
-        calories: 0,
-      });
-    } else if (dayOfWeek === 6) { // Saturday - Active recovery
-      workouts.push({
-        id: `active-${date.getTime()}`,
-        title: 'Morning Walk',
-        time: '8:00 AM',
-        duration: '30 min',
-        type: 'active',
-        difficulty: 'Beginner',
-        calories: 150,
-      });
-    } else {
-      // Weekdays - Regular workouts
-      const program = workoutPrograms[dayIndex % workoutPrograms.length];
-      const isCompleted = date < new Date() && Math.random() > 0.3; // 70% completion rate for past days
-      
-      workouts.push({
-        id: `workout-${date.getTime()}`,
-        title: program.name,
-        time: '6:30 AM',
-        duration: program.duration,
-        type: 'workout',
-        difficulty: program.level,
-        calories: program.estimatedCalories,
-        completed: isCompleted,
-      });
-      
-      // Sometimes add evening workouts
-      if (Math.random() > 0.7) {
-        workouts.push({
-          id: `evening-${date.getTime()}`,
-          title: 'Evening Cardio',
-          time: '6:00 PM',
-          duration: '20 min',
+      // Example workout schedule
+      if (i === 0 || i === 2 || i === 4) { // Mon, Wed, Fri
+        dayWorkouts.push({
+          id: `workout-${date.format('YYYY-MM-DD')}-1`,
+          title: ['Chest & Triceps', 'Back & Biceps', 'Legs & Glutes'][i === 0 ? 0 : i === 2 ? 1 : 2],
+          time: '9:00 AM',
+          duration: '45 min',
+          difficulty: 'Intermediate',
           type: 'workout',
-          difficulty: 'Beginner',
-          calories: 200,
-          completed: isCompleted && Math.random() > 0.5,
+          calories: 350,
+          completed: date.isBefore(moment(), 'day'),
         });
       }
-    }
-    
-    return workouts;
-  };
+      
+      if (i === 1 || i === 3) { // Tue, Thu
+        dayWorkouts.push({
+          id: `workout-${date.format('YYYY-MM-DD')}-2`,
+          title: i === 1 ? 'Shoulders & Abs' : 'Full Body HIIT',
+          time: '6:00 PM',
+          duration: '30 min',
+          difficulty: i === 1 ? 'Intermediate' : 'Advanced',
+          type: 'workout',
+          calories: i === 1 ? 280 : 400,
+          completed: date.isBefore(moment(), 'day'),
+        });
+      }
+      
+      if (i === 5) { // Saturday
+        dayWorkouts.push({
+          id: `workout-${date.format('YYYY-MM-DD')}-3`,
+          title: 'Yoga & Stretching',
+          time: '10:00 AM',
+          duration: '60 min',
+          difficulty: 'Beginner',
+          type: 'workout',
+          calories: 150,
+          completed: date.isBefore(moment(), 'day'),
+        });
+      }
+      
+      if (i === 6) { // Sunday
+        dayWorkouts.push({
+          id: `rest-${date.format('YYYY-MM-DD')}`,
+          title: 'Rest Day',
+          time: 'All Day',
+          duration: '-',
+          difficulty: 'Beginner',
+          type: 'rest',
+          calories: 0,
+          completed: false,
+        });
+      }
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'Beginner': return '#4ECDC4';
-      case 'Intermediate': return '#FFD93D';
-      case 'Advanced': return '#FF6B6B';
-      default: return '#667eea';
+      days.push({
+        date: date.toDate(),
+        dayName: date.format('ddd'),
+        dayNumber: date.format('D'),
+        isToday,
+        workouts: dayWorkouts,
+      });
     }
-  };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'workout': return 'fitness';
-      case 'rest': return 'bed';
-      case 'active': return 'walk';
-      default: return 'ellipse';
-    }
+    setWeekDays(days);
   };
 
   const navigateWeek = (direction: 'prev' | 'next') => {
+    // Animation
     Animated.sequence([
-      Animated.timing(fadeAnim, {
-        toValue: 0.5,
-        duration: 150,
+      Animated.timing(slideAnim, {
+        toValue: direction === 'next' ? -width : width,
+        duration: 200,
         useNativeDriver: true,
       }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 150,
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 0,
         useNativeDriver: true,
       }),
     ]).start();
 
-    setSelectedWeek(prev => direction === 'next' ? prev + 1 : prev - 1);
+    if (direction === 'prev') {
+      setCurrentWeek(currentWeek.clone().subtract(1, 'week'));
+    } else {
+      setCurrentWeek(currentWeek.clone().add(1, 'week'));
+    }
   };
 
-  const selectDay = (day: DayData) => {
-    setSelectedDate(day.date);
-    
-    // Animate selection
-    Animated.timing(slideAnim, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      slideAnim.setValue(0);
-    });
+  const getWeekRange = () => {
+    const start = currentWeek.clone().startOf('week');
+    const end = currentWeek.clone().endOf('week');
+    return `${start.format('MMM D')} - ${end.format('MMM D, YYYY')}`;
   };
 
   const handleWorkoutPress = (workout: WorkoutEvent) => {
     if (workout.type === 'workout') {
-      // Find the program for this workout
-      const program = workoutPrograms.find(p => p.name === workout.title);
-      if (program) {
-        navigation.navigate('ProgramDetail', { program });
+      // Create a workout object with exercises based on the workout type
+      const workoutExercises = getWorkoutExercises(workout.title);
+      
+      navigation.navigate('WorkoutDetail', { 
+        workout: {
+          id: workout.id,
+          name: workout.title,
+          duration: workout.duration,
+          difficulty: workout.difficulty,
+          exercises: workoutExercises,
+          calories: workout.calories,
+        }
+      });
+    }
+  };
+  
+  const getWorkoutExercises = (workoutTitle: string) => {
+    // Define exercises for each workout type
+    const workoutMap: { [key: string]: any[] } = {
+      'Chest & Triceps': [
+        { id: 'bench_press', name: 'Barbell Bench Press', sets: 4, reps: '8-10', rest: '90s' },
+        { id: 'incline_db', name: 'Incline Dumbbell Press', sets: 3, reps: '10-12', rest: '60s' },
+        { id: 'cable_fly', name: 'Cable Flyes', sets: 3, reps: '12-15', rest: '45s' },
+        { id: 'dips', name: 'Dips', sets: 3, reps: '8-12', rest: '60s' },
+        { id: 'tricep_pushdown', name: 'Tricep Pushdowns', sets: 3, reps: '12-15', rest: '45s' },
+        { id: 'overhead_ext', name: 'Overhead Tricep Extension', sets: 3, reps: '10-12', rest: '45s' },
+      ],
+      'Back & Biceps': [
+        { id: 'deadlift', name: 'Deadlifts', sets: 4, reps: '6-8', rest: '120s' },
+        { id: 'pullups', name: 'Pull-ups', sets: 3, reps: '8-12', rest: '90s' },
+        { id: 'bb_row', name: 'Barbell Rows', sets: 3, reps: '8-10', rest: '60s' },
+        { id: 'lat_pulldown', name: 'Lat Pulldowns', sets: 3, reps: '10-12', rest: '45s' },
+        { id: 'bb_curl', name: 'Barbell Curls', sets: 3, reps: '10-12', rest: '45s' },
+        { id: 'hammer_curl', name: 'Hammer Curls', sets: 3, reps: '12-15', rest: '45s' },
+      ],
+      'Legs & Glutes': [
+        { id: 'squat', name: 'Barbell Squats', sets: 4, reps: '8-10', rest: '120s' },
+        { id: 'leg_press', name: 'Leg Press', sets: 3, reps: '10-12', rest: '90s' },
+        { id: 'lunges', name: 'Walking Lunges', sets: 3, reps: '12 each', rest: '60s' },
+        { id: 'rdl', name: 'Romanian Deadlifts', sets: 3, reps: '10-12', rest: '60s' },
+        { id: 'leg_curl', name: 'Leg Curls', sets: 3, reps: '12-15', rest: '45s' },
+        { id: 'calf_raise', name: 'Calf Raises', sets: 4, reps: '15-20', rest: '30s' },
+      ],
+      'Shoulders & Abs': [
+        { id: 'military_press', name: 'Military Press', sets: 4, reps: '8-10', rest: '90s' },
+        { id: 'lateral_raise', name: 'Lateral Raises', sets: 3, reps: '12-15', rest: '45s' },
+        { id: 'rear_delt', name: 'Rear Delt Flyes', sets: 3, reps: '12-15', rest: '45s' },
+        { id: 'face_pulls', name: 'Face Pulls', sets: 3, reps: '15-20', rest: '45s' },
+        { id: 'plank', name: 'Plank', sets: 3, reps: '60s', rest: '30s' },
+        { id: 'ab_wheel', name: 'Ab Wheel Rollouts', sets: 3, reps: '10-15', rest: '45s' },
+      ],
+      'Full Body HIIT': [
+        { id: 'burpees', name: 'Burpees', sets: 4, reps: '10', rest: '30s' },
+        { id: 'mountain_climbers', name: 'Mountain Climbers', sets: 4, reps: '20', rest: '30s' },
+        { id: 'jump_squats', name: 'Jump Squats', sets: 4, reps: '15', rest: '30s' },
+        { id: 'push_ups', name: 'Push-ups', sets: 4, reps: '12', rest: '30s' },
+        { id: 'high_knees', name: 'High Knees', sets: 4, reps: '30s', rest: '30s' },
+        { id: 'plank_jacks', name: 'Plank Jacks', sets: 4, reps: '15', rest: '30s' },
+      ],
+      'Yoga & Stretching': [
+        { id: 'sun_salutation', name: 'Sun Salutation', sets: 3, reps: '5 flows', rest: '60s' },
+        { id: 'warrior_one', name: 'Warrior I Pose', sets: 2, reps: '30s each side', rest: '30s' },
+        { id: 'downward_dog', name: 'Downward Dog', sets: 3, reps: '45s', rest: '30s' },
+        { id: 'pigeon_pose', name: 'Pigeon Pose', sets: 2, reps: '60s each side', rest: '30s' },
+        { id: 'child_pose', name: 'Child\'s Pose', sets: 3, reps: '60s', rest: '30s' },
+        { id: 'corpse_pose', name: 'Corpse Pose', sets: 1, reps: '5 min', rest: '0s' },
+      ]
+    };
+
+    return workoutMap[workoutTitle] || [];
+  };
+
+  const handleDragStart = (workout: WorkoutEvent, fromDay: Date) => {
+    setDraggedWorkout(workout);
+    setDraggedFromDay(fromDay);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  };
+
+  const handleDragEnd = (gestureState: any) => {
+    if (draggedWorkout && draggedFromDay) {
+      // Determine drop target based on drag position
+      const { absoluteY } = gestureState.nativeEvent;
+      const targetDay = findDayFromPosition(absoluteY);
+      
+      if (targetDay && !moment(targetDay).isSame(draggedFromDay, 'day')) {
+        // Move workout to new day
+        moveWorkout(draggedWorkout, draggedFromDay, targetDay);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
     }
+    
+    // Reset drag state
+    setDraggedWorkout(null);
+    setDraggedFromDay(null);
+    setDropTargetDay(null);
+    
+    // Reset animations
+    Animated.timing(dragOpacity, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
   };
 
-  const selectedDayData = weekDays.find(day => 
-    day.date.toDateString() === selectedDate.toDateString()
-  );
+  const findDayFromPosition = (absoluteY: number): Date | null => {
+    // Simple approximation - you might want to measure actual positions
+    const headerHeight = 150; // Approximate header + navigation height
+    const dayHeight = 150; // Approximate height per day
+    const relativeY = absoluteY - headerHeight;
+    const dayIndex = Math.floor(relativeY / dayHeight);
+    
+    if (dayIndex >= 0 && dayIndex < weekDays.length) {
+      return weekDays[dayIndex].date;
+    }
+    return null;
+  };
 
-  const getWeekRange = () => {
-    if (weekDays.length === 0) return '';
-    const start = weekDays[0].date;
-    const end = weekDays[6].date;
+  const moveWorkout = (workout: WorkoutEvent, fromDay: Date, toDay: Date) => {
+    if (moment(fromDay).isSame(toDay, 'day')) return;
     
-    const startMonth = start.toLocaleDateString('en-US', { month: 'short' });
-    const endMonth = end.toLocaleDateString('en-US', { month: 'short' });
+    Alert.alert(
+      'Move Workout',
+      `Move "${workout.title}" from ${moment(fromDay).format('ddd, MMM D')} to ${moment(toDay).format('ddd, MMM D')}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Move',
+          onPress: () => {
+            // Update the workouts in your state management
+            // For now, just regenerate the schedule
+            generateWeekSchedule();
+          },
+        },
+      ]
+    );
+  };
+
+  const renderWorkoutCard = (workout: WorkoutEvent, day: DaySchedule) => {
+    const isDragging = draggedWorkout?.id === workout.id;
+    const isDropTarget = dropTargetDay && moment(dropTargetDay).isSame(day.date, 'day');
     
-    if (startMonth === endMonth) {
-      return `${startMonth} ${start.getDate()}-${end.getDate()}, ${start.getFullYear()}`;
-    } else {
-      return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}, ${start.getFullYear()}`;
+    if (workout.type === 'rest') {
+      return (
+        <View
+          key={workout.id}
+          style={[
+            styles.restDayCard,
+            day.isToday && styles.todayCard
+          ]}
+        >
+          <BlurView intensity={10} tint="light" style={styles.restDayContent}>
+            <Icon name="bed" size={24} color="rgba(255,255,255,0.6)" />
+            <Text style={styles.restDayText}>Rest Day</Text>
+            <Text style={styles.restDaySubtext}>Recovery is important</Text>
+          </BlurView>
+        </View>
+      );
+    }
+
+    return (
+      <PanGestureHandler
+        key={workout.id}
+        onGestureEvent={(event) => {
+          dragPositionY.setValue(event.nativeEvent.translationY);
+          
+          // Update drop target during drag
+          if (draggedWorkout) {
+            const targetDay = findDayFromPosition(event.nativeEvent.absoluteY);
+            if (targetDay) {
+              setDropTargetDay(targetDay);
+            }
+          }
+        }}
+        onHandlerStateChange={(event) => {
+          if (event.nativeEvent.state === State.BEGAN) {
+            handleDragStart(workout, day.date);
+            Animated.timing(dragOpacity, {
+              toValue: 0.7,
+              duration: 200,
+              useNativeDriver: true,
+            }).start();
+          } else if (event.nativeEvent.state === State.END) {
+            handleDragEnd(event);
+          }
+        }}
+      >
+        <Animated.View
+          style={[
+            isDragging && {
+              opacity: dragOpacity,
+              transform: [{ translateY: dragPositionY }],
+            }
+          ]}
+        >
+          <TouchableOpacity
+            onPress={() => handleWorkoutPress(workout)}
+            activeOpacity={0.8}
+          >
+            <BlurView
+              intensity={day.isToday ? 25 : 15}
+              tint="light"
+              style={[
+                styles.workoutCard,
+                workout.completed && styles.completedCard,
+                isDropTarget && styles.dropTargetCard,
+              ]}
+            >
+              <View style={styles.workoutHeader}>
+                <View style={styles.workoutTitleRow}>
+                  <Icon 
+                    name={workout.completed ? "checkmark-circle" : "fitness"} 
+                    size={20} 
+                    color={workout.completed ? "#4CAF50" : "white"} 
+                  />
+                  <Text style={[
+                    styles.workoutTitle,
+                    workout.completed && styles.completedText
+                  ]} numberOfLines={1} ellipsizeMode="tail">
+                    {workout.title}
+                  </Text>
+                </View>
+                <TouchableOpacity style={styles.dragHandle}>
+                  <Icon name="reorder-three" size={24} color="rgba(255,255,255,0.5)" />
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.workoutDetails}>
+                <View style={styles.workoutStat}>
+                  <Icon name="time" size={14} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.workoutStatText}>{workout.duration}</Text>
+                </View>
+                
+                {workout.calories > 0 && (
+                  <View style={styles.workoutStat}>
+                    <Icon name="flame" size={14} color="rgba(255,255,255,0.7)" />
+                    <Text style={styles.workoutStatText}>{workout.calories} cal</Text>
+                  </View>
+                )}
+                
+                <View style={[styles.difficultyBadge, getDifficultyStyle(workout.difficulty)]}>
+                  <Text style={styles.difficultyText}>{workout.difficulty}</Text>
+                </View>
+              </View>
+            </BlurView>
+          </TouchableOpacity>
+        </Animated.View>
+      </PanGestureHandler>
+    );
+  };
+
+  const getDifficultyStyle = (difficulty: string) => {
+    switch (difficulty) {
+      case 'Beginner':
+        return { backgroundColor: 'rgba(76, 175, 80, 0.3)' };
+      case 'Intermediate':
+        return { backgroundColor: 'rgba(255, 152, 0, 0.3)' };
+      case 'Advanced':
+        return { backgroundColor: 'rgba(244, 67, 54, 0.3)' };
+      default:
+        return { backgroundColor: 'rgba(158, 158, 158, 0.3)' };
     }
   };
 
-  const renderWorkoutCard = (workout: WorkoutEvent) => (
-    <TouchableOpacity
-      key={workout.id}
-      style={[
-        styles.workoutCard,
-        workout.completed && styles.completedWorkout,
-        workout.type === 'rest' && styles.restWorkout,
-      ]}
-      onPress={() => handleWorkoutPress(workout)}
-    >
-      <BlurView intensity={25} tint="light" style={styles.workoutContent}>
-        <View style={styles.workoutHeader}>
-          <View style={styles.workoutIcon}>
-            <Icon 
-              name={getTypeIcon(workout.type)} 
-              size={20} 
-              color={workout.type === 'rest' ? '#9E9E9E' : '#667eea'} 
-            />
-          </View>
-          
-          <View style={styles.workoutInfo}>
-            <Text style={[
-              styles.workoutTitle,
-              workout.type === 'rest' && styles.restText
-            ]}>
-              {workout.title}
-            </Text>
-            <Text style={[
-              styles.workoutTime,
-              workout.type === 'rest' && styles.restText
-            ]}>
-              {workout.time}
-            </Text>
-          </View>
-          
-          <View style={styles.workoutMeta}>
-            {workout.type !== 'rest' && (
-              <>
-                <View style={[
-                  styles.difficultyBadge, 
-                  { backgroundColor: getDifficultyColor(workout.difficulty) }
-                ]}>
-                  <Text style={styles.difficultyText}>{workout.difficulty[0]}</Text>
-                </View>
-                {workout.completed && (
-                  <Icon name="checkmark-circle" size={24} color="#4CAF50" />
-                )}
-              </>
-            )}
-          </View>
-        </View>
-        
-        <View style={styles.workoutDetails}>
-          <View style={styles.workoutStat}>
-            <Icon name="time" size={14} color="rgba(255,255,255,0.7)" />
-            <Text style={styles.workoutStatText}>{workout.duration}</Text>
-          </View>
-          
-          {workout.calories > 0 && (
-            <View style={styles.workoutStat}>
-              <Icon name="flame" size={14} color="rgba(255,255,255,0.7)" />
-              <Text style={styles.workoutStatText}>{workout.calories} cal</Text>
-            </View>
-          )}
-        </View>
-      </BlurView>
-    </TouchableOpacity>
-  );
+  const gradientColors = isDarkMode 
+    ? ['#0f0c29', '#302b63', '#24243e'] 
+    : ['#667eea', '#764ba2', '#f093fb'];
 
   return (
-    <LinearGradient colors={['#667eea', '#764ba2', '#f093fb']} style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Timeline</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-          <Icon name="settings-outline" size={24} color="white" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Week Navigation */}
-      <View style={styles.weekNavigation}>
-        <TouchableOpacity 
-          style={styles.navButton}
-          onPress={() => navigateWeek('prev')}
-        >
-          <Icon name="chevron-back" size={20} color="white" />
-        </TouchableOpacity>
-        
-        <Text style={styles.weekRange}>{getWeekRange()}</Text>
-        
-        <TouchableOpacity 
-          style={styles.navButton}
-          onPress={() => navigateWeek('next')}
-        >
-          <Icon name="chevron-forward" size={20} color="white" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Full Week View - All Days with Activities */}
-      <ScrollView style={styles.weeklyView} showsVerticalScrollIndicator={false}>
-        {weekDays.map((day) => (
-          <View key={day.date.toISOString()} style={styles.daySection}>
-            {/* Day Header */}
-            <View style={[
-              styles.dayHeader,
-              day.isToday && styles.todayHeader
-            ]}>
-              <View style={styles.dayInfo}>
-                <Text style={[
-                  styles.dayName,
-                  day.isToday && styles.todayText
-                ]}>
-                  {day.dayName}
-                </Text>
-                <Text style={[
-                  styles.dayNumber,
-                  day.isToday && styles.todayText
-                ]}>
-                  {day.dayNumber}
-                </Text>
-              </View>
-              
-              {day.isToday && (
-                <View style={styles.todayBadge}>
-                  <Text style={styles.todayBadgeText}>TODAY</Text>
-                </View>
-              )}
-            </View>
-            
-            {/* Day's Workouts */}
-            <View style={styles.dayWorkouts}>
-              {day.workouts.length > 0 ? (
-                day.workouts.map((workout) => (
-                  <TouchableOpacity
-                    key={workout.id}
-                    style={[
-                      styles.compactWorkoutCard,
-                      workout.completed && styles.completedWorkout,
-                      workout.type === 'rest' && styles.restDay
-                    ]}
-                    onPress={() => handleWorkoutPress(workout)}
-                  >
-                    <BlurView intensity={20} tint="light" style={styles.compactWorkoutContent}>
-                      <Icon 
-                        name={getTypeIcon(workout.type)} 
-                        size={20} 
-                        color={workout.type === 'rest' ? '#9E9E9E' : '#667eea'} 
-                      />
-                      <View style={styles.compactWorkoutInfo}>
-                        <Text style={[
-                          styles.compactWorkoutTitle,
-                          workout.type === 'rest' && styles.restText
-                        ]}>
-                          {workout.title}
-                        </Text>
-                        <Text style={[
-                          styles.compactWorkoutTime,
-                          workout.type === 'rest' && styles.restText
-                        ]}>
-                          {workout.time} • {workout.duration}
-                        </Text>
-                      </View>
-                      {workout.type !== 'rest' && (
-                        <View style={[
-                          styles.difficultyIndicator,
-                          { backgroundColor: getDifficultyColor(workout.difficulty) }
-                        ]} />
-                      )}
-                      {workout.completed && (
-                        <Icon name="checkmark-circle" size={20} color="#4CAF50" />
-                      )}
-                    </BlurView>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <View style={styles.emptyDay}>
-                  <Text style={styles.emptyDayText}>No activities scheduled</Text>
-                </View>
-              )}
-            </View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <LinearGradient colors={gradientColors} style={styles.container}>
+        {/* Enhanced Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerSubtitle}>Your Journey</Text>
+            <Text style={styles.headerTitle}>Timeline</Text>
           </View>
-        ))}
-        
-        {/* Add some bottom padding for FABs */}
-        <View style={{ height: 150 }} />
-      </ScrollView>
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.settingsButton}>
+            <LinearGradient colors={['rgba(240, 147, 251, 0.2)', 'rgba(102, 126, 234, 0.2)']} style={styles.settingsGradient}>
+              <Icon name="settings-outline" size={24} color="white" />
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
 
-      {/* Quick Actions FABs */}
-      <View style={styles.fabContainer}>
-        <Animated.View style={{ transform: [{ scale: fabPulse }] }}>
+        {/* Week Navigation */}
+        <View style={styles.weekNavigation}>
           <TouchableOpacity 
-            style={[styles.fab, styles.secondaryFab]}
-            onPress={() => navigation.navigate('WorkoutOverview')}
-            activeOpacity={0.8}
+            style={styles.navButton}
+            onPress={() => navigateWeek('prev')}
           >
-            <LinearGradient colors={['#FF6B6B', '#FF8E53']} style={styles.fabGradient}>
-              <Icon name="barbell" size={24} color="white" />
-            </LinearGradient>
+            <Icon name="chevron-back" size={20} color="white" />
           </TouchableOpacity>
-        </Animated.View>
-        
-        <Animated.View style={{ transform: [{ scale: fabPulse }] }}>
+          
+          <Text style={styles.weekRange}>{getWeekRange()}</Text>
+          
           <TouchableOpacity 
-            style={styles.fab}
-            onPress={() => navigation.navigate('Discover')}
-            activeOpacity={0.8}
+            style={styles.navButton}
+            onPress={() => navigateWeek('next')}
           >
-            <LinearGradient colors={['#4ECDC4', '#44A08D']} style={styles.fabGradient}>
-              <Icon name="add" size={28} color="white" />
-            </LinearGradient>
+            <Icon name="chevron-forward" size={20} color="white" />
           </TouchableOpacity>
-        </Animated.View>
-      </View>
-    </LinearGradient>
+        </View>
+
+        {/* Week View with Draggable Workouts */}
+        <ScrollView 
+          style={styles.weeklyView} 
+          showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+        >
+          {weekDays.map((day) => {
+            const isDropTarget = dropTargetDay && moment(dropTargetDay).isSame(day.date, 'day');
+            
+            return (
+              <View 
+                key={day.date.toISOString()} 
+                style={[
+                  styles.daySection,
+                  isDropTarget && styles.dropTargetSection
+                ]}
+              >
+                {/* Day Header */}
+                <View style={styles.dayHeader}>
+                  <View style={styles.dayInfo}>
+                    <Text style={[
+                      styles.dayName,
+                      day.isToday && styles.todayText
+                    ]}>
+                      {day.dayName}
+                    </Text>
+                    <Text style={[
+                      styles.dayNumber,
+                      day.isToday && styles.todayNumber
+                    ]}>
+                      {day.dayNumber}
+                    </Text>
+                  </View>
+                  {day.isToday && (
+                    <View style={styles.todayBadge}>
+                      <Text style={styles.todayBadgeText}>TODAY</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Workouts */}
+                <View style={styles.dayWorkouts}>
+                  {day.workouts.length > 0 ? (
+                    day.workouts.map((workout) => renderWorkoutCard(workout, day))
+                  ) : (
+                    <View key="empty-day" style={styles.emptyDay}>
+                      <Text style={styles.emptyDayText}>No workouts scheduled</Text>
+                    </View>
+                  )}
+                  
+                  {/* Drop Zone Indicator */}
+                  {isDropTarget && draggedWorkout && (
+                    <View style={styles.dropZone}>
+                      <Icon name="add-circle-outline" size={24} color="rgba(255,255,255,0.5)" />
+                      <Text style={styles.dropZoneText}>Drop here</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+      </LinearGradient>
+    </GestureHandlerRootView>
   );
 };
 
@@ -458,59 +536,72 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 50,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: 4,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     color: 'white',
   },
+  settingsButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: 'hidden',
+  },
+  settingsGradient: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   weekNavigation: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     marginBottom: 20,
   },
   navButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   weekRange: {
-    color: 'white',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
+    color: 'white',
   },
   weeklyView: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
   },
   daySection: {
-    marginBottom: 16,
+    marginBottom: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  dropTargetSection: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
   },
   dayHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  todayHeader: {
-    backgroundColor: 'rgba(255,215,0,0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,215,0,0.5)',
+    marginBottom: 12,
   },
   dayInfo: {
     flexDirection: 'row',
@@ -518,140 +609,77 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   dayName: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
   },
   dayNumber: {
-    color: 'rgba(255,255,255,0.8)',
     fontSize: 24,
     fontWeight: 'bold',
+    color: 'white',
   },
   todayText: {
-    color: '#FFD700',
+    color: '#4CAF50',
+  },
+  todayNumber: {
+    color: '#4CAF50',
   },
   todayBadge: {
-    backgroundColor: '#FFD700',
-    paddingHorizontal: 8,
+    backgroundColor: 'rgba(76, 175, 80, 0.3)',
+    paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
   },
   todayBadgeText: {
-    color: '#333',
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 'bold',
+    color: '#4CAF50',
   },
   dayWorkouts: {
-    gap: 8,
-  },
-  compactWorkoutCard: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 4,
-  },
-  restDay: {
-    opacity: 0.7,
-  },
-  compactWorkoutContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    gap: 12,
-  },
-  compactWorkoutInfo: {
-    flex: 1,
-  },
-  compactWorkoutTitle: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  compactWorkoutTime: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
-  },
-  difficultyIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  emptyDay: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  emptyDayText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 14,
-    fontStyle: 'italic',
-  },
-  workoutsList: {
-    gap: 12,
-    paddingBottom: 100,
+    gap: 10,
   },
   workoutCard: {
-    borderRadius: 16,
+    padding: 16,
+    borderRadius: 12,
     overflow: 'hidden',
+    marginBottom: 8,
   },
-  completedWorkout: {
-    opacity: 0.8,
-  },
-  restWorkout: {
+  completedCard: {
     opacity: 0.7,
   },
-  workoutContent: {
-    padding: 16,
+  dropTargetCard: {
+    borderWidth: 2,
+    borderColor: 'rgba(76, 175, 80, 0.5)',
   },
   workoutHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
   },
-  workoutIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
+  workoutTitleRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 12,
-  },
-  workoutInfo: {
+    gap: 8,
     flex: 1,
   },
   workoutTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
+    flex: 1,
   },
-  workoutTime: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 14,
+  completedText: {
+    textDecorationLine: 'line-through',
+    opacity: 0.8,
   },
-  restText: {
-    color: 'rgba(255,255,255,0.6)',
-  },
-  workoutMeta: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  difficultyBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  difficultyText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
+  dragHandle: {
+    padding: 4,
   },
   workoutDetails: {
     flexDirection: 'row',
-    gap: 16,
+    alignItems: 'center',
+    gap: 12,
   },
   workoutStat: {
     flexDirection: 'row',
@@ -659,46 +687,69 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   workoutStatText: {
-    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  difficultyBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 'auto',
+  },
+  difficultyText: {
     fontSize: 12,
+    fontWeight: '600',
+    color: 'white',
   },
-  noWorkouts: {
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  noWorkoutsText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 16,
-    marginTop: 12,
-  },
-  fabContainer: {
-    position: 'absolute',
-    bottom: 100,
-    right: 20,
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-  },
-  fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  restDayCard: {
+    marginBottom: 8,
+    borderRadius: 12,
     overflow: 'hidden',
-    elevation: 12,
-    shadowColor: '#667eea',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    marginBottom: 12,
   },
-  secondaryFab: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-  },
-  fabGradient: {
-    flex: 1,
-    justifyContent: 'center',
+  restDayContent: {
+    padding: 20,
     alignItems: 'center',
+  },
+  restDayText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 8,
+  },
+  restDaySubtext: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 4,
+  },
+  emptyDay: {
+    padding: 20,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  emptyDayText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  dropZone: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 16,
+    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(76, 175, 80, 0.4)',
+    borderStyle: 'dashed',
+  },
+  dropZoneText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '600',
+  },
+  todayCard: {
+    transform: [{ scale: 1.02 }],
   },
 });
 

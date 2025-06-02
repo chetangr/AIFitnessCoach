@@ -84,7 +84,7 @@ const ProfileScreen = ({ navigation }: any) => {
         {/* Stats */}
         <View style={styles.statsContainer}>
           {stats.map((stat, index) => (
-            <BlurView key={index} intensity={20} tint="light" style={styles.statCard}>
+            <BlurView key={index} intensity={30} tint="light" style={styles.statCard}>
               <Text style={styles.statValue}>{stat.value}</Text>
               <Text style={styles.statLabel}>{stat.label}</Text>
             </BlurView>
@@ -92,7 +92,7 @@ const ProfileScreen = ({ navigation }: any) => {
         </View>
 
         {/* Settings */}
-        <BlurView intensity={25} tint="light" style={styles.settingsCard}>
+        <BlurView intensity={30} tint="light" style={styles.settingsCard}>
           <Text style={styles.sectionTitle}>Quick Settings</Text>
           
           <View style={styles.settingItem}>
@@ -129,7 +129,7 @@ const ProfileScreen = ({ navigation }: any) => {
               key={index}
               onPress={() => handleMenuAction(item.action)}
             >
-              <BlurView intensity={20} tint="light" style={styles.menuItem}>
+              <BlurView intensity={30} tint="light" style={styles.menuItem}>
                 <View style={styles.menuLeft}>
                   <Icon name={item.icon} size={24} color="white" />
                   <Text style={styles.menuLabel}>{item.label}</Text>

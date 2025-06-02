@@ -8,12 +8,18 @@ import {
   TextInput,
   ActivityIndicator,
   FlatList,
+  Animated,
+  Dimensions,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { exerciseService } from '../services/exerciseService';
 import { WorkoutProgram } from '../data/exercisesDatabase';
+import { useThemeStore } from '../store/themeStore';
+
+const { width } = Dimensions.get('window');
 
 interface Exercise {
   id: string;
@@ -25,6 +31,7 @@ interface Exercise {
 }
 
 const DiscoverScreen = ({ navigation }: any) => {
+  const { isDarkMode, theme } = useThemeStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [programs, setPrograms] = useState<WorkoutProgram[]>([]);
@@ -32,6 +39,9 @@ const DiscoverScreen = ({ navigation }: any) => {
   const [selectedMuscle, setSelectedMuscle] = useState('All');
   const [page, setPage] = useState(1);
   const [activeTab, setActiveTab] = useState<'Programs' | 'Exercises'>('Programs');
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [trendingAnimValue] = useState(new Animated.Value(0));
+  const [challengeAnimValue] = useState(new Animated.Value(0));
 
   const muscleGroups = [
     'All',
@@ -44,11 +54,87 @@ const DiscoverScreen = ({ navigation }: any) => {
     'Glutes',
   ];
 
-  const popularWorkouts = [
-    { name: 'Push Day', icon: 'trending-up', color: '#FF6B6B' },
-    { name: 'Pull Day', icon: 'trending-down', color: '#4ECDC4' },
-    { name: 'Leg Day', icon: 'footsteps', color: '#45B7D1' },
-    { name: 'Core Blast', icon: 'body', color: '#96CEB4' },
+  const trendingWorkouts = [
+    { 
+      name: 'HIIT Fusion', 
+      icon: 'flash', 
+      color: ['#FF6B6B', '#ff8787'], 
+      difficulty: 'Intermediate',
+      duration: '20 min',
+      participants: '12.3k',
+      trend: '+15%'
+    },
+    { 
+      name: 'Strength Builder', 
+      icon: 'barbell', 
+      color: ['#4ECDC4', '#6fdddc'], 
+      difficulty: 'Beginner',
+      duration: '35 min',
+      participants: '8.7k',
+      trend: '+8%'
+    },
+    { 
+      name: 'Core Crusher', 
+      icon: 'body', 
+      color: ['#45B7D1', '#74c7e3'], 
+      difficulty: 'Advanced',
+      duration: '15 min',
+      participants: '15.2k',
+      trend: '+22%'
+    },
+    { 
+      name: 'Cardio Blast', 
+      icon: 'heart', 
+      color: ['#96CEB4', '#a8d4c2'], 
+      difficulty: 'Intermediate',
+      duration: '25 min',
+      participants: '9.8k',
+      trend: '+11%'
+    },
+  ];
+
+  const challenges = [
+    {
+      id: '1',
+      title: '30-Day Push-Up Challenge',
+      description: 'Build upper body strength with progressive push-ups',
+      participants: '25.6k',
+      daysLeft: 12,
+      progress: 0.6,
+      reward: '🏆 Badge',
+      color: ['#667eea', '#764ba2'],
+    },
+    {
+      id: '2',
+      title: 'Plank Masters',
+      description: 'Hold planks longer and strengthen your core',
+      participants: '18.2k',
+      daysLeft: 8,
+      progress: 0.8,
+      reward: '🎖️ Medal',
+      color: ['#f093fb', '#f5576c'],
+    },
+  ];
+
+  const aiSuggestions = [
+    {
+      id: '1',
+      title: 'Morning Energy Boost',
+      subtitle: 'Based on your sleep pattern',
+      icon: 'sunny',
+      color: ['#ffeaa7', '#fdcb6e'],
+      exercises: 5,
+      duration: '10 min'
+    },
+    {
+      id: '2',
+      title: 'Stress Relief Flow',
+      subtitle: 'Recommended for today',
+      icon: 'leaf',
+      color: ['#00b894', '#00a085'],
+      exercises: 8,
+      duration: '15 min'
+    },
   ];
 
   useEffect(() => {
@@ -58,6 +144,33 @@ const DiscoverScreen = ({ navigation }: any) => {
       loadPrograms();
     }
   }, [selectedMuscle, page, activeTab, searchQuery]);
+
+  useEffect(() => {
+    // Start trending animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(trendingAnimValue, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(trendingAnimValue, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    // Start challenge animation
+    Animated.loop(
+      Animated.timing(challengeAnimValue, {
+        toValue: 1,
+        duration: 3000,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, []);
 
   const loadExercises = async () => {
     setLoading(true);
@@ -230,170 +343,409 @@ const DiscoverScreen = ({ navigation }: any) => {
     }
   };
 
-  return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
-      <FlatList
-        ListHeaderComponent={
-          <>
-            <View style={styles.header}>
-              <View>
-                <Text style={styles.headerTitle}>Discover</Text>
-                <Text style={styles.headerSubtitle}>10,000+ Exercises</Text>
+  const renderTrendingCard = ({ item, index }: { item: any, index: number }) => {
+    const scale = trendingAnimValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, 1.05],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.trendingCard,
+          { transform: [{ scale: index === 0 ? scale : 1 }] }
+        ]}
+      >
+        <TouchableOpacity
+          onPress={() => console.log('Trending workout selected:', item.name)}
+        >
+          <LinearGradient colors={item.color} style={styles.trendingGradient}>
+            <BlurView intensity={25} tint="light" style={styles.trendingContent}>
+              <View style={styles.trendingHeader}>
+                <View style={styles.trendingIconContainer}>
+                  <Icon name={item.icon} size={24} color="white" />
+                </View>
+                <View style={styles.trendingBadge}>
+                  <Text style={styles.trendingText}>{item.trend}</Text>
+                  <Icon name="trending-up" size={12} color="#4CAF50" />
+                </View>
               </View>
-              <TouchableOpacity onPress={() => navigation.navigate('ExerciseLibrary')}>
-                <BlurView intensity={20} tint="light" style={styles.libraryButton}>
-                  <Icon name="library-outline" size={20} color="white" />
-                  <Text style={styles.libraryButtonText}>Full Library</Text>
+              
+              <Text style={styles.trendingName}>{item.name}</Text>
+              
+              <View style={styles.trendingStats}>
+                <View style={styles.trendingStatItem}>
+                  <Icon name="time" size={14} color="rgba(255,255,255,0.8)" />
+                  <Text style={styles.trendingStatText}>{item.duration}</Text>
+                </View>
+                <View style={styles.trendingStatItem}>
+                  <Icon name="people" size={14} color="rgba(255,255,255,0.8)" />
+                  <Text style={styles.trendingStatText}>{item.participants}</Text>
+                </View>
+              </View>
+              
+              <View style={[styles.difficultyPill, { backgroundColor: getDifficultyColor(item.difficulty) }]}>
+                <Text style={styles.difficultyPillText}>{item.difficulty}</Text>
+              </View>
+            </BlurView>
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  const renderChallengeCard = ({ item }: { item: any }) => {
+    const progressAnimation = challengeAnimValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, item.progress],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <TouchableOpacity style={styles.challengeCard}>
+        <LinearGradient colors={item.color} style={styles.challengeGradient}>
+          <BlurView intensity={30} tint="light" style={styles.challengeContent}>
+            <View style={styles.challengeHeader}>
+              <View style={styles.challengeInfo}>
+                <Text style={styles.challengeTitle}>{item.title}</Text>
+                <Text style={styles.challengeDescription}>{item.description}</Text>
+              </View>
+              <Text style={styles.challengeReward}>{item.reward}</Text>
+            </View>
+            
+            <View style={styles.challengeStats}>
+              <View style={styles.challengeStatItem}>
+                <Text style={styles.challengeStatLabel}>Participants</Text>
+                <Text style={styles.challengeStatValue}>{item.participants}</Text>
+              </View>
+              <View style={styles.challengeStatItem}>
+                <Text style={styles.challengeStatLabel}>Days Left</Text>
+                <Text style={styles.challengeStatValue}>{item.daysLeft}</Text>
+              </View>
+            </View>
+            
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBackground}>
+                <Animated.View 
+                  style={[
+                    styles.progressFill,
+                    { 
+                      width: progressAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0%', '100%'],
+                        extrapolate: 'clamp',
+                      })
+                    }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.progressText}>{Math.round(item.progress * 100)}% Complete</Text>
+            </View>
+          </BlurView>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderAISuggestion = ({ item }: { item: any }) => (
+    <TouchableOpacity style={styles.aiSuggestionCard}>
+      <LinearGradient colors={item.color} style={styles.aiSuggestionGradient}>
+        <BlurView intensity={25} tint="light" style={styles.aiSuggestionContent}>
+          <View style={styles.aiSuggestionHeader}>
+            <View style={styles.aiIconContainer}>
+              <Icon name={item.icon} size={20} color="white" />
+            </View>
+            <View style={styles.aiLabel}>
+              <Icon name="sparkles" size={12} color="#FFD700" />
+              <Text style={styles.aiLabelText}>AI</Text>
+            </View>
+          </View>
+          
+          <Text style={styles.aiSuggestionTitle}>{item.title}</Text>
+          <Text style={styles.aiSuggestionSubtitle}>{item.subtitle}</Text>
+          
+          <View style={styles.aiSuggestionFooter}>
+            <View style={styles.aiSuggestionStat}>
+              <Icon name="fitness" size={14} color="rgba(255,255,255,0.8)" />
+              <Text style={styles.aiSuggestionStatText}>{item.exercises} exercises</Text>
+            </View>
+            <View style={styles.aiSuggestionStat}>
+              <Icon name="time" size={14} color="rgba(255,255,255,0.8)" />
+              <Text style={styles.aiSuggestionStatText}>{item.duration}</Text>
+            </View>
+          </View>
+        </BlurView>
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+
+  const renderSearchModal = () => (
+    <Modal
+      visible={showSearchModal}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={() => setShowSearchModal(false)}
+    >
+      <View style={styles.searchModalOverlay}>
+        <BlurView intensity={80} tint={isDarkMode ? "dark" : "light"} style={styles.searchModalContainer}>
+          <View style={styles.searchModalHeader}>
+            <Text style={styles.searchModalTitle}>Search {activeTab}</Text>
+            <TouchableOpacity onPress={() => setShowSearchModal(false)}>
+              <Icon name="close" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.searchInputContainer}>
+            <Icon name="search" size={20} color="rgba(255,255,255,0.6)" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder={`Search for ${activeTab.toLowerCase()}...`}
+              placeholderTextColor="rgba(255,255,255,0.6)"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoFocus={true}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Icon name="close-circle" size={20} color="rgba(255,255,255,0.6)" />
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.searchButton}
+            onPress={() => {
+              handleSearch();
+              setShowSearchModal(false);
+            }}
+          >
+            <LinearGradient colors={['#667eea', '#764ba2']} style={styles.searchButtonGradient}>
+              <Text style={styles.searchButtonText}>Search</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </BlurView>
+      </View>
+    </Modal>
+  );
+
+  const gradientColors = isDarkMode 
+    ? ['#0f0c29', '#302b63', '#24243e'] 
+    : ['#667eea', '#764ba2'];
+
+  return (
+    <LinearGradient colors={gradientColors} style={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollContainer}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerTitle}>Discover</Text>
+            <Text style={styles.headerSubtitle}>AI-Powered Fitness</Text>
+          </View>
+          <TouchableOpacity onPress={() => navigation.navigate('ExerciseLibrary')}>
+            <BlurView intensity={25} tint="light" style={styles.libraryButton}>
+              <Icon name="library-outline" size={20} color="white" />
+              <Text style={styles.libraryButtonText}>Full Library</Text>
+            </BlurView>
+          </TouchableOpacity>
+        </View>
+
+        {/* Compact Search & Toggle Row */}
+        <View style={styles.compactSearchRow}>
+          <TouchableOpacity 
+            onPress={() => setShowSearchModal(true)}
+            style={styles.searchButtonContainer}
+          >
+            <BlurView intensity={30} tint="light" style={styles.searchButtonContent}>
+              <Icon name="search" size={18} color="rgba(255,255,255,0.8)" />
+              <Text style={styles.searchButtonText}>Search {activeTab.toLowerCase()}...</Text>
+            </BlurView>
+          </TouchableOpacity>
+
+          <BlurView intensity={30} tint="light" style={styles.compactTabContainer}>
+            <TouchableOpacity
+              onPress={() => {
+                setActiveTab('Programs');
+                resetAndLoad();
+              }}
+              style={[
+                styles.compactTabButton,
+                activeTab === 'Programs' && styles.activeCompactTab,
+              ]}
+            >
+              <Text style={[
+                styles.compactTabText,
+                activeTab === 'Programs' && styles.activeCompactTabText,
+              ]}>Programs</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              onPress={() => {
+                setActiveTab('Exercises');
+                resetAndLoad();
+              }}
+              style={[
+                styles.compactTabButton,
+                activeTab === 'Exercises' && styles.activeCompactTab,
+              ]}
+            >
+              <Text style={[
+                styles.compactTabText,
+                activeTab === 'Exercises' && styles.activeCompactTabText,
+              ]}>Exercises</Text>
+            </TouchableOpacity>
+          </BlurView>
+        </View>
+
+        {/* AI Suggestions */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>AI Suggestions</Text>
+            <View style={styles.aiIconBadge}>
+              <Icon name="sparkles" size={14} color="#FFD700" />
+            </View>
+          </View>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={aiSuggestions}
+            renderItem={renderAISuggestion}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.horizontalList}
+          />
+        </View>
+
+        {/* Trending Now */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Trending Now</Text>
+            <View style={styles.trendingBadgeSmall}>
+              <Icon name="trending-up" size={14} color="#4CAF50" />
+              <Text style={styles.trendingBadgeText}>HOT</Text>
+            </View>
+          </View>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={trendingWorkouts}
+            renderItem={renderTrendingCard}
+            keyExtractor={(item, index) => index.toString()}
+            contentContainerStyle={styles.horizontalList}
+          />
+        </View>
+
+        {/* Active Challenges */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Active Challenges</Text>
+            <TouchableOpacity>
+              <Text style={styles.viewAllText}>View All</Text>
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={challenges}
+            renderItem={renderChallengeCard}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.horizontalList}
+          />
+        </View>
+
+        {/* Muscle Groups */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Target Muscle Groups</Text>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={muscleGroups}
+            renderItem={({ item: muscle }) => (
+              <TouchableOpacity
+                onPress={() => {
+                  setSelectedMuscle(muscle);
+                  setPage(1);
+                  console.log('Muscle Group Selected', { muscle });
+                }}
+              >
+                <BlurView
+                  intensity={selectedMuscle === muscle ? 40 : 25}
+                  tint="light"
+                  style={[
+                    styles.muscleChip,
+                    selectedMuscle === muscle && styles.selectedMuscleChip,
+                  ]}
+                >
+                  <Text style={[
+                    styles.muscleText,
+                    selectedMuscle === muscle && styles.selectedMuscleText
+                  ]}>{muscle}</Text>
                 </BlurView>
               </TouchableOpacity>
+            )}
+            keyExtractor={(item) => item}
+            contentContainerStyle={styles.horizontalList}
+          />
+        </View>
+
+        {/* Main Content */}
+        <View style={styles.mainContentSection}>
+          <Text style={styles.sectionTitle}>
+            {activeTab} {selectedMuscle !== 'All' ? `• ${selectedMuscle}` : ''}
+          </Text>
+          
+          {loading && page === 1 ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="white" />
+              <Text style={styles.loadingText}>Loading {activeTab.toLowerCase()}...</Text>
             </View>
-
-            {/* Search Bar */}
-            <BlurView intensity={30} tint="light" style={styles.searchContainer}>
-        <Icon name="search" size={20} color="rgba(255,255,255,0.6)" />
-        <TextInput
-          style={styles.searchInput}
-          placeholder={`Search ${activeTab.toLowerCase()}...`}
-          placeholderTextColor="rgba(255,255,255,0.5)"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          onSubmitEditing={handleSearch}
-        />
-      </BlurView>
-
-      {/* Programs/Exercises Toggle */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          onPress={() => {
-            setActiveTab('Programs');
-            resetAndLoad();
-          }}
-        >
-          <BlurView
-            intensity={activeTab === 'Programs' ? 40 : 20}
-            tint="light"
-            style={[
-              styles.tabButton,
-              activeTab === 'Programs' && styles.activeTab,
-            ]}
-          >
-            <Text style={[
-              styles.tabText,
-              activeTab === 'Programs' && styles.activeTabText
-            ]}>
-              Programs
-            </Text>
-          </BlurView>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          onPress={() => {
-            setActiveTab('Exercises');
-            resetAndLoad();
-          }}
-        >
-          <BlurView
-            intensity={activeTab === 'Exercises' ? 40 : 20}
-            tint="light"
-            style={[
-              styles.tabButton,
-              activeTab === 'Exercises' && styles.activeTab,
-            ]}
-          >
-            <Text style={[
-              styles.tabText,
-              activeTab === 'Exercises' && styles.activeTabText
-            ]}>
-              Exercises
-            </Text>
-          </BlurView>
-        </TouchableOpacity>
-      </View>
-
-            {/* Popular Workouts */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Popular Workouts</Text>
-              <FlatList
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                data={popularWorkouts}
-                renderItem={({ item, index }) => (
-                  <TouchableOpacity key={index}>
-                    <BlurView intensity={25} tint="light" style={styles.popularCard}>
-                      <LinearGradient
-                        colors={[item.color, item.color + 'aa']}
-                        style={styles.popularIcon}
-                      >
-                        <Icon name={item.icon} size={28} color="white" />
-                      </LinearGradient>
-                      <Text style={styles.popularName}>{item.name}</Text>
-                    </BlurView>
-                  </TouchableOpacity>
-                )}
-                keyExtractor={(item, index) => index.toString()}
-              />
-            </View>
-
-            {/* Muscle Groups */}
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.muscleGroupsContainer}
-              data={muscleGroups}
-              renderItem={({ item: muscle }) => (
-                <TouchableOpacity
-                  onPress={() => {
-                    setSelectedMuscle(muscle);
-                    setPage(1);
-                    console.log('Muscle Group Selected', { muscle });
-                  }}
-                >
-                  <BlurView
-                    intensity={selectedMuscle === muscle ? 40 : 20}
-                    tint="light"
-                    style={[
-                      styles.muscleChip,
-                      selectedMuscle === muscle && styles.selectedMuscleChip,
-                    ]}
-                  >
-                    <Text style={styles.muscleText}>{muscle}</Text>
-                  </BlurView>
-                </TouchableOpacity>
+          ) : (
+            <View style={styles.contentGrid}>
+              {(activeTab === 'Exercises' ? exercises : programs).map((item, index) => (
+                <View key={item.id}>
+                  {activeTab === 'Exercises' 
+                    ? renderExerciseCard({ item: item as Exercise })
+                    : renderProgramCard({ item: item as WorkoutProgram })
+                  }
+                </View>
+              ))}
+              
+              {loading && page > 1 && (
+                <View style={styles.loadMoreContainer}>
+                  <ActivityIndicator color="white" />
+                  <Text style={styles.loadMoreText}>Loading more...</Text>
+                </View>
               )}
-              keyExtractor={(item) => item}
-            />
-          </>
-        }
-        data={activeTab === 'Exercises' ? exercises : programs}
-        renderItem={activeTab === 'Exercises' ? renderExerciseCard : renderProgramCard}
-        keyExtractor={(item) => item.id}
-        showsVerticalScrollIndicator={false}
-        onEndReached={() => setPage(page + 1)}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={() =>
-          loading && page > 1 ? <ActivityIndicator color="white" /> : null
-        }
-        ListEmptyComponent={
-          !loading ? (
-            <View style={styles.emptyContainer}>
-              <Icon 
-                name={activeTab === 'Exercises' ? "barbell-outline" : "list-outline"} 
-                size={60} 
-                color="rgba(255,255,255,0.5)" 
-              />
-              <Text style={styles.emptyText}>
-                No {activeTab.toLowerCase()} found
-              </Text>
+              
+              {!loading && (activeTab === 'Exercises' ? exercises : programs).length === 0 && (
+                <View style={styles.emptyContainer}>
+                  <Icon 
+                    name={activeTab === 'Exercises' ? "barbell-outline" : "list-outline"} 
+                    size={60} 
+                    color="rgba(255,255,255,0.5)" 
+                  />
+                  <Text style={styles.emptyText}>
+                    No {activeTab.toLowerCase()} found
+                  </Text>
+                  <Text style={styles.emptySubtext}>
+                    Try adjusting your search or filters
+                  </Text>
+                </View>
+              )}
             </View>
-          ) : null
-        }
-      />
+          )}
+        </View>
+      </ScrollView>
+
+      {renderSearchModal()}
     </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  scrollContainer: {
     flex: 1,
   },
   header: {
@@ -413,20 +765,51 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
     marginTop: 4,
   },
-  searchContainer: {
+  compactSearchRow: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginTop: 16,
+    gap: 12,
+  },
+  searchButtonContainer: {
+    flex: 1,
+  },
+  searchButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 20,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 20,
+    borderRadius: 16,
     overflow: 'hidden',
   },
-  searchInput: {
+  searchButtonText: {
     flex: 1,
-    marginLeft: 10,
-    fontSize: 16,
+    marginLeft: 8,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  compactTabContainer: {
+    flexDirection: 'row',
+    borderRadius: 16,
+    overflow: 'hidden',
+    padding: 2,
+  },
+  compactTabButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 14,
+  },
+  activeCompactTab: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  compactTabText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '500',
+  },
+  activeCompactTabText: {
     color: 'white',
+    fontWeight: '600',
   },
   section: {
     marginTop: 24,
@@ -649,6 +1032,350 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
+  },
+  
+  // New Modern Styles
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 20,
+  },
+  aiIconBadge: {
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  trendingBadgeSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  trendingBadgeText: {
+    color: '#4CAF50',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  viewAllText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  horizontalList: {
+    paddingHorizontal: 20,
+  },
+  
+  // Trending Cards
+  trendingCard: {
+    width: width * 0.4,
+    marginRight: 16,
+  },
+  trendingGradient: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  trendingContent: {
+    padding: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  trendingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  trendingIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trendingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  trendingText: {
+    color: '#4CAF50',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  trendingName: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  trendingStats: {
+    gap: 8,
+    marginBottom: 12,
+  },
+  trendingStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  trendingStatText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+  },
+  difficultyPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  difficultyPillText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  
+  // Challenge Cards
+  challengeCard: {
+    width: width * 0.8,
+    marginRight: 16,
+  },
+  challengeGradient: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  challengeContent: {
+    padding: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  challengeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  challengeInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  challengeTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 6,
+  },
+  challengeDescription: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  challengeReward: {
+    fontSize: 24,
+  },
+  challengeStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  challengeStatItem: {
+    alignItems: 'center',
+  },
+  challengeStatLabel: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  challengeStatValue: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  progressContainer: {
+    gap: 8,
+  },
+  progressBackground: {
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+    borderRadius: 3,
+  },
+  progressText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  
+  // AI Suggestion Cards
+  aiSuggestionCard: {
+    width: width * 0.45,
+    marginRight: 16,
+  },
+  aiSuggestionGradient: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  aiSuggestionContent: {
+    padding: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  aiSuggestionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  aiIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  aiLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
+    gap: 4,
+  },
+  aiLabelText: {
+    color: '#FFD700',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  aiSuggestionTitle: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  aiSuggestionSubtitle: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    marginBottom: 12,
+  },
+  aiSuggestionFooter: {
+    gap: 6,
+  },
+  aiSuggestionStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  aiSuggestionStatText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 11,
+  },
+  
+  // Search Modal
+  searchModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  searchModalContainer: {
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    padding: 20,
+    paddingBottom: 40,
+    overflow: 'hidden',
+  },
+  searchModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  searchModalTitle: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 20,
+    gap: 12,
+  },
+  searchInput: {
+    flex: 1,
+    color: 'white',
+    fontSize: 16,
+  },
+  searchButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  searchButtonGradient: {
+    paddingHorizontal: 30,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  searchButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  
+  // Main Content
+  mainContentSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 100,
+  },
+  contentGrid: {
+    gap: 12,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 16,
+    marginTop: 12,
+  },
+  loadMoreContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    gap: 12,
+  },
+  loadMoreText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
+  },
+  emptySubtext: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  selectedMuscleText: {
+    fontWeight: 'bold',
   },
 });
 

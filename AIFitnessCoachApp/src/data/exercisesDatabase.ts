@@ -928,6 +928,7 @@ export const workoutPrograms: WorkoutProgram[] = [
 
 // Helper functions for searching and filtering
 export const searchExercises = (query: string, category?: string): Exercise[] => {
+  // Use completeExercisesDatabase which includes all exercises
   let results = completeExercisesDatabase;
   
   if (category && category !== 'All') {
@@ -972,7 +973,12 @@ export const searchPrograms = (query: string, level?: string, category?: string)
 };
 
 export const getExerciseById = (id: string): Exercise | undefined => {
-  return completeExercisesDatabase.find(exercise => exercise.id === id);
+  // First try to find in the complete database
+  const exercise = completeExercisesDatabase.find(exercise => exercise.id === id);
+  if (exercise) return exercise;
+  
+  // If not found, try the base exercises database
+  return exercisesDatabase.find(exercise => exercise.id === id);
 };
 
 export const getProgramById = (id: string): WorkoutProgram | undefined => {

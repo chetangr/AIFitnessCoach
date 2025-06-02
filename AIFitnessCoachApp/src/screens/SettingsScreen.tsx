@@ -12,11 +12,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../store/authStore';
+import { useThemeStore } from '../store/themeStore';
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
   const { logout } = useAuthStore();
-  const [darkMode, setDarkMode] = React.useState(false);
+  const { isDarkMode, theme, setDarkMode } = useThemeStore();
   const [notifications, setNotifications] = React.useState(true);
   const [publicProfile, setPublicProfile] = React.useState(false);
 
@@ -57,7 +58,16 @@ const SettingsScreen = () => {
     {
       title: 'Preferences',
       items: [
-        { icon: 'moon-outline', label: 'Dark Mode', toggle: true, value: darkMode, onToggle: setDarkMode },
+        { 
+          icon: 'moon-outline', 
+          label: 'Dark Mode', 
+          toggle: true, 
+          value: isDarkMode, 
+          onToggle: (value: boolean) => {
+            console.log('Dark mode toggle:', value, 'Current:', isDarkMode);
+            setDarkMode(value);
+          }
+        },
         { icon: 'notifications-outline', label: 'Push Notifications', toggle: true, value: notifications, onToggle: setNotifications },
         { icon: 'language-outline', label: 'Language', value: 'English', onPress: () => {} },
       ],
@@ -80,8 +90,12 @@ const SettingsScreen = () => {
     },
   ];
 
+  const gradientColors = isDarkMode 
+    ? ['#0f0c29', '#302b63', '#24243e'] 
+    : ['#667eea', '#764ba2'];
+
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+    <LinearGradient colors={gradientColors} style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Icon name="arrow-back" size={24} color="#fff" />
@@ -90,11 +104,14 @@ const SettingsScreen = () => {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={[styles.content, { backgroundColor: isDarkMode ? theme.colors.surface : '#f5f5f5' }]} 
+        showsVerticalScrollIndicator={false}
+      >
         {settingsSections.map((section, index) => (
           <View key={index} style={styles.section}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-            <View style={styles.sectionContent}>
+            <Text style={[styles.sectionTitle, { color: isDarkMode ? theme.colors.textSecondary : '#666' }]}>{section.title}</Text>
+            <View style={[styles.sectionContent, { backgroundColor: isDarkMode ? theme.colors.background : '#fff' }]}>
               {section.items.map((item, itemIndex) => (
                 <TouchableOpacity
                   key={itemIndex}
@@ -103,8 +120,8 @@ const SettingsScreen = () => {
                   disabled={item.toggle}
                 >
                   <View style={styles.settingLeft}>
-                    <Icon name={item.icon} size={22} color="#667eea" />
-                    <Text style={styles.settingLabel}>{item.label}</Text>
+                    <Icon name={item.icon} size={22} color={isDarkMode ? theme.colors.primary : "#667eea"} />
+                    <Text style={[styles.settingLabel, { color: isDarkMode ? theme.colors.text : '#333' }]}>{item.label}</Text>
                   </View>
                   {item.toggle ? (
                     <Switch
@@ -124,12 +141,30 @@ const SettingsScreen = () => {
           </View>
         ))}
 
+        {/* Debug Theme Button */}
+        <TouchableOpacity 
+          style={[styles.logoutButton, { backgroundColor: isDarkMode ? '#4ECDC4' : '#667eea', marginBottom: 10 }]} 
+          onPress={() => {
+            console.log('Manual theme toggle clicked. Current:', isDarkMode);
+            setDarkMode(!isDarkMode);
+          }}
+        >
+          <Text style={styles.logoutText}>
+            {isDarkMode ? '☀️ Switch to Light' : '🌙 Switch to Dark'}
+          </Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
 
         <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>Version 2.0.0</Text>
+          <Text style={[styles.versionText, { color: isDarkMode ? theme.colors.textSecondary : '#999' }]}>
+            Version 2.0.0 {isDarkMode ? '🌙' : '☀️'}
+          </Text>
+          <Text style={[styles.debugText, { color: isDarkMode ? theme.colors.textSecondary : '#999' }]}>
+            Theme: {isDarkMode ? 'Dark Mode' : 'Light Mode'}
+          </Text>
         </View>
       </ScrollView>
     </LinearGradient>
@@ -225,6 +260,12 @@ const styles = StyleSheet.create({
   versionText: {
     color: '#999',
     fontSize: 12,
+    textAlign: 'center',
+  },
+  debugText: {
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 4,
   },
 });
 

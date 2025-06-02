@@ -53,15 +53,253 @@ const ProgramDetailScreen: React.FC<ProgramDetailScreenProps> = ({ navigation, r
     ]).start();
   }, []);
 
+  const createProgramExercises = (program: WorkoutProgram): Exercise[] => {
+    const programName = program.name.toLowerCase();
+    const level = program.level;
+    
+    // Define exercise templates based on program types
+    const exerciseTemplates: { [key: string]: Exercise[] } = {
+      transformation: [
+        {
+          id: 'push_ups',
+          name: 'Push-ups',
+          category: 'Chest',
+          muscles: ['Chest', 'Triceps'],
+          primaryMuscles: ['Chest', 'Triceps'],
+          secondaryMuscles: ['Shoulders', 'Core'],
+          equipment: 'Bodyweight',
+          difficulty: level,
+          description: 'Classic bodyweight chest exercise',
+          instructions: [
+            'Start in plank position with hands shoulder-width apart',
+            'Lower body until chest nearly touches floor',
+            'Push back up to starting position',
+            'Keep core tight throughout movement'
+          ],
+          tips: ['Keep body in straight line', 'Control the descent', 'Breathe steadily'],
+        },
+        {
+          id: 'squats',
+          name: 'Bodyweight Squats',
+          category: 'Legs',
+          muscles: ['Quadriceps', 'Glutes'],
+          primaryMuscles: ['Quadriceps', 'Glutes'],
+          secondaryMuscles: ['Hamstrings', 'Core'],
+          equipment: 'Bodyweight',
+          difficulty: level,
+          description: 'Fundamental lower body exercise',
+          instructions: [
+            'Stand with feet shoulder-width apart',
+            'Lower body by bending knees and hips',
+            'Keep chest up and core engaged',
+            'Return to standing position'
+          ],
+          tips: ['Keep knees tracking over toes', 'Go as low as comfortable', 'Drive through heels'],
+        },
+        {
+          id: 'plank',
+          name: 'Plank Hold',
+          category: 'Core',
+          muscles: ['Core', 'Shoulders'],
+          primaryMuscles: ['Core'],
+          secondaryMuscles: ['Shoulders', 'Glutes'],
+          equipment: 'Bodyweight',
+          difficulty: level,
+          description: 'Isometric core strengthening exercise',
+          instructions: [
+            'Start in push-up position',
+            'Hold body in straight line',
+            'Engage core muscles',
+            'Breathe steadily'
+          ],
+          tips: ['Don\'t let hips sag', 'Keep core tight', 'Start with shorter holds'],
+        },
+      ],
+      strength: [
+        {
+          id: 'deadlift',
+          name: 'Deadlift',
+          category: 'Back',
+          muscles: ['Back', 'Glutes'],
+          primaryMuscles: ['Erector Spinae', 'Glutes'],
+          secondaryMuscles: ['Hamstrings', 'Traps'],
+          equipment: 'Barbell',
+          difficulty: level,
+          description: 'Compound movement targeting posterior chain',
+          instructions: [
+            'Stand with feet hip-width apart',
+            'Grip bar with hands just outside legs',
+            'Keep back straight, lift by extending hips',
+            'Lower bar with control'
+          ],
+          tips: ['Keep bar close to body', 'Drive through heels', 'Maintain neutral spine'],
+        },
+        {
+          id: 'bench_press',
+          name: 'Bench Press',
+          category: 'Chest',
+          muscles: ['Chest', 'Triceps'],
+          primaryMuscles: ['Chest'],
+          secondaryMuscles: ['Triceps', 'Shoulders'],
+          equipment: 'Barbell',
+          difficulty: level,
+          description: 'Primary chest building exercise',
+          instructions: [
+            'Lie on bench with feet flat on floor',
+            'Grip bar slightly wider than shoulders',
+            'Lower bar to chest with control',
+            'Press back up to starting position'
+          ],
+          tips: ['Keep shoulder blades retracted', 'Touch chest lightly', 'Control the weight'],
+        },
+        {
+          id: 'squat',
+          name: 'Barbell Squat',
+          category: 'Legs',
+          muscles: ['Quadriceps', 'Glutes'],
+          primaryMuscles: ['Quadriceps', 'Glutes'],
+          secondaryMuscles: ['Hamstrings', 'Core'],
+          equipment: 'Barbell',
+          difficulty: level,
+          description: 'King of leg exercises',
+          instructions: [
+            'Position bar on upper back',
+            'Stand with feet shoulder-width apart',
+            'Lower by sitting back and down',
+            'Drive through heels to stand'
+          ],
+          tips: ['Keep chest up', 'Track knees over toes', 'Full range of motion'],
+        },
+      ],
+      hiit: [
+        {
+          id: 'burpees',
+          name: 'Burpees',
+          category: 'Cardio',
+          muscles: ['Full Body'],
+          primaryMuscles: ['Full Body'],
+          secondaryMuscles: [],
+          equipment: 'Bodyweight',
+          difficulty: level,
+          description: 'High-intensity full body exercise',
+          instructions: [
+            'Start standing',
+            'Drop into squat, hands on floor',
+            'Jump feet back to plank',
+            'Jump feet forward, then jump up'
+          ],
+          tips: ['Land softly', 'Keep core engaged', 'Modify as needed'],
+        },
+        {
+          id: 'mountain_climbers',
+          name: 'Mountain Climbers',
+          category: 'Cardio',
+          muscles: ['Core', 'Shoulders'],
+          primaryMuscles: ['Core'],
+          secondaryMuscles: ['Shoulders', 'Legs'],
+          equipment: 'Bodyweight',
+          difficulty: level,
+          description: 'Dynamic core and cardio exercise',
+          instructions: [
+            'Start in plank position',
+            'Bring one knee to chest',
+            'Quickly switch legs',
+            'Maintain plank position'
+          ],
+          tips: ['Keep hips level', 'Move quickly', 'Breathe steadily'],
+        },
+        {
+          id: 'jumping_jacks',
+          name: 'Jumping Jacks',
+          category: 'Cardio',
+          muscles: ['Full Body'],
+          primaryMuscles: ['Legs'],
+          secondaryMuscles: ['Shoulders', 'Core'],
+          equipment: 'Bodyweight',
+          difficulty: level,
+          description: 'Classic cardio warm-up exercise',
+          instructions: [
+            'Start with feet together, arms at sides',
+            'Jump feet apart while raising arms overhead',
+            'Jump back to starting position',
+            'Maintain steady rhythm'
+          ],
+          tips: ['Land on balls of feet', 'Keep core engaged', 'Stay light on feet'],
+        },
+      ]
+    };
+
+    // Determine which exercise set to use based on program name
+    let selectedExercises: Exercise[] = [];
+    
+    if (programName.includes('transformation') || programName.includes('12 week')) {
+      selectedExercises = exerciseTemplates.transformation;
+    } else if (programName.includes('strength') || programName.includes('builder')) {
+      selectedExercises = exerciseTemplates.strength;
+    } else if (programName.includes('hiit') || programName.includes('shred') || programName.includes('cardio')) {
+      selectedExercises = exerciseTemplates.hiit;
+    } else if (programName.includes('upper')) {
+      selectedExercises = [exerciseTemplates.strength[1], exerciseTemplates.transformation[0], exerciseTemplates.strength[0]]; // Bench, Push-ups, Deadlift
+    } else {
+      // Default mixed workout
+      selectedExercises = [
+        exerciseTemplates.transformation[0], // Push-ups
+        exerciseTemplates.transformation[1], // Squats
+        exerciseTemplates.transformation[2], // Plank
+      ];
+    }
+
+    return selectedExercises;
+  };
+
   const loadProgramExercises = async () => {
     try {
       setLoading(true);
-      const programDetails = await exerciseService.getProgramById(program.id);
-      if (programDetails?.exerciseDetails) {
-        setExercises(programDetails.exerciseDetails);
-      }
+      console.log('Loading exercises for program:', program);
+      
+      // Create realistic exercises based on program name and type
+      const programBasedExercises = createProgramExercises(program);
+      console.log('Created program-based exercises:', programBasedExercises);
+      setExercises(programBasedExercises);
     } catch (error) {
       console.error('Failed to load program exercises:', error);
+      // Load some default exercises as fallback
+      setExercises([
+        {
+          id: 'default_1',
+          name: 'Push-ups',
+          category: 'Chest',
+          muscles: ['Chest', 'Triceps'],
+          primaryMuscles: ['Chest', 'Triceps'],
+          secondaryMuscles: ['Shoulders', 'Core'],
+          equipment: 'Bodyweight',
+          difficulty: 'Beginner',
+          description: 'Classic bodyweight chest exercise',
+          instructions: [
+            'Start in plank position',
+            'Lower body until chest nearly touches floor',
+            'Push back up to starting position'
+          ],
+          tips: ['Keep core tight', 'Maintain straight body line'],
+        },
+        {
+          id: 'default_2',
+          name: 'Squats',
+          category: 'Legs',
+          muscles: ['Quadriceps', 'Glutes'],
+          primaryMuscles: ['Quadriceps', 'Glutes'],
+          secondaryMuscles: ['Hamstrings', 'Core'],
+          equipment: 'Bodyweight',
+          difficulty: 'Beginner',
+          description: 'Fundamental lower body exercise',
+          instructions: [
+            'Stand with feet shoulder-width apart',
+            'Lower body by bending knees and hips',
+            'Return to standing position'
+          ],
+          tips: ['Keep knees tracking over toes', 'Maintain upright torso'],
+        },
+      ]);
     } finally {
       setLoading(false);
     }

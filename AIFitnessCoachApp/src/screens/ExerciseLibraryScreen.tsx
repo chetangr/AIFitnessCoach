@@ -94,11 +94,11 @@ const ExerciseLibraryScreen = ({ navigation }: any) => {
             <View style={styles.exerciseTags}>
               <View style={styles.tag}>
                 <Icon name="body-outline" size={12} color="white" />
-                <Text style={styles.tagText}>{item.muscles[0]}</Text>
+                <Text style={styles.tagText} numberOfLines={1} ellipsizeMode="tail">{item.muscles[0]}</Text>
               </View>
               <View style={styles.tag}>
                 <Icon name="barbell-outline" size={12} color="white" />
-                <Text style={styles.tagText}>{item.equipment}</Text>
+                <Text style={styles.tagText} numberOfLines={1} ellipsizeMode="tail">{item.equipment}</Text>
               </View>
             </View>
           </View>
@@ -178,7 +178,7 @@ const ExerciseLibraryScreen = ({ navigation }: any) => {
                 size={20}
                 color={selectedMuscle === muscle.id ? 'white' : 'rgba(255,255,255,0.8)'}
               />
-              <Text style={styles.muscleGroupText}>{muscle.name}</Text>
+              <Text style={styles.muscleGroupText} numberOfLines={1} ellipsizeMode="tail">{muscle.name}</Text>
             </BlurView>
           </TouchableOpacity>
         ))}
@@ -269,6 +269,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 8,
+    textAlign: 'center',
+    numberOfLines: 1,
+    ellipsizeMode: 'tail',
   },
   exerciseList: {
     paddingHorizontal: 20,
@@ -305,11 +308,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    maxWidth: 120,
   },
   tagText: {
     color: 'white',
     fontSize: 12,
+    fontWeight: '500',
     marginLeft: 4,
+    numberOfLines: 1,
+    ellipsizeMode: 'tail',
   },
   difficultyBadge: {
     paddingHorizontal: 12,

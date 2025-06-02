@@ -4,7 +4,11 @@ import {
   getExercisesByCategory,
   getRandomExercises
 } from '../data/comprehensiveExerciseDatabase';
-import { workoutPrograms } from '../data/exercisesDatabase';
+import { 
+  workoutPrograms, 
+  completeExercisesDatabase,
+  getExerciseById as getExerciseFromDatabase 
+} from '../data/exercisesDatabase';
 
 interface ExerciseQuery {
   muscle?: string;
@@ -61,11 +65,24 @@ class ExerciseService {
 
   async getExerciseById(id: string) {
     try {
-      // Find in comprehensive database
-      const exercise = comprehensiveExerciseDatabase.find(ex => ex.id === id);
+      // First try to find in completeExercisesDatabase (includes exercisesDatabase + variations)
+      let exercise = completeExercisesDatabase.find(ex => ex.id === id);
+      
+      // If not found, try comprehensive database as fallback
+      if (!exercise) {
+        exercise = comprehensiveExerciseDatabase.find(ex => ex.id === id);
+      }
       
       if (!exercise) {
-        throw new Error('Exercise not found');
+        // Try using the getExerciseById helper from exercisesDatabase
+        const dbExercise = getExerciseFromDatabase(id);
+        if (dbExercise) {
+          exercise = dbExercise;
+        }
+      }
+      
+      if (!exercise) {
+        throw new Error(`Exercise not found: ${id}`);
       }
       
       return {
@@ -133,9 +150,22 @@ class ExerciseService {
       }
       
       // Get exercises for this program
-      const programExercises = program.exercises.map(exerciseId => 
-        comprehensiveExerciseDatabase.find(ex => ex.id === exerciseId)
-      ).filter(Boolean);
+      const programExercises = program.exercises.map(exerciseId => {
+        // First try completeExercisesDatabase
+        let exercise = completeExercisesDatabase.find(ex => ex.id === exerciseId);
+        
+        // If not found, try comprehensive database
+        if (!exercise) {
+          exercise = comprehensiveExerciseDatabase.find(ex => ex.id === exerciseId);
+        }
+        
+        // If still not found, try the helper function
+        if (!exercise) {
+          exercise = getExerciseFromDatabase(exerciseId);
+        }
+        
+        return exercise;
+      }).filter(Boolean);
       
       return {
         ...program,

@@ -97,7 +97,7 @@ const WorkoutOverviewScreen = ({ navigation }: any) => {
   };
 
   const ExerciseCard = ({ exercise }: { exercise: Exercise }) => (
-    <BlurView intensity={15} tint="light" style={styles.exerciseCard}>
+    <BlurView intensity={30} tint="dark" style={styles.exerciseCard}>
       <View style={styles.exerciseHeader}>
         <View style={styles.exerciseInfo}>
           <Text style={styles.exerciseName}>{exercise.name}</Text>
@@ -120,15 +120,20 @@ const WorkoutOverviewScreen = ({ navigation }: any) => {
   );
 
   return (
-    <LinearGradient colors={['#667eea', '#764ba2', '#f093fb']} style={styles.container}>
-      {/* Header */}
+    <LinearGradient colors={['#0f0c29', '#302b63', '#24243e']} style={styles.container}>
+      {/* Enhanced Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={24} color="white" />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <BlurView intensity={20} tint="dark" style={styles.backButtonBlur}>
+            <Icon name="arrow-back" size={24} color="white" />
+          </BlurView>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Today's Workout</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-          <Icon name="settings-outline" size={24} color="white" />
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerSubtitle}>Ready to crush it?</Text>
+          <Text style={styles.headerTitle}>Today's Workout</Text>
+        </View>
+        <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.settingsButton}>
+          <Icon name="settings-outline" size={24} color="#f093fb" />
         </TouchableOpacity>
       </View>
 
@@ -197,7 +202,7 @@ const WorkoutOverviewScreen = ({ navigation }: any) => {
       {/* Start Workout Button */}
       <View style={styles.startWorkoutContainer}>
         <TouchableOpacity onPress={startWorkout} style={styles.startWorkoutButton} activeOpacity={0.9}>
-          <LinearGradient colors={['#FF6B6B', '#FF8E53', '#FFD93D']} style={styles.startButtonGradient}>
+          <LinearGradient colors={['#f093fb', '#667eea', '#764ba2']} style={styles.startButtonGradient}>
             <Icon name="play" size={24} color="white" />
             <Text style={styles.startButtonText}>Start Workout</Text>
           </LinearGradient>
@@ -229,10 +234,33 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 20,
   },
+  backButton: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  backButtonBlur: {
+    padding: 8,
+    borderRadius: 20,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(240, 147, 251, 0.8)',
+    marginBottom: 4,
+  },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     color: 'white',
+    textShadowColor: '#f093fb',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+  },
+  settingsButton: {
+    padding: 8,
   },
   workoutOverview: {
     paddingHorizontal: 20,
@@ -337,6 +365,9 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(240, 147, 251, 0.2)',
+    backgroundColor: 'rgba(48, 43, 99, 0.5)',
   },
   exerciseHeader: {
     flexDirection: 'row',
