@@ -9,127 +9,147 @@ import {
   Animated,
   Platform,
   Alert,
+  Modal,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import moment from 'moment';
 import { useThemeStore } from '../store/themeStore';
-import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
+import { workoutScheduleService, WorkoutEvent } from '../services/workoutScheduleService';
+import { SAFE_BOTTOM_PADDING } from '../constants/layout';
+import { Swipeable } from 'react-native-gesture-handler';
 
 const { width } = Dimensions.get('window');
 
-interface WorkoutEvent {
-  id: string;
-  title: string;
-  time: string;
-  duration: string;
-  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
-  type: 'workout' | 'rest';
-  calories: number;
-  completed: boolean;
-  originalDate?: Date;
-}
+// Remove duplicate interface since we're importing from service
+// interface WorkoutEvent is already imported
 
 interface DaySchedule {
   date: Date;
   dayName: string;
   dayNumber: string;
   isToday: boolean;
-  workouts: WorkoutEvent[];
+  workouts: (WorkoutEvent & { duration: string })[];
 }
 
 const TimelineScreen = ({ navigation }: any) => {
   const { isDarkMode } = useThemeStore();
   const [currentWeek, setCurrentWeek] = useState(moment());
   const [weekDays, setWeekDays] = useState<DaySchedule[]>([]);
-  const [draggedWorkout, setDraggedWorkout] = useState<WorkoutEvent | null>(null);
-  const [draggedFromDay, setDraggedFromDay] = useState<Date | null>(null);
-  const [dropTargetDay, setDropTargetDay] = useState<Date | null>(null);
+  const [showDayPicker, setShowDayPicker] = useState(false);
+  const [selectedWorkout, setSelectedWorkout] = useState<{workout: WorkoutEvent, fromDay: Date} | null>(null);
   
   const slideAnim = useRef(new Animated.Value(0)).current;
-  const dragPositionY = useRef(new Animated.Value(0)).current;
-  const dragOpacity = useRef(new Animated.Value(1)).current;
+  const scrollViewRef = useRef<ScrollView>(null);
+  const fabPulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     generateWeekSchedule();
   }, [currentWeek]);
+  
+  useEffect(() => {
+    // Create a pulsing animation for FAB
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(fabPulse, {
+          toValue: 1.1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fabPulse, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseAnimation.start();
+    
+    return () => pulseAnimation.stop();
+  }, []);
 
-  const generateWeekSchedule = () => {
-    const startOfWeek = currentWeek.clone().startOf('week');
-    const days: DaySchedule[] = [];
+  // Refresh when screen comes into focus (to pick up AI changes)
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('📱 Timeline screen focused - refreshing data...');
+      generateWeekSchedule();
+    }, [currentWeek])
+  );
 
-    for (let i = 0; i < 7; i++) {
-      const date = startOfWeek.clone().add(i, 'days');
-      const isToday = date.isSame(moment(), 'day');
+  const generateWeekSchedule = async () => {
+    try {
+      console.log('🔄 Generating week schedule from workout service...');
       
-      // Generate workouts based on the day
-      const dayWorkouts: WorkoutEvent[] = [];
+      // Initialize services if needed
+      await workoutScheduleService.initializeDefaultSchedule();
       
-      // Example workout schedule
-      if (i === 0 || i === 2 || i === 4) { // Mon, Wed, Fri
-        dayWorkouts.push({
-          id: `workout-${date.format('YYYY-MM-DD')}-1`,
-          title: ['Chest & Triceps', 'Back & Biceps', 'Legs & Glutes'][i === 0 ? 0 : i === 2 ? 1 : 2],
-          time: '9:00 AM',
-          duration: '45 min',
-          difficulty: 'Intermediate',
-          type: 'workout',
-          calories: 350,
-          completed: date.isBefore(moment(), 'day'),
-        });
-      }
+      const startOfWeek = currentWeek.clone().startOf('week');
+      const endOfWeek = currentWeek.clone().endOf('week');
       
-      if (i === 1 || i === 3) { // Tue, Thu
-        dayWorkouts.push({
-          id: `workout-${date.format('YYYY-MM-DD')}-2`,
-          title: i === 1 ? 'Shoulders & Abs' : 'Full Body HIIT',
-          time: '6:00 PM',
-          duration: '30 min',
-          difficulty: i === 1 ? 'Intermediate' : 'Advanced',
-          type: 'workout',
-          calories: i === 1 ? 280 : 400,
-          completed: date.isBefore(moment(), 'day'),
-        });
-      }
+      // Get actual workouts from the service
+      const weekWorkouts = await workoutScheduleService.getWorkoutsForDateRange(
+        startOfWeek.toDate(),
+        endOfWeek.toDate()
+      );
       
-      if (i === 5) { // Saturday
-        dayWorkouts.push({
-          id: `workout-${date.format('YYYY-MM-DD')}-3`,
-          title: 'Yoga & Stretching',
-          time: '10:00 AM',
-          duration: '60 min',
-          difficulty: 'Beginner',
-          type: 'workout',
-          calories: 150,
-          completed: date.isBefore(moment(), 'day'),
-        });
-      }
+      console.log('📋 Found', weekWorkouts.length, 'workouts for this week');
       
-      if (i === 6) { // Sunday
-        dayWorkouts.push({
-          id: `rest-${date.format('YYYY-MM-DD')}`,
-          title: 'Rest Day',
-          time: 'All Day',
-          duration: '-',
-          difficulty: 'Beginner',
-          type: 'rest',
-          calories: 0,
-          completed: false,
+      const days: DaySchedule[] = [];
+
+      for (let i = 0; i < 7; i++) {
+        const date = startOfWeek.clone().add(i, 'days');
+        const isToday = date.isSame(moment(), 'day');
+        
+        // Find workouts for this specific day and format them for UI
+        const dayWorkouts = weekWorkouts
+          .filter(workout => moment(workout.date).isSame(date, 'day'))
+          .map(workout => ({
+            ...workout,
+            // Convert duration from number to string format expected by UI
+            duration: typeof workout.duration === 'number' ? `${workout.duration} min` : workout.duration,
+            // Ensure difficulty matches expected format
+            difficulty: workout.difficulty as 'Beginner' | 'Intermediate' | 'Advanced'
+          }));
+        
+        console.log(`📅 ${date.format('ddd D')}:`, dayWorkouts.length, 'workouts');
+        
+        days.push({
+          date: date.toDate(),
+          dayName: date.format('ddd'),
+          dayNumber: date.format('D'),
+          isToday,
+          workouts: dayWorkouts as unknown as (WorkoutEvent & { duration: string })[],
         });
       }
 
-      days.push({
-        date: date.toDate(),
-        dayName: date.format('ddd'),
-        dayNumber: date.format('D'),
-        isToday,
-        workouts: dayWorkouts,
+      setWeekDays(days);
+      
+      // Scroll to today after a small delay to ensure layout is complete
+      setTimeout(() => {
+        scrollToToday(days);
+      }, 500);
+    } catch (error) {
+      console.error('❌ Error generating week schedule:', error);
+      // Fallback to empty schedule
+      setWeekDays([]);
+    }
+  };
+  
+  const scrollToToday = (days: DaySchedule[]) => {
+    const todayIndex = days.findIndex(day => day.isToday);
+    if (todayIndex !== -1 && scrollViewRef.current) {
+      // Calculate position based on approximate height of each day section
+      const approximateDayHeight = 200; // Adjust based on your actual day section height
+      const scrollPosition = todayIndex * approximateDayHeight;
+      
+      scrollViewRef.current.scrollTo({
+        y: scrollPosition,
+        animated: true
       });
     }
-
-    setWeekDays(days);
   };
 
   const navigateWeek = (direction: 'prev' | 'next') => {
@@ -161,7 +181,7 @@ const TimelineScreen = ({ navigation }: any) => {
   };
 
   const handleWorkoutPress = (workout: WorkoutEvent) => {
-    if (workout.type === 'workout') {
+    if (workout.type !== 'rest') {
       // Create a workout object with exercises based on the workout type
       const workoutExercises = getWorkoutExercises(workout.title);
       
@@ -234,82 +254,144 @@ const TimelineScreen = ({ navigation }: any) => {
     return workoutMap[workoutTitle] || [];
   };
 
-  const handleDragStart = (workout: WorkoutEvent, fromDay: Date) => {
-    setDraggedWorkout(workout);
-    setDraggedFromDay(fromDay);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  };
 
-  const handleDragEnd = (gestureState: any) => {
-    if (draggedWorkout && draggedFromDay) {
-      // Determine drop target based on drag position
-      const { absoluteY } = gestureState.nativeEvent;
-      const targetDay = findDayFromPosition(absoluteY);
+  const swapWorkouts = async (workout1: WorkoutEvent, day1: Date, workout2: WorkoutEvent | null, day2: Date) => {
+    if (moment(day1).isSame(day2, 'day')) return;
+    
+    try {
+      console.log('Swapping workouts:', workout1.title, 'with', workout2?.title || 'rest day');
       
-      if (targetDay && !moment(targetDay).isSame(draggedFromDay, 'day')) {
-        // Move workout to new day
-        moveWorkout(draggedWorkout, draggedFromDay, targetDay);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      // Get both workouts
+      const targetDayWorkout = await workoutScheduleService.getWorkoutForDate(day2);
+      
+      // Delete both workouts
+      await workoutScheduleService.deleteWorkout(day1);
+      await workoutScheduleService.deleteWorkout(day2);
+      
+      // Add workout1 to day2
+      const movedWorkout1 = {
+        ...workout1,
+        date: day2
+      };
+      await workoutScheduleService.addWorkout(day2, movedWorkout1);
+      
+      // If there was a workout on day2, add it to day1
+      if (targetDayWorkout && targetDayWorkout.type !== 'rest') {
+        const movedWorkout2 = {
+          ...targetDayWorkout,
+          date: day1
+        };
+        await workoutScheduleService.addWorkout(day1, movedWorkout2);
       }
+      
+      // Regenerate the schedule to reflect changes
+      generateWeekSchedule();
+      
+      // Show success feedback
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (error) {
+      console.error('Error swapping workouts:', error);
+      Alert.alert('Error', 'Failed to swap workouts. Please try again.');
     }
-    
-    // Reset drag state
-    setDraggedWorkout(null);
-    setDraggedFromDay(null);
-    setDropTargetDay(null);
-    
-    // Reset animations
-    Animated.timing(dragOpacity, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
   };
 
-  const findDayFromPosition = (absoluteY: number): Date | null => {
-    // Simple approximation - you might want to measure actual positions
-    const headerHeight = 150; // Approximate header + navigation height
-    const dayHeight = 150; // Approximate height per day
-    const relativeY = absoluteY - headerHeight;
-    const dayIndex = Math.floor(relativeY / dayHeight);
+  const renderWorkoutCard = (workout: WorkoutEvent & { duration: string }, day: DaySchedule) => {
+    // Create animated values directly without useRef inside render
+    const scaleValue = new Animated.Value(1);
+    let swipeableRef: Swipeable | null = null;
     
-    if (dayIndex >= 0 && dayIndex < weekDays.length) {
-      return weekDays[dayIndex].date;
-    }
-    return null;
-  };
-
-  const moveWorkout = (workout: WorkoutEvent, fromDay: Date, toDay: Date) => {
-    if (moment(fromDay).isSame(toDay, 'day')) return;
+    const animatePress = () => {
+      Animated.sequence([
+        Animated.timing(scaleValue, {
+          toValue: 0.95,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleValue, {
+          toValue: 1,
+          friction: 3,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    };
     
-    Alert.alert(
-      'Move Workout',
-      `Move "${workout.title}" from ${moment(fromDay).format('ddd, MMM D')} to ${moment(toDay).format('ddd, MMM D')}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Move',
-          onPress: () => {
-            // Update the workouts in your state management
-            // For now, just regenerate the schedule
-            generateWeekSchedule();
+    const renderLeftActions = (progress: Animated.AnimatedInterpolation<number>) => {
+      const translateX = progress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [-80, 0],
+      });
+      
+      return (
+        <Animated.View style={[styles.swipeAction, { transform: [{ translateX }] }]}>
+          <LinearGradient
+            colors={['#667eea', '#764ba2']}
+            style={styles.swipeLeftGradient}
+          >
+            <Icon name="swap-horizontal" size={24} color="white" />
+            <Text style={styles.swipeActionText}>Reschedule</Text>
+          </LinearGradient>
+        </Animated.View>
+      );
+    };
+    
+    const renderRightActions = (progress: Animated.AnimatedInterpolation<number>) => {
+      const translateX = progress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [80, 0],
+      });
+      
+      return (
+        <Animated.View style={[styles.swipeAction, { transform: [{ translateX }] }]}>
+          <LinearGradient
+            colors={['#f44336', '#ff6b6b']}
+            style={styles.swipeRightGradient}
+          >
+            <Icon name="bed" size={24} color="white" />
+            <Text style={styles.swipeActionText}>Rest Day</Text>
+          </LinearGradient>
+        </Animated.View>
+      );
+    };
+    
+    const handleSwipeLeft = () => {
+      swipeableRef?.close();
+      setSelectedWorkout({ workout, fromDay: day.date });
+      setShowDayPicker(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    };
+    
+    const handleSwipeRight = async () => {
+      swipeableRef?.close();
+      Alert.alert(
+        'Make Rest Day',
+        `Convert "${workout.title}" to a rest day?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Yes, Rest Day',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await workoutScheduleService.deleteWorkout(day.date);
+                generateWeekSchedule();
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              } catch (error) {
+                Alert.alert('Error', 'Failed to update workout');
+              }
+            },
           },
-        },
-      ]
-    );
-  };
-
-  const renderWorkoutCard = (workout: WorkoutEvent, day: DaySchedule) => {
-    const isDragging = draggedWorkout?.id === workout.id;
-    const isDropTarget = dropTargetDay && moment(dropTargetDay).isSame(day.date, 'day');
+        ]
+      );
+    };
     
     if (workout.type === 'rest') {
       return (
-        <View
-          key={workout.id}
+        <Animated.View
           style={[
             styles.restDayCard,
-            day.isToday && styles.todayCard
+            day.isToday && styles.todayCard,
+            { transform: [{ scale: scaleValue }] }
           ]}
         >
           <BlurView intensity={10} tint="light" style={styles.restDayContent}>
@@ -317,98 +399,84 @@ const TimelineScreen = ({ navigation }: any) => {
             <Text style={styles.restDayText}>Rest Day</Text>
             <Text style={styles.restDaySubtext}>Recovery is important</Text>
           </BlurView>
-        </View>
+        </Animated.View>
       );
     }
+    
+    const handleLongPress = () => {
+      setSelectedWorkout({ workout, fromDay: day.date });
+      setShowDayPicker(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    };
+    
+    const handlePress = () => {
+      animatePress();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      handleWorkoutPress(workout);
+    };
 
     return (
-      <PanGestureHandler
-        key={workout.id}
-        onGestureEvent={(event) => {
-          dragPositionY.setValue(event.nativeEvent.translationY);
-          
-          // Update drop target during drag
-          if (draggedWorkout) {
-            const targetDay = findDayFromPosition(event.nativeEvent.absoluteY);
-            if (targetDay) {
-              setDropTargetDay(targetDay);
-            }
-          }
-        }}
-        onHandlerStateChange={(event) => {
-          if (event.nativeEvent.state === State.BEGAN) {
-            handleDragStart(workout, day.date);
-            Animated.timing(dragOpacity, {
-              toValue: 0.7,
-              duration: 200,
-              useNativeDriver: true,
-            }).start();
-          } else if (event.nativeEvent.state === State.END) {
-            handleDragEnd(event);
-          }
-        }}
+      <Swipeable
+        ref={(ref) => { swipeableRef = ref; }}
+        renderLeftActions={renderLeftActions}
+        renderRightActions={renderRightActions}
+        onSwipeableLeftOpen={handleSwipeLeft}
+        onSwipeableRightOpen={handleSwipeRight}
+        overshootLeft={false}
+        overshootRight={false}
+        friction={2}
       >
-        <Animated.View
-          style={[
-            isDragging && {
-              opacity: dragOpacity,
-              transform: [{ translateY: dragPositionY }],
-            }
-          ]}
+        <TouchableOpacity
+          onPress={handlePress}
+          onLongPress={handleLongPress}
+          activeOpacity={1}
         >
-          <TouchableOpacity
-            onPress={() => handleWorkoutPress(workout)}
-            activeOpacity={0.8}
-          >
-            <BlurView
-              intensity={day.isToday ? 25 : 15}
-              tint="light"
-              style={[
-                styles.workoutCard,
-                workout.completed && styles.completedCard,
-                isDropTarget && styles.dropTargetCard,
-              ]}
-            >
-              <View style={styles.workoutHeader}>
-                <View style={styles.workoutTitleRow}>
-                  <Icon 
-                    name={workout.completed ? "checkmark-circle" : "fitness"} 
-                    size={20} 
-                    color={workout.completed ? "#4CAF50" : "white"} 
-                  />
-                  <Text style={[
-                    styles.workoutTitle,
-                    workout.completed && styles.completedText
-                  ]} numberOfLines={1} ellipsizeMode="tail">
-                    {workout.title}
-                  </Text>
-                </View>
-                <TouchableOpacity style={styles.dragHandle}>
-                  <Icon name="reorder-three" size={24} color="rgba(255,255,255,0.5)" />
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.workoutDetails}>
-                <View style={styles.workoutStat}>
-                  <Icon name="time" size={14} color="rgba(255,255,255,0.7)" />
-                  <Text style={styles.workoutStatText}>{workout.duration}</Text>
-                </View>
-                
-                {workout.calories > 0 && (
-                  <View style={styles.workoutStat}>
-                    <Icon name="flame" size={14} color="rgba(255,255,255,0.7)" />
-                    <Text style={styles.workoutStatText}>{workout.calories} cal</Text>
+          <Animated.View style={{ transform: [{ scale: scaleValue }] }}>
+              <BlurView
+                intensity={day.isToday ? 25 : 15}
+                tint="light"
+                style={[
+                  styles.workoutCard,
+                  workout.completed && styles.completedCard
+                ]}
+              >
+                <View style={styles.workoutHeader}>
+                  <View style={styles.workoutTitleRow}>
+                    <Icon 
+                      name={workout.completed ? "checkmark-circle" : "fitness"} 
+                      size={20} 
+                      color={workout.completed ? "#4CAF50" : "white"} 
+                    />
+                    <Text style={[
+                      styles.workoutTitle,
+                      workout.completed && styles.completedText
+                    ]} numberOfLines={1} ellipsizeMode="tail">
+                      {workout.title}
+                    </Text>
                   </View>
-                )}
-                
-                <View style={[styles.difficultyBadge, getDifficultyStyle(workout.difficulty)]}>
-                  <Text style={styles.difficultyText}>{workout.difficulty}</Text>
                 </View>
-              </View>
-            </BlurView>
-          </TouchableOpacity>
-        </Animated.View>
-      </PanGestureHandler>
+                
+                <View style={styles.workoutDetails}>
+                  <View style={styles.workoutStat}>
+                    <Icon name="time" size={14} color="rgba(255,255,255,0.7)" />
+                    <Text style={styles.workoutStatText}>{workout.duration}</Text>
+                  </View>
+                  
+                  {workout.calories > 0 && (
+                    <View style={styles.workoutStat}>
+                      <Icon name="flame" size={14} color="rgba(255,255,255,0.7)" />
+                      <Text style={styles.workoutStatText}>{workout.calories} cal</Text>
+                    </View>
+                  )}
+                  
+                  <View style={[styles.difficultyBadge, getDifficultyStyle(workout.difficulty)]}>
+                    <Text style={styles.difficultyText}>{workout.difficulty}</Text>
+                  </View>
+                </View>
+              </BlurView>
+          </Animated.View>
+        </TouchableOpacity>
+      </Swipeable>
     );
   };
 
@@ -426,11 +494,11 @@ const TimelineScreen = ({ navigation }: any) => {
   };
 
   const gradientColors = isDarkMode 
-    ? ['#0f0c29', '#302b63', '#24243e'] 
-    : ['#667eea', '#764ba2', '#f093fb'];
+    ? ['#0f0c29', '#302b63', '#24243e'] as const
+    : ['#667eea', '#764ba2', '#f093fb'] as const;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <>
       <LinearGradient colors={gradientColors} style={styles.container}>
         {/* Enhanced Header */}
         <View style={styles.header}>
@@ -438,11 +506,13 @@ const TimelineScreen = ({ navigation }: any) => {
             <Text style={styles.headerSubtitle}>Your Journey</Text>
             <Text style={styles.headerTitle}>Timeline</Text>
           </View>
-          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.settingsButton}>
-            <LinearGradient colors={['rgba(240, 147, 251, 0.2)', 'rgba(102, 126, 234, 0.2)']} style={styles.settingsGradient}>
-              <Icon name="settings-outline" size={24} color="white" />
-            </LinearGradient>
-          </TouchableOpacity>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity onPress={generateWeekSchedule} style={styles.refreshButton}>
+              <LinearGradient colors={['rgba(76, 175, 80, 0.2)', 'rgba(76, 175, 80, 0.3)']} style={styles.refreshGradient}>
+                <Icon name="refresh" size={20} color="#4CAF50" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Week Navigation */}
@@ -466,20 +536,18 @@ const TimelineScreen = ({ navigation }: any) => {
 
         {/* Week View with Draggable Workouts */}
         <ScrollView 
+          ref={scrollViewRef}
           style={styles.weeklyView} 
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
+          contentContainerStyle={{ paddingBottom: SAFE_BOTTOM_PADDING }}
         >
           {weekDays.map((day) => {
-            const isDropTarget = dropTargetDay && moment(dropTargetDay).isSame(day.date, 'day');
             
             return (
               <View 
-                key={day.date.toISOString()} 
-                style={[
-                  styles.daySection,
-                  isDropTarget && styles.dropTargetSection
-                ]}
+                key={day.date.toISOString()}
+                style={styles.daySection}
               >
                 {/* Day Header */}
                 <View style={styles.dayHeader}>
@@ -507,18 +575,14 @@ const TimelineScreen = ({ navigation }: any) => {
                 {/* Workouts */}
                 <View style={styles.dayWorkouts}>
                   {day.workouts.length > 0 ? (
-                    day.workouts.map((workout) => renderWorkoutCard(workout, day))
+                    day.workouts.map((workout) => (
+                      <React.Fragment key={workout.id}>
+                        {renderWorkoutCard(workout, day)}
+                      </React.Fragment>
+                    ))
                   ) : (
-                    <View key="empty-day" style={styles.emptyDay}>
+                    <View style={styles.emptyDay}>
                       <Text style={styles.emptyDayText}>No workouts scheduled</Text>
-                    </View>
-                  )}
-                  
-                  {/* Drop Zone Indicator */}
-                  {isDropTarget && draggedWorkout && (
-                    <View style={styles.dropZone}>
-                      <Icon name="add-circle-outline" size={24} color="rgba(255,255,255,0.5)" />
-                      <Text style={styles.dropZoneText}>Drop here</Text>
                     </View>
                   )}
                 </View>
@@ -526,8 +590,94 @@ const TimelineScreen = ({ navigation }: any) => {
             );
           })}
         </ScrollView>
+
+        {/* Floating Workout Tracking Button */}
+        <Animated.View style={[styles.floatingButton, { transform: [{ scale: fabPulse }] }]}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('WorkoutTracking')}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={['#ff6b6b', '#ff4757']}
+              style={styles.floatingButtonGradient}
+            >
+              <Icon name="barbell" size={28} color="white" />
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
       </LinearGradient>
-    </GestureHandlerRootView>
+
+      {/* Day Selection Modal */}
+      <Modal
+        visible={showDayPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowDayPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <BlurView intensity={100} tint="dark" style={styles.modalContent}>
+              <Text style={styles.modalTitle}>
+                Move "{selectedWorkout?.workout.title}" to:
+              </Text>
+              
+              <ScrollView style={styles.dayList}>
+                {weekDays.map((d) => {
+                  const hasWorkout = d.workouts.some(w => w.type !== 'rest');
+                  const workoutName = hasWorkout ? d.workouts.find(w => w.type !== 'rest')?.title : 'Rest Day';
+                  const isCurrentDay = selectedWorkout && moment(d.date).isSame(selectedWorkout.fromDay, 'day');
+                  
+                  return (
+                    <TouchableOpacity
+                      key={d.date.toISOString()}
+                      style={[styles.dayOption, isCurrentDay && styles.currentDayOption]}
+                      onPress={async () => {
+                        if (selectedWorkout && !isCurrentDay) {
+                          const targetWorkout = d.workouts.find(w => w.type !== 'rest') || null;
+                          await swapWorkouts(
+                            selectedWorkout.workout, 
+                            selectedWorkout.fromDay, 
+                            targetWorkout, 
+                            d.date
+                          );
+                          setShowDayPicker(false);
+                          setSelectedWorkout(null);
+                        }
+                      }}
+                      disabled={isCurrentDay || false}
+                    >
+                      <View style={styles.dayOptionContent}>
+                        <Text style={[styles.dayOptionDate, isCurrentDay && styles.disabledText]}>
+                          {d.dayName} {d.dayNumber}
+                        </Text>
+                        <Text style={[styles.dayOptionWorkout, isCurrentDay && styles.disabledText]}>
+                          {workoutName}
+                        </Text>
+                      </View>
+                      {d.isToday && (
+                        <View style={styles.todayIndicator}>
+                          <Text style={styles.todayIndicatorText}>TODAY</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  setShowDayPicker(false);
+                  setSelectedWorkout(null);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </BlurView>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 };
 
@@ -553,13 +703,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
   },
-  settingsButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  refreshButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     overflow: 'hidden',
   },
-  settingsGradient: {
+  refreshGradient: {
     width: '100%',
     height: '100%',
     justifyContent: 'center',
@@ -750,6 +905,143 @@ const styles = StyleSheet.create({
   },
   todayCard: {
     transform: [{ scale: 1.02 }],
+  },
+  floatingButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  floatingButtonGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '90%',
+    maxHeight: '80%',
+    borderRadius: 24,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(30, 30, 46, 0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    shadowColor: '#764ba2',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 20,
+  },
+  modalContent: {
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  dayList: {
+    maxHeight: 400,
+  },
+  dayOption: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  currentDayOption: {
+    opacity: 0.5,
+  },
+  dayOptionContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dayOptionDate: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'white',
+  },
+  dayOptionWorkout: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  disabledText: {
+    color: 'rgba(255,255,255,0.4)',
+  },
+  todayIndicator: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(76, 175, 80, 0.3)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  todayIndicatorText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  cancelButton: {
+    marginTop: 20,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(244, 67, 54, 0.2)',
+    borderRadius: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(244, 67, 54, 0.3)',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+  },
+  swipeAction: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: '100%',
+  },
+  swipeLeftGradient: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  swipeRightGradient: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 16,
+    marginLeft: 8,
+  },
+  swipeActionText: {
+    color: 'white',
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '600',
   },
 });
 

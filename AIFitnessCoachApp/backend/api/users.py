@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
 from models.user import User
-from services.database import get_db
+from services.async_database import get_db
 from services.auth_service import AuthService
 from schemas.auth import UserResponse
 from schemas.user import UserUpdate, UserPreferencesUpdate

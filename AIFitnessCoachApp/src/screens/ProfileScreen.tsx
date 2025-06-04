@@ -12,11 +12,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuthStore } from '../store/authStore';
+import { useThemeStore } from '../store/themeStore';
 // Logger temporarily removed - was causing import errors
 
 const ProfileScreen = ({ navigation }: any) => {
   const { user, logout } = useAuthStore();
-  const [darkMode, setDarkMode] = React.useState(false);
+  const { isDarkMode, toggleDarkMode } = useThemeStore();
   const [notifications, setNotifications] = React.useState(true);
 
   const stats = [
@@ -45,8 +46,12 @@ const ProfileScreen = ({ navigation }: any) => {
     await logout();
   };
 
+  const gradientColors = isDarkMode 
+    ? ['#0f0c29', '#302b63', '#24243e'] as const
+    : ['#667eea', '#764ba2', '#f093fb'] as const;
+
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+    <LinearGradient colors={gradientColors} style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
@@ -101,8 +106,8 @@ const ProfileScreen = ({ navigation }: any) => {
               <Text style={styles.settingLabel}>Dark Mode</Text>
             </View>
             <Switch
-              value={darkMode}
-              onValueChange={setDarkMode}
+              value={isDarkMode}
+              onValueChange={toggleDarkMode}
               trackColor={{ false: 'rgba(255,255,255,0.3)', true: '#667eea' }}
               thumbColor="white"
             />

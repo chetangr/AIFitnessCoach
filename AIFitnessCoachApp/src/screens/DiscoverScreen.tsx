@@ -31,7 +31,7 @@ interface Exercise {
 }
 
 const DiscoverScreen = ({ navigation }: any) => {
-  const { isDarkMode, theme } = useThemeStore();
+  const { isDarkMode } = useThemeStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [programs, setPrograms] = useState<WorkoutProgram[]>([]);
@@ -216,7 +216,7 @@ const DiscoverScreen = ({ navigation }: any) => {
     }
   };
 
-  const getSampleExercises = (): Exercise[] => {
+  const _getSampleExercises = (): Exercise[] => {
     return [
       { id: '1', name: 'Bench Press', category: 'Chest', muscles: ['Chest', 'Triceps'], equipment: 'Barbell', difficulty: 'Intermediate' },
       { id: '2', name: 'Squats', category: 'Legs', muscles: ['Quads', 'Glutes'], equipment: 'Barbell', difficulty: 'Intermediate' },
@@ -530,8 +530,8 @@ const DiscoverScreen = ({ navigation }: any) => {
   );
 
   const gradientColors = isDarkMode 
-    ? ['#0f0c29', '#302b63', '#24243e'] 
-    : ['#667eea', '#764ba2'];
+    ? ['#0f0c29', '#302b63', '#24243e'] as const
+    : ['#667eea', '#764ba2'] as const;
 
   return (
     <LinearGradient colors={gradientColors} style={styles.container}>
@@ -558,7 +558,7 @@ const DiscoverScreen = ({ navigation }: any) => {
           >
             <BlurView intensity={30} tint="light" style={styles.searchButtonContent}>
               <Icon name="search" size={18} color="rgba(255,255,255,0.8)" />
-              <Text style={styles.searchButtonText}>Search {activeTab.toLowerCase()}...</Text>
+              <Text style={styles.searchInputText}>Search {activeTab.toLowerCase()}...</Text>
             </BlurView>
           </TouchableOpacity>
 
@@ -629,7 +629,7 @@ const DiscoverScreen = ({ navigation }: any) => {
             showsHorizontalScrollIndicator={false}
             data={trendingWorkouts}
             renderItem={renderTrendingCard}
-            keyExtractor={(item, index) => index.toString()}
+            keyExtractor={(_item, index) => index.toString()}
             contentContainerStyle={styles.horizontalList}
           />
         </View>
@@ -700,7 +700,7 @@ const DiscoverScreen = ({ navigation }: any) => {
             </View>
           ) : (
             <View style={styles.contentGrid}>
-              {(activeTab === 'Exercises' ? exercises : programs).map((item, index) => (
+              {(activeTab === 'Exercises' ? exercises : programs).map((item, _index) => (
                 <View key={item.id}>
                   {activeTab === 'Exercises' 
                     ? renderExerciseCard({ item: item as Exercise })
@@ -782,7 +782,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
   },
-  searchButtonText: {
+  searchInputText: {
     flex: 1,
     marginLeft: 8,
     fontSize: 14,

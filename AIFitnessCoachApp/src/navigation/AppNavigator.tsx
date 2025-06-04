@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
 import { View, StyleSheet, Platform, TouchableOpacity, Animated } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -12,7 +12,6 @@ import RegisterScreen from '../screens/RegisterScreen';
 
 // Main Screens
 import TimelineScreen from '../screens/TimelineScreen';
-import CreativeHomeScreen from '../screens/CreativeHomeScreen';
 import EnhancedDiscoverScreen from '../screens/EnhancedDiscoverScreen';
 import ImprovedProfileScreen from '../screens/ImprovedProfileScreen';
 import SimpleMessagesScreen from '../screens/SimpleMessagesScreen';
@@ -27,6 +26,7 @@ import EnhancedActiveWorkoutScreen from '../screens/EnhancedActiveWorkoutScreen'
 import WorkoutDetailScreen from '../screens/WorkoutDetailScreen';
 import ExerciseLibraryScreen from '../screens/ExerciseLibraryScreen';
 import ProgramDetailScreen from '../screens/ProgramDetailScreen';
+import ProgramsScreen from '../screens/ProgramsScreen';
 import DebugLogScreen from '../screens/DebugLogScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import WorkoutHistoryScreen from '../screens/WorkoutHistoryScreen';
@@ -54,28 +54,46 @@ const AuthStack = () => (
   </Stack.Navigator>
 );
 
-const CustomTabBar = ({ state, navigation }: any) => {
+const CustomTabBar = ({ state, navigation }: BottomTabBarProps) => {
   const scaleValues = useRef(
     state.routes.map(() => new Animated.Value(1))
   ).current;
 
   const animateTab = (index: number, focused: boolean) => {
-    Animated.spring(scaleValues[index], {
-      toValue: focused ? 1.1 : 1,
-      useNativeDriver: true,
-      friction: 3,
-    }).start();
+    if (focused) {
+      // Bounce effect when selected
+      Animated.sequence([
+        Animated.spring(scaleValues[index], {
+          toValue: 1.2,
+          useNativeDriver: true,
+          speed: 20,
+          bounciness: 12,
+        }),
+        Animated.spring(scaleValues[index], {
+          toValue: 1.1,
+          useNativeDriver: true,
+          speed: 20,
+          bounciness: 8,
+        }),
+      ]).start();
+    } else {
+      Animated.spring(scaleValues[index], {
+        toValue: 1,
+        useNativeDriver: true,
+        friction: 3,
+      }).start();
+    }
   };
 
   useEffect(() => {
-    state.routes.forEach((_, index: number) => {
+    state.routes.forEach((_route, index: number) => {
       animateTab(index, state.index === index);
     });
   }, [state.index]);
 
   return (
     <View style={styles.tabBarContainer}>
-      <BlurView intensity={85} tint="dark" style={styles.tabBar}>
+      <BlurView intensity={95} tint="dark" style={styles.tabBar}>
         <View style={styles.tabBarContent}>
         {state.routes.map((route: any, index: number) => {
           const isFocused = state.index === index;
@@ -119,8 +137,8 @@ const CustomTabBar = ({ state, navigation }: any) => {
               >
                 <Icon
                   name={iconMap[route.name] || 'ellipse-outline'}
-                  size={22}
-                  color={isFocused ? '#fff' : 'rgba(255,255,255,0.4)'}
+                  size={24}
+                  color={isFocused ? '#f093fb' : 'rgba(255,255,255,0.6)'}
                 />
                 {isFocused && (
                   <View style={styles.activeDot} />
@@ -163,10 +181,11 @@ const MainStack = () => (
     <Stack.Screen name="MainTabs" component={MainTabs} />
     <Stack.Screen name="ExerciseDetail" component={ActiveWorkoutScreen} />
     <Stack.Screen name="ActiveWorkout" component={EnhancedActiveWorkoutScreen} />
-    <Stack.Screen name="WorkoutDetail" component={WorkoutDetailScreen} />
+    <Stack.Screen name="WorkoutDetail" component={WorkoutDetailScreen as any} />
     <Stack.Screen name="WorkoutOverview" component={WorkoutOverviewScreen} />
     <Stack.Screen name="WorkoutTracking" component={WorkoutTrackingScreen} />
-    <Stack.Screen name="ProgramDetail" component={ProgramDetailScreen} />
+    <Stack.Screen name="ProgramDetail" component={ProgramDetailScreen as any} />
+    <Stack.Screen name="Programs" component={ProgramsScreen} />
     <Stack.Screen name="ExerciseLibrary" component={ExerciseLibraryScreen} />
     <Stack.Screen name="Settings" component={SettingsScreen} />
     <Stack.Screen name="WorkoutHistory" component={WorkoutHistoryScreen} />
@@ -193,29 +212,29 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: Platform.OS === 'ios' ? 85 : 75,
+    height: Platform.OS === 'ios' ? 90 : 80,
     justifyContent: 'flex-end',
     paddingBottom: Platform.OS === 'ios' ? 20 : 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
   },
   tabBar: {
-    height: Platform.OS === 'ios' ? 60 : 55,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    height: Platform.OS === 'ios' ? 65 : 60,
+    borderRadius: 32,
+    backgroundColor: 'rgba(30, 30, 46, 0.85)',
     overflow: 'hidden',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.15)',
+    elevation: 20,
+    shadowColor: '#764ba2',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   tabBarContent: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
   },
   tabItem: {
     flex: 1,
@@ -226,19 +245,31 @@ const styles = StyleSheet.create({
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   activeIconContainer: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(240, 147, 251, 0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(240, 147, 251, 0.4)',
+    shadowColor: '#f093fb',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 5,
   },
   activeDot: {
     position: 'absolute',
-    bottom: -8,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#fff',
+    bottom: -10,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#f093fb',
+    shadowColor: '#f093fb',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    elevation: 3,
   },
 });

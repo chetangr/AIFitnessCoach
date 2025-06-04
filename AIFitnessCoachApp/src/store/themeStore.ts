@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SunriseSunsetService } from '../services/sunriseSunsetService';
 
 export interface ThemeColors {
   primary: string;
@@ -91,21 +92,38 @@ const darkTheme: Theme = {
 
 interface ThemeState {
   isDarkMode: boolean;
+  autoMode: boolean;
   theme: Theme;
   toggleTheme: () => void;
+  toggleDarkMode: () => void;
   setDarkMode: (isDark: boolean) => void;
+  setAutoMode: (enabled: boolean) => void;
+  checkAndUpdateTheme: () => Promise<void>;
+  initializeAutoMode: () => void;
 }
+
+let autoModeInterval: NodeJS.Timeout | null = null;
 
 export const useThemeStore = create<ThemeState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       isDarkMode: false,
+      autoMode: false,
       theme: lightTheme,
 
       toggleTheme: () => {
         set((state) => ({
           isDarkMode: !state.isDarkMode,
           theme: !state.isDarkMode ? darkTheme : lightTheme,
+          autoMode: false, // Disable auto mode when manually toggling
+        }));
+      },
+
+      toggleDarkMode: () => {
+        set((state) => ({
+          isDarkMode: !state.isDarkMode,
+          theme: !state.isDarkMode ? darkTheme : lightTheme,
+          autoMode: false, // Disable auto mode when manually toggling
         }));
       },
 
@@ -119,17 +137,66 @@ export const useThemeStore = create<ThemeState>()(
           };
         });
       },
+
+      setAutoMode: async (enabled: boolean) => {
+        console.log('ThemeStore: setAutoMode called with:', enabled);
+        
+        // Clear any existing interval
+        if (autoModeInterval) {
+          clearInterval(autoModeInterval);
+          autoModeInterval = null;
+        }
+
+        set({ autoMode: enabled });
+
+        if (enabled) {
+          // Check immediately
+          await get().checkAndUpdateTheme();
+          
+          // Set up interval to check every minute
+          autoModeInterval = setInterval(() => {
+            get().checkAndUpdateTheme();
+          }, 60000); // Check every minute
+        }
+      },
+
+      checkAndUpdateTheme: async () => {
+        const state = get();
+        if (!state.autoMode) return;
+
+        try {
+          const isDark = await SunriseSunsetService.isDarkTime();
+          if (isDark !== state.isDarkMode) {
+            console.log('ThemeStore: Auto updating theme based on sun times. Dark:', isDark);
+            state.setDarkMode(isDark);
+          }
+        } catch (error) {
+          console.error('Error checking sun times:', error);
+        }
+      },
+
+      initializeAutoMode: () => {
+        const state = get();
+        if (state.autoMode) {
+          // Re-initialize auto mode after app restart
+          state.setAutoMode(true);
+        }
+      },
     }),
     {
       name: 'theme-storage',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({ isDarkMode: state.isDarkMode }),
+      partialize: (state) => ({ isDarkMode: state.isDarkMode, autoMode: state.autoMode }),
       onRehydrateStorage: () => {
         console.log('ThemeStore: Starting rehydration...');
         return (state) => {
           if (state) {
-            console.log('ThemeStore: Rehydrated with isDarkMode:', state.isDarkMode);
+            console.log('ThemeStore: Rehydrated with isDarkMode:', state.isDarkMode, 'autoMode:', state.autoMode);
             state.theme = state.isDarkMode ? darkTheme : lightTheme;
+            // Initialize auto mode if it was enabled
+            if (state.autoMode) {
+              setTimeout(() => state.initializeAutoMode(), 1000); // Delay to ensure app is ready
+            }
           } else {
             console.log('ThemeStore: No stored state found, using default');
           }

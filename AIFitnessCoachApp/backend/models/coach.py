@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy import Column, String, Integer, JSON, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
@@ -24,6 +25,7 @@ class CoachingMessage(BaseModel):
     role = Column(String(50), nullable=False)  # 'user' or 'assistant'
     content = Column(Text, nullable=False)
     message_metadata = Column(JSON)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Relationships
     session = relationship("CoachingSession", back_populates="messages")

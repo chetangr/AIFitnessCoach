@@ -10,12 +10,19 @@ from fastapi.security import OAuth2PasswordBearer
 
 from models.user import User
 from schemas.auth import UserRegister
-from services.database import get_db
+from services.async_database import get_db
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
 
-JWT_SECRET = os.getenv("JWT_SECRET_KEY", "your-secret-key")
+JWT_SECRET = os.getenv("JWT_SECRET_KEY")
+if not JWT_SECRET:
+    # Generate a random secret for development, but warn the user
+    import secrets
+    JWT_SECRET = secrets.token_urlsafe(32)
+    print("⚠️  WARNING: No JWT_SECRET_KEY found in environment. Generated temporary key for development.")
+    print("⚠️  Set JWT_SECRET_KEY environment variable for production!")
+
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXPIRATION_MINUTES = int(os.getenv("JWT_EXPIRATION_MINUTES", "10080"))  # 7 days
 
@@ -105,14 +112,39 @@ class AuthService:
             headers={"WWW-Authenticate": "Bearer"},
         )
         
+        # Handle demo tokens
+        if token.startswith('demo-token-'):
+            return User(
+                id="demo-user-001",
+                email="demo@fitness.com",
+                display_name="Demo User",
+                created_at=datetime.utcnow()
+            )
+        
         try:
             payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-            user_id: str = payload.get("sub")
-            if user_id is None:
+            email: str = payload.get("sub")
+            user_id: str = payload.get("user_id")
+            if email is None or user_id is None:
                 raise credentials_exception
         except jwt.PyJWTError:
             raise credentials_exception
         
+        # Handle demo user without database
+        if user_id == "demo-user-001" and email == "demo@fitness.com":
+            return User(
+                id="demo-user-001",
+                email="demo@fitness.com",
+                display_name="Demo User",
+                username="demo",
+                first_name="Demo",
+                last_name="User",
+                created_at=datetime.utcnow(),
+                is_verified=True,
+                onboarding_completed=True
+            )
+        
+        # For real users, query database
         stmt = select(User).where(User.id == user_id)
         result = await db.execute(stmt)
         user = result.scalar_one_or_none()
@@ -121,3 +153,17 @@ class AuthService:
             raise credentials_exception
         
         return user
+    
+    async def get_optional_current_user(
+        self,
+        token: Optional[str] = Depends(oauth2_scheme),
+        db: AsyncSession = Depends(get_db)
+    ) -> Optional[User]:
+        """Get current user if authenticated, return None if not"""
+        if not token:
+            return None
+        
+        try:
+            return await self.get_current_user(token, db)
+        except HTTPException:
+            return None

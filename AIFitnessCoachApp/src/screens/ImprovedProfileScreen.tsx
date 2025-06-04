@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Switch,
   Modal,
   TextInput,
   Alert,
@@ -23,9 +22,6 @@ const ImprovedProfileScreen = ({ navigation }: any) => {
   const { user, logout } = useAuthStore();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showGoalsModal, setShowGoalsModal] = useState(false);
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [biometricAuth, setBiometricAuth] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
   
   // Edit profile state
   const [editName, setEditName] = useState(user?.email?.split('@')[0] || '');
@@ -45,7 +41,7 @@ const ImprovedProfileScreen = ({ navigation }: any) => {
 
   const menuItems = [
     { label: 'Edit Profile', icon: 'person-outline', action: () => setShowEditModal(true) },
-    { label: 'Fitness Goals', icon: 'target-outline', action: () => setShowGoalsModal(true) },
+    { label: 'Fitness Goals', icon: 'flag-outline', action: () => setShowGoalsModal(true) },
     { label: 'Change AI Coach', icon: 'chatbubble-ellipses-outline', action: () => navigation.navigate('TrainerSelection') },
     { label: 'Workout History', icon: 'time-outline', action: () => navigation.navigate('WorkoutHistory') },
     { label: 'Progress Photos', icon: 'camera-outline', action: () => navigation.navigate('ProgressPhotos') },
@@ -59,10 +55,23 @@ const ImprovedProfileScreen = ({ navigation }: any) => {
     'Flexibility', 'General Fitness', 'Rehabilitation', 'Sport Specific'
   ];
 
-  const handleSaveProfile = () => {
-    // TODO: Implement actual profile update
-    Alert.alert('Success', 'Profile updated successfully!');
-    setShowEditModal(false);
+  const handleSaveProfile = async () => {
+    try {
+      // Update the user in the auth store
+      const updatedUser = {
+        ...user!,
+        name: editName,
+        email: editEmail
+      };
+      
+      // Update in AsyncStorage and auth store
+      await useAuthStore.getState().login(updatedUser);
+      
+      Alert.alert('Success', 'Profile updated successfully!');
+      setShowEditModal(false);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update profile');
+    }
   };
 
   const handleSaveGoals = () => {
@@ -125,7 +134,14 @@ const ImprovedProfileScreen = ({ navigation }: any) => {
       'Are you sure you want to logout?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', style: 'destructive', onPress: logout }
+        { 
+          text: 'Logout', 
+          style: 'destructive', 
+          onPress: async () => {
+            await logout();
+            // Navigation should be handled by AppNavigator auth state change
+          }
+        }
       ]
     );
   };
@@ -148,9 +164,14 @@ const ImprovedProfileScreen = ({ navigation }: any) => {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profile</Text>
-          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-            <Icon name="log-out-outline" size={24} color="white" />
-          </TouchableOpacity>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.headerButton}>
+              <Icon name="settings-outline" size={24} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleLogout} style={styles.headerButton}>
+              <Icon name="log-out-outline" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Profile Info */}
@@ -188,7 +209,12 @@ const ImprovedProfileScreen = ({ navigation }: any) => {
         <View style={styles.menuContainer}>
           <Text style={styles.sectionTitle}>Profile & Settings</Text>
           {menuItems.map((item, index) => (
-            <TouchableOpacity key={index} onPress={item.action}>
+            <TouchableOpacity 
+              key={index} 
+              onPress={item.action}
+              activeOpacity={0.7}
+              style={styles.menuTouchable}
+            >
               <BlurView intensity={20} style={styles.menuItem}>
                 <View style={styles.menuItemContent}>
                   <Icon name={item.icon} size={20} color="white" />
@@ -200,49 +226,6 @@ const ImprovedProfileScreen = ({ navigation }: any) => {
           ))}
         </View>
 
-        {/* App Settings */}
-        <View style={styles.settingsContainer}>
-          <Text style={styles.sectionTitle}>App Settings</Text>
-          
-          <BlurView intensity={20} style={styles.settingItem}>
-            <View style={styles.settingContent}>
-              <Icon name="notifications-outline" size={20} color="white" />
-              <Text style={styles.settingText}>Push Notifications</Text>
-              <Switch
-                value={pushNotifications}
-                onValueChange={setPushNotifications}
-                trackColor={{ false: '#767577', true: '#f093fb' }}
-                thumbColor={pushNotifications ? '#f5576c' : '#f4f3f4'}
-              />
-            </View>
-          </BlurView>
-
-          <BlurView intensity={20} style={styles.settingItem}>
-            <View style={styles.settingContent}>
-              <Icon name="finger-print-outline" size={20} color="white" />
-              <Text style={styles.settingText}>Biometric Authentication</Text>
-              <Switch
-                value={biometricAuth}
-                onValueChange={setBiometricAuth}
-                trackColor={{ false: '#767577', true: '#f093fb' }}
-                thumbColor={biometricAuth ? '#f5576c' : '#f4f3f4'}
-              />
-            </View>
-          </BlurView>
-
-          <BlurView intensity={20} style={styles.settingItem}>
-            <View style={styles.settingContent}>
-              <Icon name="moon-outline" size={20} color="white" />
-              <Text style={styles.settingText}>Dark Mode</Text>
-              <Switch
-                value={darkMode}
-                onValueChange={setDarkMode}
-                trackColor={{ false: '#767577', true: '#f093fb' }}
-                thumbColor={darkMode ? '#f5576c' : '#f4f3f4'}
-              />
-            </View>
-          </BlurView>
-        </View>
       </ScrollView>
 
       {/* Edit Profile Modal */}
@@ -374,6 +357,14 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
   },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerButton: {
+    padding: 8,
+  },
   logoutButton: {
     padding: 8,
   },
@@ -460,6 +451,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 8,
     overflow: 'hidden',
+  },
+  menuTouchable: {
+    marginBottom: 4,
   },
   menuItemContent: {
     flexDirection: 'row',

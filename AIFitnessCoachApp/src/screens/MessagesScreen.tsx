@@ -17,7 +17,7 @@ import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 // Logger temporarily removed - was causing import errors
-import { openaiService } from '../services/openaiService';
+import { backendAgentService } from '../services/backendAgentService';
 
 interface Message {
   id: string;
@@ -48,7 +48,7 @@ const MessagesScreen = () => {
 
   const loadConversation = async () => {
     try {
-      await openaiService.loadConversation();
+      // Backend agent service handles conversation history automatically
       console.log('Conversation history loaded');
     } catch (error) {
       console.error('Error loading conversation:', error);
@@ -63,7 +63,7 @@ const MessagesScreen = () => {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images as any,
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
@@ -93,18 +93,18 @@ const MessagesScreen = () => {
     console.log('User Message Sent', { message: messageText, hasImage: !!imageUri });
 
     try {
-      // Call AI service
-      const response = await openaiService.sendMessageSimple(messageText, imageUri);
+      // Call backend multi-agent service
+      const response = await backendAgentService.sendMultiAgentMessage(messageText);
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: response,
+        text: response.response,
         sender: 'ai',
         timestamp: new Date(),
       };
 
       setMessages((prev) => [...prev, aiMessage]);
-      console.log('AI Response Received', { response });
+      console.log('AI Response Received', { response: response.response, respondingAgents: response.responding_agents });
     } catch (error) {
       console.error('AI Chat Error', error);
       // Fallback response

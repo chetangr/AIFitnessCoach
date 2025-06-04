@@ -6,7 +6,7 @@ from typing import Optional
 import os
 
 from models.user import User
-from services.database import get_db
+from services.async_database import get_db
 from services.auth_service import AuthService
 from utils.validators import validate_email, validate_password
 from schemas.auth import (
@@ -20,6 +20,33 @@ router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
 
 auth_service = AuthService()
+
+@router.post("/demo-login", response_model=TokenResponse)
+async def demo_login():
+    """Demo login endpoint for development - provides real JWT token"""
+    # Create a demo user object
+    demo_user = User(
+        id="demo-user-001",
+        email="demo@fitness.com",
+        display_name="Demo User",
+        created_at=datetime.utcnow()
+    )
+    
+    # Generate real JWT token for demo user
+    access_token = auth_service.create_access_token(
+        data={"sub": demo_user.email, "user_id": demo_user.id}
+    )
+    
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserResponse(
+            id=demo_user.id,
+            email=demo_user.email,
+            display_name=demo_user.display_name,
+            created_at=demo_user.created_at
+        )
+    )
 
 @router.post("/register", response_model=UserResponse)
 async def register(
@@ -74,9 +101,70 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db)
 ):
-    """Login with username/email and password"""
+    """Login with username/email and password (form data)"""
     # Try to authenticate with email or username
     user = await auth_service.authenticate_user(db, form_data.username, form_data.password)
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username/email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Create access token
+    access_token = auth_service.create_access_token(
+        data={"sub": str(user.id), "email": user.email}
+    )
+    
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserResponse(
+            id=str(user.id),
+            email=user.email,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            display_name=user.display_name,
+            fitness_level=user.fitness_level,
+            onboarding_completed=user.onboarding_completed
+        )
+    )
+
+from pydantic import BaseModel
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@router.post("/login-json", response_model=TokenResponse)
+async def login_json(
+    login_data: LoginRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Login with username/email and password (JSON body)"""
+    # Handle demo credentials
+    if login_data.username == "demo@fitness.com" and login_data.password == "demo123":
+        # Generate real JWT token for demo user
+        access_token = auth_service.create_access_token(
+            data={"sub": "demo@fitness.com", "user_id": "demo-user-001"}
+        )
+        
+        return TokenResponse(
+            access_token=access_token,
+            token_type="bearer",
+            user=UserResponse(
+                id="demo-user-001",
+                email="demo@fitness.com",
+                display_name="Demo User",
+                username="demo",
+                created_at=datetime.utcnow()
+            )
+        )
+    
+    # Try to authenticate with email or username
+    user = await auth_service.authenticate_user(db, login_data.username, login_data.password)
     
     if not user:
         raise HTTPException(

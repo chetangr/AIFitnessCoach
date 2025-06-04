@@ -17,9 +17,11 @@ import { useThemeStore } from '../store/themeStore';
 const SettingsScreen = () => {
   const navigation = useNavigation();
   const { logout } = useAuthStore();
-  const { isDarkMode, theme, setDarkMode } = useThemeStore();
+  const { isDarkMode, theme, setDarkMode, autoMode, setAutoMode } = useThemeStore();
   const [notifications, setNotifications] = React.useState(true);
   const [publicProfile, setPublicProfile] = React.useState(false);
+  const [biometricAuth, setBiometricAuth] = React.useState(false);
+  const [vacationMode, setVacationMode] = React.useState(false);
 
   const handleLogout = () => {
     Alert.alert(
@@ -68,8 +70,44 @@ const SettingsScreen = () => {
             setDarkMode(value);
           }
         },
+        { 
+          icon: 'sunny-outline', 
+          label: 'Auto Dark Mode (Sunrise/Sunset)', 
+          toggle: true, 
+          value: autoMode, 
+          onToggle: (value: boolean) => {
+            console.log('Auto dark mode toggle:', value);
+            setAutoMode(value);
+            if (value) {
+              Alert.alert(
+                'Auto Dark Mode Enabled', 
+                'Theme will automatically switch based on sunrise and sunset times in your location.'
+              );
+            }
+          }
+        },
         { icon: 'notifications-outline', label: 'Push Notifications', toggle: true, value: notifications, onToggle: setNotifications },
+        { icon: 'finger-print-outline', label: 'Biometric Authentication', toggle: true, value: biometricAuth, onToggle: setBiometricAuth },
         { icon: 'language-outline', label: 'Language', value: 'English', onPress: () => {} },
+      ],
+    },
+    {
+      title: 'Workout Settings',
+      items: [
+        { 
+          icon: 'airplane-outline', 
+          label: 'Vacation Mode', 
+          toggle: true, 
+          value: vacationMode, 
+          onToggle: (value: boolean) => {
+            setVacationMode(value);
+            if (value) {
+              Alert.alert('Vacation Mode', 'Your workouts will be paused. Enjoy your time off!');
+            }
+          }
+        },
+        { icon: 'calendar-outline', label: 'Manage Vacation Days', onPress: () => Alert.alert('Coming Soon', 'Vacation day management will be available soon!') },
+        { icon: 'repeat-outline', label: 'Auto-schedule Workouts', toggle: true, value: true, onToggle: () => {} },
       ],
     },
     {
@@ -91,8 +129,8 @@ const SettingsScreen = () => {
   ];
 
   const gradientColors = isDarkMode 
-    ? ['#0f0c29', '#302b63', '#24243e'] 
-    : ['#667eea', '#764ba2'];
+    ? ['#0f0c29', '#302b63', '#24243e'] as const
+    : ['#667eea', '#764ba2', '#f093fb'] as const;
 
   return (
     <LinearGradient colors={gradientColors} style={styles.container}>

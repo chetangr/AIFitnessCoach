@@ -12,12 +12,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuthStore } from '../store/authStore';
+import { useThemeStore } from '../store/themeStore';
 // Logger removed - causing import errors
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation }: any) => {
   const { user } = useAuthStore();
+  const { isDarkMode } = useThemeStore();
   const [todayWorkout] = useState({
     name: 'Upper Body Strength',
     duration: '45 min',
@@ -61,8 +63,12 @@ const HomeScreen = ({ navigation }: any) => {
     }
   };
 
+  const gradientColors = isDarkMode 
+    ? ['#0f0c29', '#302b63', '#24243e'] as const
+    : ['#667eea', '#764ba2', '#f093fb'] as const;
+
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+    <LinearGradient colors={gradientColors} style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>

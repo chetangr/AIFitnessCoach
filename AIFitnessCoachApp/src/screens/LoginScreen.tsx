@@ -31,22 +31,56 @@ const LoginScreen = ({ navigation }: any) => {
     console.log('Login Attempt', { email });
 
     try {
-      // For demo purposes
-      if (email === 'demo@fitness.com' && password === 'demo123') {
-        await login({
-          id: '1',
-          email: 'demo@fitness.com',
-          name: 'Demo User',
-          token: 'demo-token',
-        });
-        console.log('Login Successful', { email });
-      } else {
-        // Real API call would go here
-        Alert.alert('Error', 'Invalid credentials. Try demo@fitness.com / demo123');
+      // Call backend login API
+      const { API_BASE_URL } = await import('../config/api');
+      const response = await fetch(`${API_BASE_URL}/api/auth/login-json`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: email,
+          password: password,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || 'Login failed');
       }
+
+      const data = await response.json();
+      
+      // Set the auth token in backend service
+      const { backendAgentService } = await import('../services/backendAgentService');
+      await backendAgentService.setAuthToken(data.access_token);
+      
+      // Login with user data
+      await login({
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.display_name || data.user.email,
+        token: data.access_token,
+      });
+      
+      console.log('Login Successful', { email });
     } catch (error) {
       console.log('Login Failed', error);
-      Alert.alert('Error', 'Login failed. Please try again.');
+      
+      // If backend fails, check for demo credentials
+      if (email === 'demo@fitness.com' && password === 'demo123') {
+        const demoToken = 'demo-token-' + Date.now();
+        const { backendAgentService } = await import('../services/backendAgentService');
+        await backendAgentService.setAuthToken(demoToken);
+        await login({
+          id: 'demo-user-001',
+          email: 'demo@fitness.com',
+          name: 'Demo User',
+          token: demoToken,
+        });
+      } else {
+        Alert.alert('Error', 'Invalid credentials. Try demo@fitness.com / demo123');
+      }
     } finally {
       setLoading(false);
     }

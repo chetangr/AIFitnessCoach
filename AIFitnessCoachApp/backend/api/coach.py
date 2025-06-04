@@ -6,9 +6,10 @@ from datetime import datetime
 
 from models.user import User
 from models.coach import CoachingSession, CoachingMessage
-from services.database import get_db
+from services.async_database import get_db
 from services.auth_service import AuthService
-from services.ai_coach_service import AICoachService
+from services.agent_service import agent_service
+from agents.openai_fitness_coach_agent import CoachPersonality
 from schemas.coach import (
     ChatRequest,
     ChatResponse,
@@ -20,7 +21,6 @@ from schemas.coach import (
 
 router = APIRouter()
 auth_service = AuthService()
-ai_coach_service = AICoachService()
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_coach(
@@ -28,30 +28,72 @@ async def chat_with_coach(
     current_user: User = Depends(auth_service.get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Chat with AI coach"""
+    """Chat with AI coach using OpenAI Agents SDK"""
     try:
-        # Get or create session
-        session = await ai_coach_service.get_or_create_session(
-            db,
-            current_user.id,
-            request.personality,
-            request.session_id
-        )
+        # Validate personality
+        personality = request.personality or CoachPersonality.SUPPORTIVE
+        if personality not in [CoachPersonality.SUPPORTIVE, CoachPersonality.AGGRESSIVE, CoachPersonality.STEADY_PACE]:
+            personality = CoachPersonality.SUPPORTIVE
         
-        # Generate AI response
-        response = await ai_coach_service.generate_response(
+        # Chat with agent
+        agent_response = await agent_service.chat_with_agent(
             user=current_user,
             message=request.message,
-            personality=request.personality,
+            personality=personality,
             context=request.context
         )
         
-        # Save messages
-        user_message = await ai_coach_service.save_message(
-            db,
+        if agent_response['status'] == 'error':
+            return ChatResponse(
+                message=agent_response.get('fallback_response', 'Sorry, I encountered an error.'),
+                session_id=request.session_id,
+                personality=personality,
+                timestamp=datetime.utcnow(),
+                actions=[],
+                requires_confirmation=False
+            )
+        
+        # Parse agent response
+        response_text = agent_response['response']
+        
+        # Save messages to database
+        # Create session if needed
+        session = await get_or_create_coaching_session(
+            db, current_user.id, personality, request.session_id
+        )
+        
+        # Save user message
+        user_message = CoachingMessage(
             session_id=session.id,
             role="user",
-            content=request.message
+            content=request.message,
+            timestamp=datetime.utcnow()
+        )
+        db.add(user_message)
+        
+        # Save AI response
+        ai_message = CoachingMessage(
+            session_id=session.id,
+            role="assistant",
+            content=response_text,
+            timestamp=datetime.utcnow(),
+            metadata={"agent_response": agent_response}
+        )
+        db.add(ai_message)
+        
+        await db.commit()
+        
+        return ChatResponse(
+            message=response_text,
+            session_id=session.id,
+            personality=personality,
+            timestamp=datetime.utcnow(),
+            actions=[],  # Actions are handled by the agent internally
+            requires_confirmation=False,
+            agent_info={
+                "agent_id": agent_response.get('agent_id'),
+                "session_stats": agent_response.get('session_info', {})
+            }
         )
         
         ai_message = await ai_coach_service.save_message(

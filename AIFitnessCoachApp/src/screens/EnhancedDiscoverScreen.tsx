@@ -10,11 +10,13 @@ import {
   Image,
   Dimensions,
   Platform,
+  SectionList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { BlurView } from 'expo-blur';
 import { searchExercises, comprehensiveExerciseDatabase, Exercise } from '../data/comprehensiveExerciseDatabase';
+import { SAFE_BOTTOM_PADDING } from '../constants/layout';
 
 const { width } = Dimensions.get('window');
 
@@ -218,101 +220,119 @@ const EnhancedDiscoverScreen = ({ navigation }: any) => {
         </BlurView>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {activeTab === 'programs' ? (
-          <>
-            <Text style={styles.sectionTitle}>Featured Programs</Text>
-            <FlatList
-              horizontal
-              data={programs}
-              renderItem={renderProgram}
-              keyExtractor={(item) => item.id}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.programList}
-            />
+      {activeTab === 'programs' ? (
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: SAFE_BOTTOM_PADDING }}>
+          {/* Custom Programs Button */}
+          <TouchableOpacity 
+            style={styles.customProgramsButton}
+            onPress={() => navigation.navigate('Programs')}
+          >
+            <LinearGradient
+              colors={['#667eea', '#764ba2']}
+              style={styles.customProgramsGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Icon name="create-outline" size={24} color="white" />
+              <Text style={styles.customProgramsText}>Create & Manage Custom Programs</Text>
+              <Icon name="chevron-forward" size={24} color="white" />
+            </LinearGradient>
+          </TouchableOpacity>
 
-            <Text style={styles.sectionTitle}>Popular Categories</Text>
-            <View style={styles.categoryGrid}>
-              {['Strength', 'Cardio', 'Yoga', 'Flexibility'].map((category) => (
-                <TouchableOpacity 
-                  key={category} 
-                  style={styles.categoryCard}
-                  onPress={() => {
-                    setSearchQuery(category);
-                    console.log(`Filter by category: ${category}`);
-                  }}
-                >
-                  <BlurView intensity={25} tint="light" style={styles.categoryGradient}>
-                    <Text style={styles.categoryText}>{category}</Text>
-                  </BlurView>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </>
-        ) : (
-          <>
-            <Text style={styles.sectionTitle}>Filter by Muscle Group</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.muscleFilter}>
-              <TouchableOpacity onPress={() => setSelectedMuscle('all')}>
-                <BlurView
-                  intensity={selectedMuscle === 'all' ? 40 : 20}
-                  tint="light"
-                  style={[styles.muscleChip, selectedMuscle === 'all' && styles.muscleChipActive]}
-                >
-                  <Text style={[styles.muscleChipText, selectedMuscle === 'all' && styles.muscleChipTextActive]}>
-                    All
-                  </Text>
+          <Text style={styles.sectionTitle}>Featured Programs</Text>
+          <FlatList
+            horizontal
+            data={programs}
+            renderItem={renderProgram}
+            keyExtractor={(item) => item.id}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.programList}
+            scrollEnabled={false}
+          />
+
+          <Text style={styles.sectionTitle}>Popular Categories</Text>
+          <View style={styles.categoryGrid}>
+            {['Strength', 'Cardio', 'Yoga', 'Flexibility'].map((category) => (
+              <TouchableOpacity 
+                key={category} 
+                style={styles.categoryCard}
+                onPress={() => {
+                  setSearchQuery(category);
+                  console.log(`Filter by category: ${category}`);
+                }}
+              >
+                <BlurView intensity={25} tint="light" style={styles.categoryGradient}>
+                  <Text style={styles.categoryText}>{category}</Text>
                 </BlurView>
               </TouchableOpacity>
-              {muscleGroups.map((muscle) => (
-                <TouchableOpacity
-                  key={muscle.id}
-                  onPress={() => setSelectedMuscle(muscle.id)}
-                >
-                  <BlurView
-                    intensity={selectedMuscle === muscle.id ? 40 : 20}
-                    tint="light"
-                    style={[styles.muscleChip, selectedMuscle === muscle.id && styles.muscleChipActive]}
-                  >
-                    <Text style={styles.muscleIcon}>{muscle.icon}</Text>
-                    <Text style={[styles.muscleChipText, selectedMuscle === muscle.id && styles.muscleChipTextActive]}>
-                      {muscle.name}
-                    </Text>
-                  </BlurView>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            ))}
+          </View>
+        </ScrollView>
+      ) : (
+        <View style={styles.content}>
+          <FlatList
+            data={searchResults}
+            renderItem={renderExercise}
+            keyExtractor={(item) => item.id}
+            numColumns={2}
+            columnWrapperStyle={styles.exerciseRow}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: SAFE_BOTTOM_PADDING }}
+            ListHeaderComponent={
+              <>
+                <Text style={styles.sectionTitle}>Filter by Muscle Group</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.muscleFilter}>
+                  <TouchableOpacity onPress={() => setSelectedMuscle('all')}>
+                    <BlurView
+                      intensity={selectedMuscle === 'all' ? 40 : 20}
+                      tint="light"
+                      style={[styles.muscleChip, selectedMuscle === 'all' && styles.muscleChipActive]}
+                    >
+                      <Text style={[styles.muscleChipText, selectedMuscle === 'all' && styles.muscleChipTextActive]}>
+                        All
+                      </Text>
+                    </BlurView>
+                  </TouchableOpacity>
+                  {muscleGroups.map((muscle) => (
+                    <TouchableOpacity
+                      key={muscle.id}
+                      onPress={() => setSelectedMuscle(muscle.id)}
+                    >
+                      <BlurView
+                        intensity={selectedMuscle === muscle.id ? 40 : 20}
+                        tint="light"
+                        style={[styles.muscleChip, selectedMuscle === muscle.id && styles.muscleChipActive]}
+                      >
+                        <Text style={styles.muscleIcon}>{muscle.icon}</Text>
+                        <Text style={[styles.muscleChipText, selectedMuscle === muscle.id && styles.muscleChipTextActive]}>
+                          {muscle.name}
+                        </Text>
+                      </BlurView>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
 
-            <Text style={styles.sectionTitle}>
-              Exercise Library ({searchResults.length} exercises)
-            </Text>
-            {isSearching ? (
-              <View style={styles.loadingContainer}>
-                <Text style={styles.loadingText}>Searching exercises...</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={searchResults}
-                renderItem={renderExercise}
-                keyExtractor={(item) => item.id}
-                numColumns={2}
-                columnWrapperStyle={styles.exerciseRow}
-                showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
-                  <View style={styles.emptyContainer}>
-                    <Icon name="search" size={60} color="rgba(255,255,255,0.5)" />
-                    <Text style={styles.emptyText}>
-                      {searchQuery ? 'No exercises found' : 'Start typing to search exercises'}
-                    </Text>
+                <Text style={styles.sectionTitle}>
+                  Exercise Library ({searchResults.length} exercises)
+                </Text>
+                {isSearching && (
+                  <View style={styles.loadingContainer}>
+                    <Text style={styles.loadingText}>Searching exercises...</Text>
                   </View>
-                }
-              />
-            )}
-          </>
-        )}
-        {/* Bottom spacing for floating tab bar */}
-        <View style={{ height: Platform.OS === 'ios' ? 90 : 80 }} />
-      </ScrollView>
+                )}
+              </>
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Icon name="search" size={60} color="rgba(255,255,255,0.5)" />
+                <Text style={styles.emptyText}>
+                  {searchQuery ? 'No exercises found' : 'Start typing to search exercises'}
+                </Text>
+              </View>
+            }
+          />
+        </View>
+      )}
     </LinearGradient>
   );
 };
@@ -588,6 +608,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginTop: 12,
+  },
+  customProgramsButton: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 5,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  customProgramsGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+  },
+  customProgramsText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'white',
+    flex: 1,
+    marginHorizontal: 12,
   },
 });
 

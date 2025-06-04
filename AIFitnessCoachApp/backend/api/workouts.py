@@ -7,7 +7,7 @@ from uuid import UUID
 
 from models.user import User
 from models.workout import WorkoutPlan, WorkoutPlanVersion
-from services.database import get_db
+from services.async_database import get_db
 from services.auth_service import AuthService
 from schemas.workout import (
     WorkoutPlanCreate,

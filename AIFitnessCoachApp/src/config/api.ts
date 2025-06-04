@@ -1,7 +1,11 @@
 // API Configuration
-export const API_BASE_URL = __DEV__ 
-  ? 'http://localhost:8000'  // Local development server
-  : 'https://api.aifitnesscoach.com';  // Production server
+// Use your computer's IP address for mobile/simulator access
+// For Android emulator use: http://10.0.2.2:8000
+// For iOS simulator use: http://localhost:8000
+// For physical device use: http://YOUR_MACHINE_IP:8000
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || (__DEV__ 
+  ? 'http://192.168.1.187:8000'  // Update with your machine's IP
+  : 'https://api.aifitnesscoach.com');  // Production server
 
 export const WGER_API_URL = 'https://wger.de/api/v2';
 

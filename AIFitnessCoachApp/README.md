@@ -17,6 +17,15 @@ A comprehensive fitness coaching app built with React Native, featuring AI-power
 - 🏠 **Home Dashboard** - Overview of daily workouts, progress stats, and quick actions
 - 💪 **Workout Management** - Drag & drop workout scheduling, exercise library with 10,000+ exercises
 - 🤖 **AI Coach Chat** - Real-time chat with AI fitness coach using OpenAI GPT-4
+- 🧠 **Multi-Agent System** - Specialized AI agents for comprehensive fitness coaching:
+  - 💪 Primary Fitness Coach - Overall guidance and workout planning
+  - 🥗 Nutrition Specialist - Meal planning and dietary advice
+  - 😴 Recovery Expert - Sleep optimization and stress management
+  - 🎯 Goal Strategist - Progress tracking and goal achievement
+  - 🛡️ Form & Safety Specialist - Injury prevention and exercise form
+  - 📋 Fitness Action Coordinator - Workout modifications and scheduling
+- 📅 **Timeline Integration** - All agents have access to your workout schedule
+- 👁️ **Agent Visibility** - See which specialists are consulted for each response
 - 👤 **Profile & Settings** - User preferences, coach selection, theme customization
 - 🎨 **Glassmorphic UI** - Modern design with blur effects and transparency
 - 📱 **Cross-Platform** - Single codebase for iOS and Android
@@ -209,10 +218,46 @@ npx react-native start --reset-cache
 killall -9 node
 ```
 
+## 🔧 Backend Configuration (Optional)
+
+The app includes a Python FastAPI backend with advanced multi-agent AI capabilities:
+
+### Starting the Backend
+
+```bash
+# Navigate to backend directory
+cd backend
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Create .env file with your API keys
+echo "OPENAI_API_KEY=your_openai_api_key_here" > .env
+
+# Run the backend server
+python app.py
+```
+
+The backend will start on `http://localhost:8000`
+
+### Multi-Agent System Features
+
+When the backend is running, the app automatically enables:
+- **Multi-Agent Responses** - Multiple AI specialists collaborate on your queries
+- **Agent Visibility** - See which specialists (nutrition, recovery, etc.) contributed
+- **Timeline Integration** - All agents have access to your workout schedule
+- **Smart Workout Modifications** - Agents can modify your schedule based on needs
+
+Toggle between single/multi-agent mode using the people/person icon in the AI chat header.
+
 ## 🔑 API Keys
 
 For full functionality, configure these in the backend:
-- **OpenAI API Key** - Required for AI coach chat
+- **OpenAI API Key** - Required for AI coach chat and multi-agent system
 - **WGER API** - No key needed (public API for exercises)
 
 ## 📝 Important Notes
