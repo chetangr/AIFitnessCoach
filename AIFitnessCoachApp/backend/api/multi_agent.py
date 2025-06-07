@@ -15,6 +15,7 @@ from agents.multi_agent_coordinator import MultiAgentCoordinator, AgentType, Coa
 from schemas.coach import ChatResponse
 from pydantic import BaseModel, Field
 from utils.logger import setup_logger
+from services.optimized_agent_service import optimized_agent_service, AgentCache
 
 router = APIRouter()
 auth_service = AuthService()
@@ -102,41 +103,53 @@ async def multi_agent_chat_demo(
         # Use demo user ID
         demo_user_id = "demo-user-001"
         
-        # Get or create coordinator
-        coordinator = get_or_create_coordinator(
-            demo_user_id,
-            api_key,
-            chat_request.personality
-        )
+        # Set API key for optimized service
+        optimized_agent_service.api_key = api_key
         
-        # Convert agent strings to AgentType enums if specified
-        required_agents = None
-        if chat_request.required_agents:
-            required_agents = []
-            for agent_str in chat_request.required_agents:
-                try:
-                    required_agents.append(AgentType(agent_str))
-                except ValueError:
-                    # Skip invalid agent types
-                    pass
-        
-        # Fast mode: Only use primary coach for quick responses
-        if chat_request.fast_mode:
-            required_agents = [AgentType.PRIMARY_COACH]
-            logger.info("Fast mode enabled - using primary coach only")
-        
-        # Add single agent mode flag to context if needed
-        enhanced_context = chat_request.context or {}
-        if chat_request.single_agent_mode:
-            enhanced_context['single_agent_mode'] = True
-            logger.info(f"Single agent mode enabled - using only: {required_agents}")
-        
-        # Process query through multi-agent system
-        coordinated_response = await coordinator.process_user_query(
-            query=chat_request.message,
-            context=enhanced_context,
-            required_agents=required_agents
-        )
+        # Fast mode or specific optimization
+        if chat_request.fast_mode or chat_request.single_agent_mode:
+            # Use optimized quick response
+            response = await optimized_agent_service.get_quick_response(
+                demo_user_id,
+                chat_request.message,
+                chat_request.context
+            )
+            
+            # Convert to MultiAgentChatResponse format
+            return MultiAgentChatResponse(
+                primary_message=response["response"],
+                agent_insights=[],
+                consensus_recommendations=[],
+                action_items=[],
+                confidence_score=0.95,
+                timestamp=datetime.now(),
+                responding_agents=response.get("responding_agents", [{"name": "primary_coach", "role": "Main Coach"}])
+            )
+        else:
+            # Use optimized multi-agent response
+            response = await optimized_agent_service.get_multi_agent_response(
+                demo_user_id,
+                chat_request.message,
+                chat_request.context
+            )
+            
+            # Return the response directly if it's already in the right format
+            if "primary_message" in response:
+                return MultiAgentChatResponse(**response)
+            
+            # Otherwise, get coordinator for fallback
+            coordinator = get_or_create_coordinator(
+                demo_user_id,
+                api_key,
+                chat_request.personality
+            )
+            
+            # Process query through multi-agent system
+            coordinated_response = await coordinator.process_user_query(
+                query=chat_request.message,
+                context=chat_request.context or {},
+                required_agents=None
+            )
         
         # Convert to API response format
         agent_insights = [

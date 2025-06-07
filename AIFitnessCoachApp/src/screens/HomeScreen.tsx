@@ -13,6 +13,7 @@ import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
+import { getThemeGradient, TEXT_STYLES, COMPONENT_STYLES } from '../utils/themeConsistency';
 // Logger removed - causing import errors
 
 const { width } = Dimensions.get('window');
@@ -63,9 +64,7 @@ const HomeScreen = ({ navigation }: any) => {
     }
   };
 
-  const gradientColors = isDarkMode 
-    ? ['#0f0c29', '#302b63', '#24243e'] as const
-    : ['#667eea', '#764ba2', '#f093fb'] as const;
+  const gradientColors = getThemeGradient(isDarkMode);
 
   return (
     <LinearGradient colors={gradientColors} style={styles.container}>

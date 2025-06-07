@@ -7,21 +7,30 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
+import { useAISettingsStore } from '../store/aiSettingsStore';
+import { theme } from '../config/theme';
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
   const { logout } = useAuthStore();
-  const { isDarkMode, theme, setDarkMode, autoMode, setAutoMode } = useThemeStore();
+  const { isDarkMode, setDarkMode, autoMode, setAutoMode, themeColor, setThemeColor } = useThemeStore();
+  const { isQuantumMode, isTurboMode, toggleQuantumMode, toggleTurboMode, loadSettings } = useAISettingsStore();
   const [notifications, setNotifications] = React.useState(true);
   const [publicProfile, setPublicProfile] = React.useState(false);
   const [biometricAuth, setBiometricAuth] = React.useState(false);
   const [vacationMode, setVacationMode] = React.useState(false);
+
+  React.useEffect(() => {
+    loadSettings();
+  }, []);
 
   const handleLogout = () => {
     Alert.alert(
@@ -38,7 +47,6 @@ const SettingsScreen = () => {
           onPress: async () => {
             try {
               await logout();
-              // Navigation will automatically redirect to login screen
             } catch (error) {
               Alert.alert('Error', 'Failed to log out. Please try again.');
             }
@@ -47,6 +55,14 @@ const SettingsScreen = () => {
       ]
     );
   };
+
+  const themeOptions = [
+    { name: 'Default', colors: ['#667eea', '#764ba2', '#f093fb'], id: 'default' },
+    { name: 'Festival', colors: ['#FF6B6B', '#FFB347', '#FFE66D'], id: 'festival' },
+    { name: 'Ocean', colors: ['#4ECDC4', '#44A08D', '#093637'], id: 'ocean' },
+    { name: 'Sunset', colors: ['#F97B22', '#F15412', '#D22B2B'], id: 'sunset' },
+    { name: 'Forest', colors: ['#2C7744', '#3D8B53', '#4E9F62'], id: 'forest' },
+  ];
 
   const settingsSections = [
     {
@@ -58,37 +74,64 @@ const SettingsScreen = () => {
       ],
     },
     {
-      title: 'Preferences',
+      title: 'Stats & Export',
+      items: [
+        { icon: 'stats-chart-outline', label: 'View Statistics', onPress: () => navigation.navigate('Stats' as any) },
+        { icon: 'download-outline', label: 'Export Data', onPress: () => navigation.navigate('Stats' as any, { openExport: true }) },
+        { icon: 'analytics-outline', label: 'Progress Reports', onPress: () => {} },
+      ],
+    },
+    {
+      title: 'Appearance',
       items: [
         { 
           icon: 'moon-outline', 
           label: 'Dark Mode', 
           toggle: true, 
           value: isDarkMode, 
-          onToggle: (value: boolean) => {
-            console.log('Dark mode toggle:', value, 'Current:', isDarkMode);
-            setDarkMode(value);
-          }
+          onToggle: (value: boolean) => setDarkMode(value)
         },
         { 
           icon: 'sunny-outline', 
-          label: 'Auto Dark Mode (Sunrise/Sunset)', 
+          label: 'Auto Dark Mode', 
           toggle: true, 
           value: autoMode, 
           onToggle: (value: boolean) => {
-            console.log('Auto dark mode toggle:', value);
             setAutoMode(value);
             if (value) {
               Alert.alert(
                 'Auto Dark Mode Enabled', 
-                'Theme will automatically switch based on sunrise and sunset times in your location.'
+                'Theme will automatically switch based on sunrise and sunset times.'
               );
             }
           }
         },
-        { icon: 'notifications-outline', label: 'Push Notifications', toggle: true, value: notifications, onToggle: setNotifications },
-        { icon: 'finger-print-outline', label: 'Biometric Authentication', toggle: true, value: biometricAuth, onToggle: setBiometricAuth },
-        { icon: 'language-outline', label: 'Language', value: 'English', onPress: () => {} },
+      ],
+    },
+    {
+      title: 'AI Settings',
+      items: [
+        { 
+          icon: 'flash-outline', 
+          label: 'Turbo Mode', 
+          toggle: true, 
+          value: isTurboMode, 
+          onToggle: toggleTurboMode
+        },
+        { 
+          icon: 'planet-outline', 
+          label: 'Quantum Mode', 
+          toggle: true, 
+          value: isQuantumMode, 
+          onToggle: toggleQuantumMode
+        },
+        { 
+          icon: 'notifications-outline', 
+          label: 'AI Notifications', 
+          toggle: true, 
+          value: notifications, 
+          onToggle: setNotifications
+        },
       ],
     },
     {
@@ -106,16 +149,22 @@ const SettingsScreen = () => {
             }
           }
         },
-        { icon: 'calendar-outline', label: 'Manage Vacation Days', onPress: () => Alert.alert('Coming Soon', 'Vacation day management will be available soon!') },
+        { icon: 'calendar-outline', label: 'Manage Vacation Days', onPress: () => {} },
         { icon: 'repeat-outline', label: 'Auto-schedule Workouts', toggle: true, value: true, onToggle: () => {} },
       ],
     },
     {
-      title: 'Privacy',
+      title: 'Security',
       items: [
+        { 
+          icon: 'finger-print-outline', 
+          label: 'Biometric Auth', 
+          toggle: true, 
+          value: biometricAuth, 
+          onToggle: setBiometricAuth
+        },
         { icon: 'eye-outline', label: 'Public Profile', toggle: true, value: publicProfile, onToggle: setPublicProfile },
         { icon: 'shield-outline', label: 'Privacy Policy', onPress: () => {} },
-        { icon: 'document-text-outline', label: 'Terms of Service', onPress: () => {} },
       ],
     },
     {
@@ -128,82 +177,108 @@ const SettingsScreen = () => {
     },
   ];
 
-  const gradientColors = isDarkMode 
-    ? ['#0f0c29', '#302b63', '#24243e'] as const
-    : ['#667eea', '#764ba2', '#f093fb'] as const;
+  const renderSection = (section: any) => (
+    <View key={section.title} style={styles.section}>
+      <Text style={styles.sectionTitle}>{section.title}</Text>
+      <BlurView intensity={40} tint="dark" style={styles.sectionContainer}>
+        {section.items.map((item: any, index: number) => (
+          <TouchableOpacity
+            key={index}
+            style={[
+              styles.settingItem,
+              index < section.items.length - 1 && styles.settingItemBorder
+            ]}
+            onPress={item.onPress}
+            disabled={item.toggle}
+          >
+            <View style={styles.settingLeft}>
+              <LinearGradient
+                colors={['#667eea', '#764ba2']}
+                style={styles.iconContainer}
+              >
+                <Icon name={item.icon} size={20} color="#fff" />
+              </LinearGradient>
+              <Text style={styles.settingLabel}>{item.label}</Text>
+            </View>
+            {item.toggle ? (
+              <Switch
+                value={item.value}
+                onValueChange={item.onToggle}
+                trackColor={{ false: 'rgba(255,255,255,0.2)', true: '#667eea' }}
+                thumbColor={item.value ? '#f093fb' : '#f4f3f4'}
+              />
+            ) : (
+              <Icon name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
+            )}
+          </TouchableOpacity>
+        ))}
+      </BlurView>
+    </View>
+  );
 
   return (
-    <LinearGradient colors={gradientColors} style={styles.container}>
+    <LinearGradient colors={theme.colors.primary.gradient as [string, string, string]} style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Icon name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.title}>Settings</Text>
+        <View style={styles.titleContainer}>
+          <Icon name="settings" size={28} color="#f093fb" />
+          <Text style={styles.title}>Settings</Text>
+        </View>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView 
-        style={[styles.content, { backgroundColor: isDarkMode ? theme.colors.surface : '#f5f5f5' }]} 
+        style={styles.content} 
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        {settingsSections.map((section, index) => (
-          <View key={index} style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: isDarkMode ? theme.colors.textSecondary : '#666' }]}>{section.title}</Text>
-            <View style={[styles.sectionContent, { backgroundColor: isDarkMode ? theme.colors.background : '#fff' }]}>
-              {section.items.map((item, itemIndex) => (
-                <TouchableOpacity
-                  key={itemIndex}
-                  style={styles.settingItem}
-                  onPress={item.onPress}
-                  disabled={item.toggle}
-                >
-                  <View style={styles.settingLeft}>
-                    <Icon name={item.icon} size={22} color={isDarkMode ? theme.colors.primary : "#667eea"} />
-                    <Text style={[styles.settingLabel, { color: isDarkMode ? theme.colors.text : '#333' }]}>{item.label}</Text>
-                  </View>
-                  {item.toggle ? (
-                    <Switch
-                      value={item.value}
-                      onValueChange={item.onToggle}
-                      trackColor={{ false: '#E0E0E0', true: '#667eea' }}
-                      thumbColor={item.value ? '#fff' : '#f4f3f4'}
-                    />
-                  ) : item.value ? (
-                    <Text style={styles.settingValue}>{item.value}</Text>
-                  ) : (
-                    <Icon name="chevron-forward" size={20} color="#999" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        ))}
+        {/* Theme Color Selector */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Theme Colors</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.themeSelector}
+          >
+            {themeOptions.map((option) => (
+              <TouchableOpacity
+                key={option.id}
+                style={[
+                  styles.themeOption,
+                  themeColor === option.id && styles.themeOptionSelected
+                ]}
+                onPress={() => setThemeColor(option.id)}
+              >
+                <LinearGradient
+                  colors={option.colors}
+                  style={styles.themePreview}
+                />
+                <Text style={styles.themeName}>{option.name}</Text>
+                {themeColor === option.id && (
+                  <Icon name="checkmark-circle" size={20} color="#f093fb" style={styles.themeCheck} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
 
-        {/* Debug Theme Button */}
-        <TouchableOpacity 
-          style={[styles.logoutButton, { backgroundColor: isDarkMode ? '#4ECDC4' : '#667eea', marginBottom: 10 }]} 
-          onPress={() => {
-            console.log('Manual theme toggle clicked. Current:', isDarkMode);
-            setDarkMode(!isDarkMode);
-          }}
-        >
-          <Text style={styles.logoutText}>
-            {isDarkMode ? '☀️ Switch to Light' : '🌙 Switch to Dark'}
-          </Text>
-        </TouchableOpacity>
+        {settingsSections.map(renderSection)}
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Log Out</Text>
+          <BlurView intensity={40} tint="dark" style={styles.logoutBlur}>
+            <LinearGradient
+              colors={['#ef4444', '#dc2626']}
+              style={styles.logoutGradient}
+            >
+              <Icon name="log-out-outline" size={24} color="white" />
+              <Text style={styles.logoutText}>Log Out</Text>
+            </LinearGradient>
+          </BlurView>
         </TouchableOpacity>
 
-        <View style={styles.versionContainer}>
-          <Text style={[styles.versionText, { color: isDarkMode ? theme.colors.textSecondary : '#999' }]}>
-            Version 2.0.0 {isDarkMode ? '🌙' : '☀️'}
-          </Text>
-          <Text style={[styles.debugText, { color: isDarkMode ? theme.colors.textSecondary : '#999' }]}>
-            Theme: {isDarkMode ? 'Dark Mode' : 'Light Mode'}
-          </Text>
-        </View>
+        <Text style={styles.version}>Version 1.0.0</Text>
       </ScrollView>
     </LinearGradient>
   );
@@ -215,95 +290,139 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 60,
+    alignItems: 'center',
     paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingBottom: 20,
   },
   backButton: {
     width: 40,
     height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: 'white',
   },
   content: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    paddingTop: 20,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 100,
   },
   section: {
-    marginBottom: 20,
+    marginBottom: 25,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#666',
-    marginLeft: 20,
+    color: 'rgba(255,255,255,0.8)',
     marginBottom: 10,
+    marginLeft: 5,
   },
-  sectionContent: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    borderRadius: 15,
+  sectionContainer: {
+    borderRadius: 16,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   settingItem: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  settingItemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   settingLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
   settingLabel: {
     fontSize: 16,
-    color: '#333',
-    marginLeft: 15,
+    color: 'white',
+    fontWeight: '500',
   },
-  settingValue: {
-    fontSize: 14,
-    color: '#999',
-    marginRight: 5,
+  themeSelector: {
+    marginBottom: 10,
+  },
+  themeOption: {
+    marginRight: 12,
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  themeOptionSelected: {
+    borderColor: '#f093fb',
+  },
+  themePreview: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginBottom: 8,
+  },
+  themeName: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '500',
+  },
+  themeCheck: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
   },
   logoutButton: {
-    backgroundColor: '#ff4757',
-    marginHorizontal: 20,
     marginTop: 20,
-    padding: 16,
-    borderRadius: 15,
+    marginBottom: 10,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  logoutBlur: {
+    borderRadius: 16,
+  },
+  logoutGradient: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 10,
   },
   logoutText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
-  versionContainer: {
-    alignItems: 'center',
-    paddingVertical: 30,
-  },
-  versionText: {
-    color: '#999',
-    fontSize: 12,
+  version: {
     textAlign: 'center',
-  },
-  debugText: {
-    fontSize: 10,
-    textAlign: 'center',
-    marginTop: 4,
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 14,
+    marginTop: 20,
+    marginBottom: 20,
   },
 });
 

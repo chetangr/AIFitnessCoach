@@ -14,6 +14,8 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { ThemedGlassCard, ThemedGlassContainer } from '../components/glass/ThemedGlassComponents';
+import { theme } from '../config/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -153,7 +155,7 @@ const StatsScreen = ({ navigation }: any) => {
     }
   };
 
-  const addSampleWorkout = async () => {
+  const _addSampleWorkout = async () => {
     const newSet: WorkoutSet = {
       id: Date.now().toString(),
       exerciseName: 'Bench Press',
@@ -186,12 +188,16 @@ const StatsScreen = ({ navigation }: any) => {
   );
 
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+    <LinearGradient colors={theme.colors.primary.gradient as [string, string, string]} style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Stats & Export</Text>
-        <TouchableOpacity onPress={addSampleWorkout}>
-          <Icon name="add-circle" size={28} color="white" />
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Icon name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
+        <Text style={styles.headerTitle}>Stats & Export</Text>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -334,6 +340,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 28,

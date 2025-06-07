@@ -2,7 +2,7 @@
 Models for user-created content: custom exercises, workout templates, and programs
 """
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, ForeignKey, JSON, Text
-from sqlalchemy.dialects.postgresql import UUID
+from .database_types import UUID
 from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime
@@ -137,6 +137,8 @@ class TrainingProgram(Base):
     
     # Relationships
     creator = relationship("User", back_populates="training_programs")
+    enrollments = relationship("UserProgramEnrollment", back_populates="program", cascade="all, delete-orphan")
+    week_details = relationship("ProgramWeekDetail", back_populates="program", cascade="all, delete-orphan", order_by="ProgramWeekDetail.week_number")
 
 class ExerciseHistory(Base):
     __tablename__ = "exercise_history"

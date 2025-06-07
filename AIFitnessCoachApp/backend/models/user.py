@@ -62,3 +62,13 @@ class User(BaseModel):
     custom_exercises = relationship("CustomExercise", back_populates="creator", cascade="all, delete-orphan")
     workout_templates = relationship("WorkoutTemplate", back_populates="creator", cascade="all, delete-orphan")
     training_programs = relationship("TrainingProgram", back_populates="creator", cascade="all, delete-orphan")
+    
+    # Program tracking
+    program_enrollments = relationship("UserProgramEnrollment", back_populates="user", cascade="all, delete-orphan")
+    vacation_periods = relationship("VacationPeriod", back_populates="user", cascade="all, delete-orphan")
+    program_change_history = relationship("ProgramChangeHistory", back_populates="user", cascade="all, delete-orphan")
+    
+    @property
+    def current_program(self):
+        """Get the user's currently active program enrollment"""
+        return next((e for e in self.program_enrollments if e.is_active and not e.is_paused), None)

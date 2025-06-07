@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from sqlalchemy import select
-from services.async_database import async_session_maker, engine, sync_engine
+from services.async_database import AsyncSessionLocal, engine, sync_engine
 from models.base import Base
 from models.workout import Exercise
 from models.custom_content import TrainingProgram, WorkoutTemplate
@@ -436,11 +436,11 @@ async def check_and_seed_exercises(session):
             exercise = Exercise(
                 name=exercise_data["name"],
                 category=exercise_data["category"],
-                target_muscles=exercise_data["target_muscles"],
-                equipment=exercise_data["equipment"],
-                difficulty=exercise_data["difficulty"],
+                muscle_groups=exercise_data["target_muscles"],
+                equipment_required=[exercise_data["equipment"]] if isinstance(exercise_data["equipment"], str) else exercise_data["equipment"],
+                difficulty_level=exercise_data["difficulty"],
                 instructions=exercise_data["instructions"],
-                tips=exercise_data["tips"],
+                safety_notes=exercise_data["tips"],
                 variations=exercise_data["variations"],
                 created_at=datetime.utcnow()
             )
@@ -467,22 +467,22 @@ async def check_and_seed_programs(session):
         
         logger.info("Seeding training programs...")
         
-        # System user ID (1) for seeded content
-        system_user_id = 1
+        # System user ID for seeded content
+        # Use string for SQLite compatibility (will be converted by SQLAlchemy)
+        system_user_id = '00000000-0000-0000-0000-000000000001'
         
         for program_data in TRAINING_PROGRAMS_DATA:
             program = TrainingProgram(
                 name=program_data["name"],
                 description=program_data["description"],
+                user_id=system_user_id,
                 difficulty_level=program_data["difficulty_level"],
                 duration_weeks=program_data["duration_weeks"],
-                category=program_data["category"],
-                target_goals=program_data["target_goals"],
+                goal=program_data["category"],  # Map category to goal field
                 equipment_needed=program_data["equipment_needed"],
                 workouts_per_week=program_data["workouts_per_week"],
                 weekly_schedule=program_data["weekly_schedule"],
                 is_public=program_data["is_public"],
-                created_by=system_user_id,
                 created_at=datetime.utcnow()
             )
             session.add(program)
@@ -508,20 +508,21 @@ async def check_and_seed_workout_templates(session):
         
         logger.info("Seeding workout templates...")
         
-        # System user ID (1) for seeded content
-        system_user_id = 1
+        # System user ID for seeded content
+        # Use string for SQLite compatibility (will be converted by SQLAlchemy)
+        system_user_id = '00000000-0000-0000-0000-000000000001'
         
         for template_data in WORKOUT_TEMPLATES_DATA:
             template = WorkoutTemplate(
                 name=template_data["name"],
                 description=template_data["description"],
-                category=template_data["category"],
+                user_id=system_user_id,
                 difficulty_level=template_data["difficulty_level"],
                 duration_minutes=template_data["duration_minutes"],
                 equipment_needed=template_data["equipment_needed"],
+                target_muscle_groups=template_data.get("target_muscle_groups", []),
                 exercises=template_data["exercises"],
                 is_public=template_data["is_public"],
-                created_by=system_user_id,
                 created_at=datetime.utcnow()
             )
             session.add(template)
@@ -531,6 +532,40 @@ async def check_and_seed_workout_templates(session):
         
     except Exception as e:
         logger.error(f"Error seeding workout templates: {e}")
+        await session.rollback()
+        raise
+
+async def ensure_system_user(session):
+    """Ensure system user exists for seeded content"""
+    try:
+        from models.user import User
+        
+        system_user_id = '00000000-0000-0000-0000-000000000001'
+        
+        # Check if system user exists
+        result = await session.execute(
+            select(User).where(User.id == system_user_id)
+        )
+        system_user = result.scalar_one_or_none()
+        
+        if not system_user:
+            logger.info("Creating system user for seeded content...")
+            system_user = User(
+                id=system_user_id,
+                email='system@aifitness.local',
+                username='system',
+                display_name='System',
+                password_hash='',  # No login allowed
+                is_active=False,
+                created_at=datetime.utcnow()
+            )
+            session.add(system_user)
+            await session.commit()
+            logger.info("System user created")
+        
+        return system_user_id
+    except Exception as e:
+        logger.error(f"Error ensuring system user: {e}")
         await session.rollback()
         raise
 
@@ -548,8 +583,11 @@ async def seed_database():
             return
     
     # Seed data
-    async with async_session_maker() as session:
+    async with AsyncSessionLocal() as session:
         try:
+            # Ensure system user exists first
+            await ensure_system_user(session)
+            
             await check_and_seed_exercises(session)
             await check_and_seed_workout_templates(session)
             await check_and_seed_programs(session)

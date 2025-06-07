@@ -14,6 +14,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import FitnessMetricsOverlay from '../components/FitnessMetricsOverlay';
+import { fitnessMetricsService } from '../services/fitnessMetricsService';
 
 const { width } = Dimensions.get('window');
 
@@ -62,6 +64,16 @@ const WorkoutTrackingScreen = ({ route, navigation }: any) => {
     totalSets: 0,
     totalVolume: 0,
   });
+  
+  // Fitness metrics state
+  const [fitnessMetrics, setFitnessMetrics] = useState({
+    heartRate: 70,
+    calories: 0,
+    activeMinutes: 0,
+    distance: 0,
+    steps: 0,
+    avgHeartRate: 70,
+  });
 
   useEffect(() => {
     initializeWorkout();
@@ -73,6 +85,23 @@ const WorkoutTrackingScreen = ({ route, navigation }: any) => {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Subscribe to fitness metrics
+  useEffect(() => {
+    const unsubscribe = fitnessMetricsService.subscribe((metrics) => {
+      setFitnessMetrics(metrics);
+    });
+
+    // Start tracking when workout begins
+    const currentExercise = exercises[currentExerciseIndex];
+    if (currentExercise) {
+      fitnessMetricsService.startTracking(currentExercise.name, 'medium');
+    }
+
+    return () => {
+      unsubscribe();
+    };
+  }, [currentExerciseIndex, exercises]);
 
   const initializeWorkout = async () => {
     try {
@@ -179,6 +208,9 @@ const WorkoutTrackingScreen = ({ route, navigation }: any) => {
 
   const finishWorkout = async () => {
     try {
+      // Stop fitness tracking
+      fitnessMetricsService.stopTracking();
+      
       // Calculate session stats
       const totalSets = exercises.reduce((sum, ex) => sum + ex.sets.filter(s => s.completed).length, 0);
       const totalVolume = exercises.reduce((sum, ex) => 
@@ -280,6 +312,20 @@ const WorkoutTrackingScreen = ({ route, navigation }: any) => {
 
   return (
     <LinearGradient colors={['#667eea', '#764ba2', '#f093fb']} style={styles.container}>
+      {/* Fitness Metrics Overlay */}
+      <FitnessMetricsOverlay
+        heartRate={fitnessMetrics.heartRate}
+        calories={fitnessMetrics.calories}
+        elapsedTime={formatTime(workoutTimer)}
+        activeMinutes={fitnessMetrics.activeMinutes}
+        currentExercise={currentExercise?.name}
+        setsCompleted={exercises.reduce((sum, ex) => sum + ex.sets.filter(s => s.completed).length, 0)}
+        totalSets={exercises.reduce((sum, ex) => sum + ex.sets.length, 0)}
+        style="minimal"
+        position="top"
+        theme="dark"
+      />
+      
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBackPress}>

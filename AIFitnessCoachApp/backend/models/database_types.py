@@ -15,6 +15,10 @@ class UUID(TypeDecorator):
     """
     impl = CHAR(36)
     cache_ok = True
+    
+    def __init__(self, as_uuid=True):
+        self.as_uuid = as_uuid
+        super().__init__()
 
     def load_dialect_impl(self, dialect):
         if dialect.name == 'postgresql':
@@ -28,10 +32,18 @@ class UUID(TypeDecorator):
         elif dialect.name == 'postgresql':
             return value
         else:
+            # For SQLite, always store as string
             if isinstance(value, uuid.UUID):
                 return str(value)
+            elif isinstance(value, str):
+                # Validate it's a valid UUID string
+                try:
+                    uuid.UUID(value)
+                    return value
+                except ValueError:
+                    raise ValueError(f"Invalid UUID string: {value}")
             else:
-                return value
+                return str(value)
 
     def process_result_value(self, value, dialect):
         if value is None:
@@ -39,10 +51,22 @@ class UUID(TypeDecorator):
         elif dialect.name == 'postgresql':
             return value
         else:
-            if not isinstance(value, uuid.UUID):
-                return uuid.UUID(value)
+            # For SQLite
+            if self.as_uuid:
+                if not isinstance(value, uuid.UUID):
+                    if isinstance(value, int):
+                        # Handle the case where SQLite might return an integer
+                        return str(value)
+                    else:
+                        try:
+                            return uuid.UUID(value)
+                        except (ValueError, AttributeError):
+                            return str(value)
+                else:
+                    return value
             else:
-                return value
+                # Return as string
+                return str(value) if value else None
 
     @property
     def python_type(self):

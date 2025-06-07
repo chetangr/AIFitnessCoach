@@ -7,10 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from dotenv import load_dotenv
 
 from models.user import User
 from schemas.auth import UserRegister
 from services.async_database import get_db
+
+# Load environment variables
+load_dotenv()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
@@ -114,25 +118,39 @@ class AuthService:
         
         # Handle demo tokens
         if token.startswith('demo-token-'):
-            return User(
+            from types import SimpleNamespace
+            return SimpleNamespace(
                 id="demo-user-001",
                 email="demo@fitness.com",
                 display_name="Demo User",
-                created_at=datetime.utcnow()
+                username="demo",
+                created_at=datetime.utcnow(),
+                is_verified=True,
+                onboarding_completed=True,
+                fitness_level="intermediate"
             )
         
         try:
             payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-            email: str = payload.get("sub")
-            user_id: str = payload.get("user_id")
-            if email is None or user_id is None:
+            # Handle both formats for backwards compatibility
+            user_id: str = payload.get("sub")  # New format uses sub for user_id
+            email: str = payload.get("email")
+            
+            # For older tokens that use the old format
+            if user_id is None:
+                user_id = payload.get("user_id")
+                email = payload.get("sub")
+            
+            if user_id is None:
                 raise credentials_exception
         except jwt.PyJWTError:
             raise credentials_exception
         
         # Handle demo user without database
         if user_id == "demo-user-001" and email == "demo@fitness.com":
-            return User(
+            # Create a mock user object for demo
+            from types import SimpleNamespace
+            demo_user = SimpleNamespace(
                 id="demo-user-001",
                 email="demo@fitness.com",
                 display_name="Demo User",
@@ -141,8 +159,18 @@ class AuthService:
                 last_name="User",
                 created_at=datetime.utcnow(),
                 is_verified=True,
-                onboarding_completed=True
+                onboarding_completed=True,
+                fitness_level="intermediate",
+                password_hash="",
+                goals=["muscle_gain", "strength"],
+                current_weight=75.0,
+                target_weight=80.0,
+                height=180,
+                age=30,
+                preferred_coach_id="coach-maya",
+                is_active=True
             )
+            return demo_user
         
         # For real users, query database
         stmt = select(User).where(User.id == user_id)
@@ -167,3 +195,13 @@ class AuthService:
             return await self.get_current_user(token, db)
         except HTTPException:
             return None
+
+# Create global instance
+auth_service = AuthService()
+
+# Helper function for getting current user ID
+async def get_current_user_id(
+    current_user: User = Depends(auth_service.get_current_user)
+) -> str:
+    """Get the current user's ID"""
+    return str(current_user.id)

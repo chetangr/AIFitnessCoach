@@ -5,10 +5,12 @@ Provides comprehensive exercise database with real data for fitness coaching age
 
 from typing import Dict, List, Any, Optional
 from sqlalchemy import select, or_, and_
-from ..models.workout import Exercise
-from ..models.custom_content import WorkoutTemplate, TrainingProgram
-from ..services.database import get_db
-from ..utils.logger import logger
+from models.workout import Exercise
+from models.custom_content import WorkoutTemplate, TrainingProgram
+from services.database import get_db
+from utils.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 
 class ExerciseService:

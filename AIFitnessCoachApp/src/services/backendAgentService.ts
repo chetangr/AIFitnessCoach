@@ -2,6 +2,7 @@
  * Backend Agent Service - Connects React Native app to Python backend with OpenAI Agents SDK
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getBackendUrl } from '../config/backend';
 
 interface AIResponse {
   text: string;
@@ -11,8 +12,15 @@ interface AIResponse {
 
 interface MultiAgentResponse {
   response: string;
-  responding_agents: string[];
+  responding_agents: Array<{
+    type: string;
+    name: string;
+    emoji: string;
+    confidence: string;
+  }>;
   conversation_id?: string;
+  action_items?: any[];
+  consensus_recommendations?: string[];
 }
 
 interface BackendChatRequest {
@@ -78,12 +86,13 @@ export class BackendAgentService {
   private sessionId: string | null = null;
 
   constructor() {
-    // Default to machine IP for development (localhost doesn't work on mobile)
+    // Use dynamic backend URL based on platform
     this.config = {
-      baseUrl: process.env.EXPO_PUBLIC_BACKEND_URL || 'http://192.168.1.187:8000',
-      timeout: 30000 // 30 seconds
+      baseUrl: getBackendUrl(),
+      timeout: 60000 // 60 seconds - increased for better AI responses
     };
     
+    console.log('Backend Service initialized with URL:', this.config.baseUrl);
     this.loadAuthToken();
   }
 
@@ -109,7 +118,8 @@ export class BackendAgentService {
   private async makeRequest(
     endpoint: string, 
     method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
-    body?: any
+    body?: any,
+    skipRetry?: boolean
   ): Promise<any> {
     // Allow requests without auth token for testing
     // if (!this.authToken) {
@@ -138,10 +148,10 @@ export class BackendAgentService {
 
     console.log(`🌐 ${method} ${url}`);
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
+    try {
       const response = await fetch(url, {
         ...requestConfig,
         signal: controller.signal
@@ -150,6 +160,11 @@ export class BackendAgentService {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        // Handle 404 gracefully for endpoints that might not exist
+        if (response.status === 404) {
+          console.log(`Endpoint not found: ${url}`);
+          return null;
+        }
         const errorText = await response.text();
         throw new Error(`Backend error (${response.status}): ${errorText}`);
       }
@@ -158,7 +173,34 @@ export class BackendAgentService {
       return data;
 
     } catch (error) {
+      clearTimeout(timeoutId);
+      
       if (error instanceof Error && error.name === 'AbortError') {
+        // For AI chat requests, retry once with a longer timeout
+        if (url.includes('/chat') && !skipRetry) {
+          console.log('Request timed out, retrying with longer timeout...');
+          const retryController = new AbortController();
+          const retryTimeoutId = setTimeout(() => retryController.abort(), 90000); // 90 seconds for retry
+          
+          try {
+            const retryResponse = await fetch(url, {
+              ...requestConfig,
+              signal: retryController.signal
+            });
+            
+            clearTimeout(retryTimeoutId);
+            
+            if (!retryResponse.ok) {
+              const errorText = await retryResponse.text();
+              throw new Error(`Backend error (${retryResponse.status}): ${errorText}`);
+            }
+            
+            return await retryResponse.json();
+          } catch (retryError) {
+            clearTimeout(retryTimeoutId);
+            throw new Error('Request timeout. The AI is taking longer than expected to respond.');
+          }
+        }
         throw new Error('Request timeout. Please check your connection.');
       }
       console.error(`Backend request failed:`, error);
@@ -237,11 +279,13 @@ export class BackendAgentService {
         request
       );
 
-      // Return simplified response
+      // Return response with action items
       return {
         response: response.primary_message || 'No response received',
-        responding_agents: response.responding_agents.map(agent => agent.type) || [],
-        conversation_id: `conv-${Date.now()}`
+        responding_agents: response.responding_agents || [],
+        conversation_id: `conv-${Date.now()}`,
+        action_items: response.action_items || [],
+        consensus_recommendations: response.consensus_recommendations || []
       };
 
     } catch (error) {
@@ -354,7 +398,8 @@ export class BackendAgentService {
    * Check if service is properly configured
    */
   isConfigured(): boolean {
-    return !!(this.config.baseUrl && this.authToken);
+    // For demo mode, we only need baseUrl
+    return !!(this.config.baseUrl);
   }
 
   /**

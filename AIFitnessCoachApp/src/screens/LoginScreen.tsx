@@ -1,18 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
   Alert,
-  ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuthStore } from '../store/authStore';
+import { theme } from '../config/theme';
+import { easings } from '../utils/animations';
+import GlassComponents from '../components/glass/GlassComponents';
 // Logger removed - causing import errors
 
 const LoginScreen = ({ navigation }: any) => {
@@ -20,6 +22,37 @@ const LoginScreen = ({ navigation }: any) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuthStore();
+  
+  // Animation values
+  const logoScale = useRef(new Animated.Value(0.5)).current;
+  const formOpacity = useRef(new Animated.Value(0)).current;
+  const formTranslateY = useRef(new Animated.Value(50)).current;
+  
+  useEffect(() => {
+    // Entrance animations
+    Animated.parallel([
+      Animated.spring(logoScale, {
+        toValue: 1,
+        tension: 50,
+        friction: 5,
+        useNativeDriver: true,
+      }),
+      Animated.timing(formOpacity, {
+        toValue: 1,
+        duration: 500,
+        delay: 200,
+        easing: easings.easeOut,
+        useNativeDriver: true,
+      }),
+      Animated.timing(formTranslateY, {
+        toValue: 0,
+        duration: 500,
+        delay: 200,
+        easing: easings.easeOut,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -93,78 +126,90 @@ const LoginScreen = ({ navigation }: any) => {
   };
 
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+    <LinearGradient 
+      colors={theme.colors.primary.gradient as [string, string, string]} 
+      style={styles.container}
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         <View style={styles.content}>
-          {/* Logo Section */}
-          <View style={styles.logoSection}>
+          {/* Animated Logo Section */}
+          <Animated.View 
+            style={[
+              styles.logoSection,
+              { transform: [{ scale: logoScale }] }
+            ]}
+          >
             <Text style={styles.logo}>💪</Text>
-            <Text style={styles.title}>AI Fitness Coach</Text>
-            <Text style={styles.subtitle}>Your Personal AI Trainer</Text>
-          </View>
+            <Text style={[styles.title, theme.typography.largeTitle]}>AI Fitness Coach</Text>
+            <Text style={[styles.subtitle, theme.typography.subheadline]}>Your Personal AI Trainer</Text>
+          </Animated.View>
 
-          {/* Login Form */}
-          <BlurView intensity={20} tint="light" style={styles.formContainer}>
-            <Text style={styles.formTitle}>Welcome Back!</Text>
+          {/* Animated Login Form */}
+          <Animated.View
+            style={[
+              { 
+                opacity: formOpacity,
+                transform: [{ translateY: formTranslateY }]
+              }
+            ]}
+          >
+            <GlassComponents.GlassContainer intensity="medium" style={styles.formContainer}>
+              <Text style={[styles.formTitle, theme.typography.title2]}>Welcome Back!</Text>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Email</Text>
-              <TextInput
-                style={styles.input}
+              <GlassComponents.GlassTextInput
+                icon="mail-outline"
                 placeholder="Enter your email"
-                placeholderTextColor="rgba(255,255,255,0.5)"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                style={styles.inputSpacing}
               />
-            </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Password</Text>
-              <TextInput
-                style={styles.input}
+              <GlassComponents.GlassTextInput
+                icon="lock-closed-outline"
                 placeholder="Enter your password"
-                placeholderTextColor="rgba(255,255,255,0.5)"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
+                style={styles.inputSpacing}
               />
-            </View>
 
-            <TouchableOpacity
-              style={styles.loginButton}
-              onPress={handleLogin}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text style={styles.loginButtonText}>Login</Text>
-              )}
-            </TouchableOpacity>
+              <GlassComponents.GlassButton
+                title="Login"
+                onPress={handleLogin}
+                loading={loading}
+                variant="primary"
+                size="large"
+                style={styles.loginButton}
+              />
 
-            <TouchableOpacity style={styles.demoButton} onPress={handleDemoLogin}>
-              <Text style={styles.demoButtonText}>Use Demo Account</Text>
-            </TouchableOpacity>
+              <GlassComponents.GlassButton
+                title="Use Demo Account"
+                onPress={handleDemoLogin}
+                variant="secondary"
+                size="medium"
+                style={styles.demoButton}
+              />
 
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>Don't have an account? </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-                <Text style={styles.linkText}>Sign Up</Text>
-              </TouchableOpacity>
-            </View>
-          </BlurView>
+              <View style={styles.footer}>
+                <Text style={[styles.footerText, theme.typography.footnote]}>Don't have an account? </Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+                  <Text style={[styles.linkText, theme.typography.footnote]}>Sign Up</Text>
+                </TouchableOpacity>
+              </View>
+            </GlassComponents.GlassContainer>
+          </Animated.View>
 
           {/* Demo Credentials Info */}
-          <View style={styles.demoInfo}>
-            <Text style={styles.demoInfoTitle}>Demo Credentials:</Text>
-            <Text style={styles.demoInfoText}>Email: demo@fitness.com</Text>
-            <Text style={styles.demoInfoText}>Password: demo123</Text>
-          </View>
+          <GlassComponents.GlassContainer intensity="light" style={styles.demoInfo} animated={true} delay={400}>
+            <Text style={[styles.demoInfoTitle, theme.typography.caption1]}>Demo Credentials:</Text>
+            <Text style={[styles.demoInfoText, theme.typography.caption2]}>Email: demo@fitness.com</Text>
+            <Text style={[styles.demoInfoText, theme.typography.caption2]}>Password: demo123</Text>
+          </GlassComponents.GlassContainer>
         </View>
       </KeyboardAvoidingView>
     </LinearGradient>
@@ -181,116 +226,64 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'center',
-    padding: 20,
+    padding: theme.spacing.lg,
   },
   logoSection: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: theme.spacing.xxl,
   },
   logo: {
     fontSize: 60,
-    marginBottom: 10,
+    marginBottom: theme.spacing.sm,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 8,
+    color: theme.colors.neutral.white,
+    marginBottom: theme.spacing.xs,
   },
   subtitle: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.9)',
+    color: theme.colors.neutral.gray300,
   },
   formContainer: {
-    borderRadius: 20,
-    padding: 24,
-    overflow: 'hidden',
+    padding: theme.spacing.lg,
   },
   formTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 24,
+    color: theme.colors.neutral.gray900,
+    marginBottom: theme.spacing.lg,
     textAlign: 'center',
   },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    color: 'white',
-    fontSize: 14,
-    marginBottom: 8,
-    fontWeight: '600',
-  },
-  input: {
-    height: 50,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    color: 'white',
-    backgroundColor: 'rgba(255,255,255,0.1)',
+  inputSpacing: {
+    marginBottom: theme.spacing.md,
   },
   loginButton: {
-    height: 50,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  loginButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+    marginTop: theme.spacing.lg,
   },
   demoButton: {
-    height: 50,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  demoButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    marginTop: theme.spacing.md,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 24,
+    marginTop: theme.spacing.lg,
   },
   footerText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
+    color: theme.colors.neutral.gray300,
   },
   linkText: {
-    color: 'white',
-    fontSize: 14,
+    color: theme.colors.primary.pink,
     fontWeight: 'bold',
     textDecorationLine: 'underline',
   },
   demoInfo: {
-    marginTop: 30,
-    padding: 16,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
+    marginTop: theme.spacing.xl,
+    padding: theme.spacing.md,
   },
   demoInfoTitle: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    color: theme.colors.neutral.white,
+    marginBottom: theme.spacing.xs,
   },
   demoInfoText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 13,
-    marginBottom: 4,
+    color: theme.colors.neutral.gray300,
+    marginBottom: theme.spacing.xs,
   },
 });
 

@@ -1,191 +1,277 @@
 import { Animated, Easing } from 'react-native';
+import { useEffect, useRef } from 'react';
 
-// Common animation durations
+// Animation duration constants
 export const ANIMATION_DURATION = {
-  fast: 100,
-  normal: 200,
-  slow: 300,
-  verySlow: 500,
+  fast: 200,
+  normal: 300,
+  slow: 500,
 };
 
-// Scale animation for press effects
-export const createScaleAnimation = (
-  animatedValue: Animated.Value,
-  toValue: number = 0.95,
-  duration: number = ANIMATION_DURATION.fast
+// Easing alias for backward compatibility
+export const EASING = {
+  easeOut: Easing.bezier(0.25, 0.46, 0.45, 0.94),
+  easeIn: Easing.bezier(0.42, 0, 1, 1),
+  easeInOut: Easing.bezier(0.42, 0, 0.58, 1),
+};
+
+// Apple-style easing curves
+export const easings = {
+  // Standard curves
+  easeInOut: Easing.bezier(0.42, 0, 0.58, 1),
+  easeOut: Easing.bezier(0.25, 0.46, 0.45, 0.94),
+  easeIn: Easing.bezier(0.42, 0, 1, 1),
+  
+  // Apple's custom curves
+  appleEase: Easing.bezier(0.25, 0.1, 0.25, 1),
+  appleSpring: Easing.bezier(0.68, -0.55, 0.265, 1.55),
+  
+  // Material Design curves
+  standard: Easing.bezier(0.4, 0, 0.2, 1),
+  decelerate: Easing.bezier(0, 0, 0.2, 1),
+  accelerate: Easing.bezier(0.4, 0, 1, 1),
+};
+
+// Animation hooks
+export const useFadeIn = (delay: number = 0, duration: number = 300) => {
+  const opacity = useRef(new Animated.Value(0)).current;
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration,
+        easing: easings.easeOut,
+        useNativeDriver: true,
+      }).start();
+    }, delay);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
+  return opacity;
+};
+
+// Fade in animation with style
+export const useFadeInAnimation = (delay: number = 0, duration: number = 300) => {
+  const fadeValue = useRef(new Animated.Value(0)).current;
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Animated.timing(fadeValue, {
+        toValue: 1,
+        duration,
+        easing: easings.easeOut,
+        useNativeDriver: true,
+      }).start();
+    }, delay);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
+  const animatedStyle = {
+    opacity: fadeValue,
+  };
+  
+  return { fadeValue, animatedStyle };
+};
+
+export const useSlideIn = (
+  from: 'bottom' | 'top' | 'left' | 'right' = 'bottom',
+  delay: number = 0,
+  distance: number = 50
 ) => {
-  return Animated.timing(animatedValue, {
-    toValue,
-    duration,
-    useNativeDriver: true,
-    easing: Easing.out(Easing.quad),
-  });
+  const translateX = useRef(new Animated.Value(
+    from === 'left' ? -distance : from === 'right' ? distance : 0
+  )).current;
+  
+  const translateY = useRef(new Animated.Value(
+    from === 'top' ? -distance : from === 'bottom' ? distance : 0
+  )).current;
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Animated.parallel([
+        Animated.spring(translateX, {
+          toValue: 0,
+          tension: 40,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.spring(translateY, {
+          toValue: 0,
+          tension: 40,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, delay);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
+  return { translateX, translateY };
 };
 
-// Bounce animation for buttons
-export const createBounceAnimation = (animatedValue: Animated.Value) => {
-  return Animated.sequence([
-    Animated.timing(animatedValue, {
-      toValue: 0.9,
-      duration: ANIMATION_DURATION.fast,
-      useNativeDriver: true,
-    }),
-    Animated.spring(animatedValue, {
-      toValue: 1,
-      friction: 3,
-      tension: 40,
-      useNativeDriver: true,
-    }),
-  ]);
+export const useScale = (initialScale: number = 0.9, delay: number = 0) => {
+  const scale = useRef(new Animated.Value(initialScale)).current;
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Animated.spring(scale, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }).start();
+    }, delay);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
+  return scale;
 };
 
-// Fade animation
-export const createFadeAnimation = (
-  animatedValue: Animated.Value,
-  toValue: number = 1,
-  duration: number = ANIMATION_DURATION.normal
-) => {
-  return Animated.timing(animatedValue, {
-    toValue,
-    duration,
-    useNativeDriver: true,
-    easing: Easing.inOut(Easing.ease),
-  });
+// Entrance animation with stagger
+export const useStaggeredEntrance = (itemCount: number, baseDelay: number = 0) => {
+  const animations = useRef(
+    Array(itemCount).fill(0).map(() => new Animated.Value(0))
+  ).current;
+  
+  useEffect(() => {
+    const staggerDelay = 50; // ms between each item
+    
+    animations.forEach((anim, index) => {
+      setTimeout(() => {
+        Animated.spring(anim, {
+          toValue: 1,
+          tension: 40,
+          friction: 8,
+          useNativeDriver: true,
+        }).start();
+      }, baseDelay + (index * staggerDelay));
+    });
+  }, []);
+  
+  return animations;
 };
 
-// Slide animation
-export const createSlideAnimation = (
-  animatedValue: Animated.Value,
-  toValue: number = 0,
-  duration: number = ANIMATION_DURATION.normal
-) => {
-  return Animated.timing(animatedValue, {
-    toValue,
-    duration,
-    useNativeDriver: true,
-    easing: Easing.out(Easing.cubic),
-  });
-};
-
-// Rotate animation
-export const createRotateAnimation = (
-  animatedValue: Animated.Value,
-  toValue: number = 1,
-  duration: number = ANIMATION_DURATION.slow
-) => {
-  return Animated.timing(animatedValue, {
-    toValue,
-    duration,
-    useNativeDriver: true,
-    easing: Easing.linear,
-  });
-};
-
-// Stagger animation for lists
-export const createStaggerAnimation = (
-  animations: Animated.CompositeAnimation[],
-  delay: number = 50
-) => {
-  return Animated.stagger(delay, animations);
-};
-
-// Parallel animation
-export const createParallelAnimation = (animations: Animated.CompositeAnimation[]) => {
-  return Animated.parallel(animations);
-};
-
-// Hook for scale press animation
-export const usePressAnimation = (initialScale: number = 1) => {
-  const scaleValue = new Animated.Value(initialScale);
-
+// Press animation
+export const usePressAnimation = () => {
+  const scaleValue = useRef(new Animated.Value(1)).current;
+  
   const onPressIn = () => {
-    createScaleAnimation(scaleValue, 0.95).start();
+    Animated.spring(scaleValue, {
+      toValue: 0.95,
+      tension: 100,
+      friction: 10,
+      useNativeDriver: true,
+    }).start();
   };
-
+  
   const onPressOut = () => {
-    createScaleAnimation(scaleValue, 1).start();
+    Animated.spring(scaleValue, {
+      toValue: 1,
+      tension: 40,
+      friction: 7,
+      useNativeDriver: true,
+    }).start();
   };
-
-  return {
-    scaleValue,
-    onPressIn,
-    onPressOut,
-    animatedStyle: {
-      transform: [{ scale: scaleValue }],
-    },
+  
+  const animatedStyle = {
+    transform: [{ scale: scaleValue }],
   };
+  
+  return { scaleValue, onPressIn, onPressOut, animatedStyle, scale: scaleValue, handlePressIn: onPressIn, handlePressOut: onPressOut };
 };
 
-// Hook for fade in animation on mount
-export const useFadeInAnimation = (delay: number = 0, duration: number = ANIMATION_DURATION.normal) => {
-  const fadeValue = new Animated.Value(0);
+// Parallax scroll animation
+export const useParallaxScroll = (scrollY: Animated.Value, rate: number = 0.5) => {
+  const translateY = scrollY.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: [-rate, 0, rate],
+  });
+  
+  return translateY;
+};
 
-  React.useEffect(() => {
-    Animated.timing(fadeValue, {
+// Pulse animation
+export const createPulseAnimation = (minScale: number = 0.95, maxScale: number = 1.05) => {
+  const scale = new Animated.Value(1);
+  
+  const pulse = Animated.loop(
+    Animated.sequence([
+      Animated.timing(scale, {
+        toValue: maxScale,
+        duration: 1000,
+        easing: easings.easeInOut,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scale, {
+        toValue: minScale,
+        duration: 1000,
+        easing: easings.easeInOut,
+        useNativeDriver: true,
+      }),
+    ])
+  );
+  
+  return { scale, pulse };
+};
+
+// Shimmer effect for loading states
+export const useShimmer = () => {
+  const shimmerValue = useRef(new Animated.Value(0)).current;
+  
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(shimmerValue, {
+        toValue: 1,
+        duration: 1500,
+        easing: easings.easeInOut,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, []);
+  
+  const translateX = shimmerValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-200, 200],
+  });
+  
+  return translateX;
+};
+
+// Legacy functions for backward compatibility
+export const createFadeInAnimation = (duration: number = 300) => {
+  const animatedValue = new Animated.Value(0);
+  
+  const fadeIn = () => {
+    Animated.timing(animatedValue, {
       toValue: 1,
       duration,
-      delay,
+      easing: easings.easeOut,
       useNativeDriver: true,
     }).start();
-  }, []);
-
-  return {
-    fadeValue,
-    animatedStyle: {
-      opacity: fadeValue,
-    },
   };
+  
+  return { animatedValue, fadeIn };
 };
 
-// Hook for slide in animation
-export const useSlideInAnimation = (
-  from: 'left' | 'right' | 'top' | 'bottom' = 'bottom',
-  delay: number = 0
+export const createSlideInAnimation = (
+  initialPosition: number = 50,
+  duration: number = 300
 ) => {
-  const slideValue = new Animated.Value(getInitialSlideValue(from));
-
-  React.useEffect(() => {
-    Animated.timing(slideValue, {
+  const animatedValue = new Animated.Value(initialPosition);
+  
+  const slideIn = () => {
+    Animated.spring(animatedValue, {
       toValue: 0,
-      duration: ANIMATION_DURATION.normal,
-      delay,
+      tension: 20,
+      friction: 7,
       useNativeDriver: true,
-      easing: Easing.out(Easing.cubic),
     }).start();
-  }, []);
-
-  const animatedStyle = getSlideAnimatedStyle(from, slideValue);
-
-  return {
-    slideValue,
-    animatedStyle,
   };
+  
+  return { animatedValue, slideIn };
 };
-
-const getInitialSlideValue = (from: 'left' | 'right' | 'top' | 'bottom'): number => {
-  switch (from) {
-    case 'left':
-    case 'top':
-      return -100;
-    case 'right':
-    case 'bottom':
-      return 100;
-  }
-};
-
-const getSlideAnimatedStyle = (
-  from: 'left' | 'right' | 'top' | 'bottom',
-  slideValue: Animated.Value
-) => {
-  switch (from) {
-    case 'left':
-    case 'right':
-      return { transform: [{ translateX: slideValue }] };
-    case 'top':
-    case 'bottom':
-      return { transform: [{ translateY: slideValue }] };
-  }
-};
-
-// React import for hooks
-import React from 'react';

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,9 @@ import {
   TextInput,
   FlatList,
   Image,
+  ActivityIndicator,
+  Animated,
+  Modal,
   Dimensions,
   Platform,
   SectionList,
@@ -17,6 +20,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { BlurView } from 'expo-blur';
 import { searchExercises, comprehensiveExerciseDatabase, Exercise } from '../data/comprehensiveExerciseDatabase';
 import { SAFE_BOTTOM_PADDING } from '../constants/layout';
+import { useThemeStore } from '../store/themeStore';
 
 const { width } = Dimensions.get('window');
 
@@ -63,6 +67,7 @@ const muscleGroups = [
 ];
 
 const EnhancedDiscoverScreen = ({ navigation }: any) => {
+  const { theme } = useThemeStore();
   const [activeTab, setActiveTab] = useState('programs');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMuscle, setSelectedMuscle] = useState('all');
@@ -93,14 +98,16 @@ const EnhancedDiscoverScreen = ({ navigation }: any) => {
   const renderProgram = ({ item }: any) => (
     <TouchableOpacity 
       style={styles.programCard}
-      onPress={() => navigation.navigate('ActiveWorkout', { 
-        workout: {
+      onPress={() => navigation.navigate('ProgramDetail', { 
+        program: {
+          id: item.id,
           name: item.title,
           description: item.description,
           duration: item.duration,
           level: item.level,
           trainer: item.trainer,
-          rating: item.rating
+          rating: item.rating,
+          image: item.image
         }
       })}
     >
@@ -136,10 +143,10 @@ const EnhancedDiscoverScreen = ({ navigation }: any) => {
       style={styles.exerciseCard}
       onPress={() => navigation.navigate('ExerciseDetail', { exercise: item })}
     >
-      <BlurView intensity={80} tint="light" style={styles.exerciseContent}>
+      <BlurView intensity={40} tint="dark" style={styles.exerciseContent}>
         <View style={styles.exerciseHeader}>
           <View style={styles.exerciseIcon}>
-            <Icon name="fitness" size={24} color="#667eea" />
+            <Icon name="fitness" size={24} color={theme.colors.primary.main} />
           </View>
           <View style={styles.exerciseInfo}>
             <Text style={styles.exerciseName} numberOfLines={2}>{item.name}</Text>
@@ -170,15 +177,15 @@ const EnhancedDiscoverScreen = ({ navigation }: any) => {
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
-      case 'Beginner': return '#4CAF50';
-      case 'Intermediate': return '#FF9800';
-      case 'Advanced': return '#F44336';
-      default: return '#667eea';
+      case 'Beginner': return theme.colors.success;
+      case 'Intermediate': return theme.colors.warning;
+      case 'Advanced': return theme.colors.error;
+      default: return theme.colors.primary.main;
     }
   };
 
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+    <LinearGradient colors={theme.colors.primary.gradient as [string, string, string]} style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Discover</Text>
         <Text style={styles.subtitle}>10,000+ Exercises & Programs</Text>
@@ -186,7 +193,7 @@ const EnhancedDiscoverScreen = ({ navigation }: any) => {
 
       {/* Tab Selector */}
       <View style={styles.tabContainer}>
-        <BlurView intensity={20} tint="light" style={styles.tabBlurContainer}>
+        <BlurView intensity={40} tint="dark" style={styles.tabBlurContainer}>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'programs' && styles.activeTab]}
             onPress={() => setActiveTab('programs')}
@@ -208,7 +215,7 @@ const EnhancedDiscoverScreen = ({ navigation }: any) => {
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <BlurView intensity={20} tint="light" style={styles.searchBar}>
+        <BlurView intensity={40} tint="dark" style={styles.searchBar}>
           <Icon name="search" size={20} color="rgba(255,255,255,0.6)" />
           <TextInput
             style={styles.searchInput}
@@ -228,7 +235,7 @@ const EnhancedDiscoverScreen = ({ navigation }: any) => {
             onPress={() => navigation.navigate('Programs')}
           >
             <LinearGradient
-              colors={['#667eea', '#764ba2']}
+              colors={[theme.colors.primary.gradient[0], theme.colors.primary.gradient[1]]}
               style={styles.customProgramsGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -257,11 +264,12 @@ const EnhancedDiscoverScreen = ({ navigation }: any) => {
                 key={category} 
                 style={styles.categoryCard}
                 onPress={() => {
-                  setSearchQuery(category);
+                  setSearchQuery(category.toLowerCase());
+                  setActiveTab('exercises');
                   console.log(`Filter by category: ${category}`);
                 }}
               >
-                <BlurView intensity={25} tint="light" style={styles.categoryGradient}>
+                <BlurView intensity={40} tint="dark" style={styles.categoryGradient}>
                   <Text style={styles.categoryText}>{category}</Text>
                 </BlurView>
               </TouchableOpacity>
@@ -284,8 +292,8 @@ const EnhancedDiscoverScreen = ({ navigation }: any) => {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.muscleFilter}>
                   <TouchableOpacity onPress={() => setSelectedMuscle('all')}>
                     <BlurView
-                      intensity={selectedMuscle === 'all' ? 40 : 20}
-                      tint="light"
+                      intensity={selectedMuscle === 'all' ? 60 : 40}
+                      tint="dark"
                       style={[styles.muscleChip, selectedMuscle === 'all' && styles.muscleChipActive]}
                     >
                       <Text style={[styles.muscleChipText, selectedMuscle === 'all' && styles.muscleChipTextActive]}>
@@ -299,8 +307,8 @@ const EnhancedDiscoverScreen = ({ navigation }: any) => {
                       onPress={() => setSelectedMuscle(muscle.id)}
                     >
                       <BlurView
-                        intensity={selectedMuscle === muscle.id ? 40 : 20}
-                        tint="light"
+                        intensity={selectedMuscle === muscle.id ? 60 : 40}
+                        tint="dark"
                         style={[styles.muscleChip, selectedMuscle === muscle.id && styles.muscleChipActive]}
                       >
                         <Text style={styles.muscleIcon}>{muscle.icon}</Text>
@@ -528,6 +536,8 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     borderRadius: 15,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   exerciseContent: {
     padding: 15,
@@ -541,7 +551,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
@@ -584,7 +594,7 @@ const styles = StyleSheet.create({
   },
   exerciseDetailText: {
     fontSize: 12,
-    color: 'rgba(0,0,0,0.7)',
+    color: 'rgba(255,255,255,0.7)',
     flex: 1,
   },
   exerciseRow: {

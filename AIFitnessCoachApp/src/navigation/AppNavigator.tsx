@@ -12,13 +12,13 @@ import RegisterScreen from '../screens/RegisterScreen';
 
 // Main Screens
 import TimelineScreen from '../screens/TimelineScreen';
-import EnhancedDiscoverScreen from '../screens/EnhancedDiscoverScreen';
+import AppleDiscoverScreen from '../screens/AppleDiscoverScreen';
 import ImprovedProfileScreen from '../screens/ImprovedProfileScreen';
 import SimpleMessagesScreen from '../screens/SimpleMessagesScreen';
 import StatsScreen from '../screens/StatsScreen';
+import DietScreen from '../screens/DietScreen';
 import WorkoutTrackingScreen from '../screens/WorkoutTrackingScreen';
 import WorkoutOverviewScreen from '../screens/WorkoutOverviewScreen';
-import FastingScreen from '../screens/FastingScreen';
 
 // Other Screens
 import ActiveWorkoutScreen from '../screens/ActiveWorkoutScreen';
@@ -34,6 +34,11 @@ import ProgressPhotosScreen from '../screens/ProgressPhotosScreen';
 import MeasurementsScreen from '../screens/MeasurementsScreen';
 import TrainerSelectionScreen from '../screens/TrainerSelectionScreen';
 import WorkoutDownloadsScreen from '../screens/WorkoutDownloadsScreen';
+
+// Enhanced Screens with Backend Integration
+import FixedEnhancedFastingScreen from '../screens/FixedEnhancedFastingScreen';
+import EnhancedWorkoutTrackingScreen from '../screens/EnhancedWorkoutTrackingScreen';
+import EnhancedMeasurementsScreen from '../screens/EnhancedMeasurementsScreen';
 
 // Store
 import { useAuthStore } from '../store/authStore';
@@ -102,7 +107,7 @@ const CustomTabBar = ({ state, navigation }: BottomTabBarProps) => {
             Timeline: 'calendar-outline',
             Discover: 'compass-outline',
             Fasting: 'timer-outline',
-            Stats: 'bar-chart-outline',
+            Diet: 'nutrition-outline',
             Messages: 'chatbubble-outline',
             Profile: 'person-outline',
           };
@@ -163,9 +168,9 @@ const MainTabs = () => (
     initialRouteName="Timeline"
   >
     <Tab.Screen name="Timeline" component={TimelineScreen} />
-    <Tab.Screen name="Discover" component={EnhancedDiscoverScreen} />
-    <Tab.Screen name="Fasting" component={FastingScreen} />
-    <Tab.Screen name="Stats" component={StatsScreen} />
+    <Tab.Screen name="Discover" component={AppleDiscoverScreen} />
+    <Tab.Screen name="Fasting" component={FixedEnhancedFastingScreen} />
+    <Tab.Screen name="Diet" component={DietScreen} />
     <Tab.Screen name="Messages" component={SimpleMessagesScreen} />
     <Tab.Screen name="Profile" component={ImprovedProfileScreen} />
   </Tab.Navigator>
@@ -188,11 +193,17 @@ const MainStack = () => (
     <Stack.Screen name="Programs" component={ProgramsScreen} />
     <Stack.Screen name="ExerciseLibrary" component={ExerciseLibraryScreen} />
     <Stack.Screen name="Settings" component={SettingsScreen} />
+    <Stack.Screen name="Stats" component={StatsScreen} />
     <Stack.Screen name="WorkoutHistory" component={WorkoutHistoryScreen} />
     <Stack.Screen name="ProgressPhotos" component={ProgressPhotosScreen} />
     <Stack.Screen name="Measurements" component={MeasurementsScreen} />
     <Stack.Screen name="TrainerSelection" component={TrainerSelectionScreen} />
     <Stack.Screen name="WorkoutDownloads" component={WorkoutDownloadsScreen} />
+    
+    {/* Enhanced Screens with Backend Integration */}
+    <Stack.Screen name="EnhancedFasting" component={FixedEnhancedFastingScreen} />
+    <Stack.Screen name="EnhancedWorkoutTracking" component={EnhancedWorkoutTrackingScreen} />
+    <Stack.Screen name="EnhancedMeasurements" component={EnhancedMeasurementsScreen} />
   </Stack.Navigator>
 );
 

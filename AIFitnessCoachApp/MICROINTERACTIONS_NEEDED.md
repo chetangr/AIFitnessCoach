@@ -50,7 +50,7 @@ Duration: 3 seconds before showing "Get Started" button
 
 **Microinteractions**:
 ```
-TAP: Icon bounces up (0.2s) → Settles with glow
+TAP: Icon bounces up (0.2s) → Settles with glow, Color changes for every Icon
 FEEDBACK: Gentle haptic + optional sound
 TRANSITION: Smooth slide between screens
 ```
@@ -70,7 +70,7 @@ SOUND: Cheerful "ding" (optional)
 - **Timer**: HUGE numbers, counts down with color change
 - **Rep Counter**: Plus/minus buttons bigger than thumb
 - **"I'm Done!"**: Big blue button that celebrates completion
-- **"I Need Help"**: Red button with question mark
+- **"I Need Help"**: Red button with question mark pop ups AI chat
 
 **Completion Celebration**:
 ```

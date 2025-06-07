@@ -13,6 +13,7 @@ import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
+import { getThemeGradient } from '../utils/themeConsistency';
 // Logger temporarily removed - was causing import errors
 
 const ProfileScreen = ({ navigation }: any) => {
@@ -38,7 +39,31 @@ const ProfileScreen = ({ navigation }: any) => {
 
   const handleMenuAction = (action: string) => {
     console.log('Profile Menu Action', { action });
-    // Handle navigation based on action
+    
+    switch (action) {
+      case 'editProfile':
+        // TODO: Create EditProfile screen
+        navigation.navigate('Settings');
+        break;
+      case 'goals':
+        navigation.navigate('Settings');
+        break;
+      case 'reports':
+        navigation.navigate('Stats');
+        break;
+      case 'history':
+        navigation.navigate('WorkoutHistory');
+        break;
+      case 'achievements':
+        // TODO: Create Achievements screen
+        navigation.navigate('Stats');
+        break;
+      case 'help':
+        navigation.navigate('Settings');
+        break;
+      default:
+        break;
+    }
   };
 
   const handleLogout = async () => {
@@ -46,9 +71,7 @@ const ProfileScreen = ({ navigation }: any) => {
     await logout();
   };
 
-  const gradientColors = isDarkMode 
-    ? ['#0f0c29', '#302b63', '#24243e'] as const
-    : ['#667eea', '#764ba2', '#f093fb'] as const;
+  const gradientColors = getThemeGradient(isDarkMode);
 
   return (
     <LinearGradient colors={gradientColors} style={styles.container}>

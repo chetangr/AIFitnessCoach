@@ -15,6 +15,7 @@ interface AuthState {
   login: (user: User) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
+  getAuthToken: () => Promise<string | null>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -86,6 +87,16 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
       set({ isLoading: false });
       console.log('isLoading set to false after error');
+    }
+  },
+
+  getAuthToken: async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      return token;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
     }
   },
 }));

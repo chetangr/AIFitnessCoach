@@ -5,12 +5,14 @@ from datetime import datetime
 from sqlalchemy import select, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.custom_content import TrainingProgram, WorkoutTemplate, CustomExercise
-from ..models.user import User
-from ..services.async_database import get_async_db
-from ..services.auth_service import get_current_user_id
-from ..schemas.auth import UserResponse
-from ..utils.logger import logger
+from models.custom_content import TrainingProgram, WorkoutTemplate, CustomExercise
+from models.user import User
+from services.async_database import get_db as get_async_db
+from services.auth_service import get_current_user_id
+from schemas.auth import UserResponse
+from utils.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 router = APIRouter()
 

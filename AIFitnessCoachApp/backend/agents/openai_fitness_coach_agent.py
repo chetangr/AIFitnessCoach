@@ -392,12 +392,9 @@ class OpenAIFitnessCoachAgent:
         handler = tool_handlers.get(function_name)
         if handler:
             try:
-                # Check if handler is async and call appropriately
-                import inspect
-                if inspect.iscoroutinefunction(handler):
-                    return await handler(**arguments)
-                else:
-                    return handler(**arguments)
+                # All our handlers are async, so we should await them
+                result = await handler(**arguments)
+                return result
             except Exception as e:
                 logger.error(f"Error in tool handler {function_name}: {str(e)}")
                 return {"error": f"Tool execution failed: {str(e)}"}
@@ -416,16 +413,25 @@ class OpenAIFitnessCoachAgent:
                     date_str = str(date_str)
                 
                 # Try different date formats
+                target_date = None
                 for fmt in ["%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%d/%m/%Y"]:
                     try:
                         target_date = datetime.strptime(date_str, fmt).date()
                         break
                     except ValueError:
                         continue
-                else:
-                    # If no format worked, try ISO format
+                
+                if not target_date:
+                    # If no format worked, try parsing as ISO format date
                     try:
-                        target_date = datetime.fromisoformat(date_str.replace('Z', '+00:00')).date()
+                        # Handle potential timezone info
+                        if 'T' in date_str:
+                            # Extract just the date part
+                            date_part = date_str.split('T')[0]
+                            target_date = datetime.strptime(date_part, "%Y-%m-%d").date()
+                        else:
+                            # Try as is
+                            target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
                     except:
                         # Default to today if parsing fails
                         logger.warning(f"Could not parse date: {date_str}, using today's date")

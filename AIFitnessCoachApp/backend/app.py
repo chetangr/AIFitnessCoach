@@ -6,7 +6,10 @@ import uvicorn
 import os
 from dotenv import load_dotenv
 
-from api import auth, users, workouts, coach, exercises, programs
+from api import auth, users, workouts, coach, exercises, programs, program_management
+from api import measurements, fasting, settings, workout_sessions, personal_records
+from api import custom_exercises, workout_templates, exercise_history, workout_schedule
+from api import theme
 from services.async_database import engine, db_available, sync_engine
 from services.agent_service import AgentService
 from utils.logger import setup_logger
@@ -27,7 +30,7 @@ async def lifespan(app: FastAPI):
         try:
             # Import all models to ensure they're registered
             from models.base import Base
-            from models import user, workout, coach, progress, tracking, measurements, custom_content
+            from models import user, workout, coach, progress, tracking, measurements, custom_content, user_program
             
             # Create all tables
             Base.metadata.create_all(bind=sync_engine)
@@ -117,6 +120,19 @@ app.include_router(multi_agent.router, prefix="/api/multi-agent", tags=["Multi-A
 
 app.include_router(exercises.router, prefix="/api/exercises", tags=["Exercises"])
 app.include_router(programs.router, prefix="/api/programs", tags=["Training Programs"])
+app.include_router(program_management.router, prefix="/api/program-management", tags=["Program Management"])
+
+# Include new API routers
+app.include_router(measurements.router, prefix="/api/measurements", tags=["Measurements"])
+app.include_router(fasting.router, prefix="/api/fasting", tags=["Fasting"])
+app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
+app.include_router(workout_sessions.router, prefix="/api/workout-sessions", tags=["Workout Sessions"])
+app.include_router(personal_records.router, prefix="/api/personal-records", tags=["Personal Records"])
+app.include_router(custom_exercises.router, prefix="/api/custom-exercises", tags=["Custom Exercises"])
+app.include_router(workout_templates.router, prefix="/api/workout-templates", tags=["Workout Templates"])
+app.include_router(exercise_history.router, prefix="/api/exercise-history", tags=["Exercise History"])
+app.include_router(workout_schedule.router, prefix="/api/workout-schedule", tags=["Workout Schedule"])
+app.include_router(theme.router, tags=["Dynamic Themes"])
 
 # Health check endpoint
 @app.get("/health")

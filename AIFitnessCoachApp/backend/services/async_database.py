@@ -2,6 +2,7 @@ import os
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
+from fastapi import HTTPException
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -36,8 +37,10 @@ except Exception as e:
 async def get_db():
     """Async dependency to get database session"""
     if not db_available:
-        yield None
-        return
+        raise HTTPException(
+            status_code=503,
+            detail="Database service is unavailable. Please check database connection."
+        )
         
     async with AsyncSessionLocal() as session:
         try:

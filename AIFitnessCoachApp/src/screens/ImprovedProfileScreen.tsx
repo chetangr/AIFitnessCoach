@@ -40,12 +40,15 @@ const ImprovedProfileScreen = ({ navigation }: any) => {
   ];
 
   const menuItems = [
-    { label: 'Edit Profile', icon: 'person-outline', action: () => setShowEditModal(true) },
+    { label: 'Edit Profile', icon: 'person-outline', action: () => {
+      console.log('Edit Profile clicked');
+      setShowEditModal(true);
+    }},
     { label: 'Fitness Goals', icon: 'flag-outline', action: () => setShowGoalsModal(true) },
     { label: 'Change AI Coach', icon: 'chatbubble-ellipses-outline', action: () => navigation.navigate('TrainerSelection') },
     { label: 'Workout History', icon: 'time-outline', action: () => navigation.navigate('WorkoutHistory') },
     { label: 'Progress Photos', icon: 'camera-outline', action: () => navigation.navigate('ProgressPhotos') },
-    { label: 'Measurements', icon: 'resize-outline', action: () => navigation.navigate('Measurements') },
+    { label: 'Measurements', icon: 'resize-outline', action: () => navigation.navigate('EnhancedMeasurements') },
     { label: 'Download Workouts', icon: 'cloud-download-outline', action: () => navigation.navigate('WorkoutDownloads') },
     { label: 'Export Data', icon: 'download-outline', action: () => handleExportData() },
   ];
@@ -231,8 +234,7 @@ const ImprovedProfileScreen = ({ navigation }: any) => {
       {/* Edit Profile Modal */}
       <Modal visible={showEditModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <BlurView intensity={100} tint="dark" style={styles.modalBlur}>
+          <View style={[styles.modalContainer, { backgroundColor: '#1a1a2e' }]}>
               <View style={styles.modalContent}>
                 <Text style={styles.modalTitle}>Edit Profile</Text>
               
@@ -271,7 +273,6 @@ const ImprovedProfileScreen = ({ navigation }: any) => {
                 </TouchableOpacity>
               </View>
             </View>
-          </BlurView>
           </View>
         </View>
       </Modal>
@@ -279,8 +280,7 @@ const ImprovedProfileScreen = ({ navigation }: any) => {
       {/* Goals Modal */}
       <Modal visible={showGoalsModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <BlurView intensity={100} tint="dark" style={styles.modalBlur}>
+          <View style={[styles.modalContainer, { backgroundColor: '#1a1a2e' }]}>
               <View style={styles.modalContent}>
                 <Text style={styles.modalTitle}>Fitness Goals</Text>
               <Text style={styles.modalSubtitle}>Select your fitness goals</Text>
@@ -326,7 +326,6 @@ const ImprovedProfileScreen = ({ navigation }: any) => {
                 </TouchableOpacity>
               </View>
             </View>
-          </BlurView>
           </View>
         </View>
       </Modal>

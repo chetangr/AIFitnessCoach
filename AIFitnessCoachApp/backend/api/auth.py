@@ -24,27 +24,25 @@ auth_service = AuthService()
 @router.post("/demo-login", response_model=TokenResponse)
 async def demo_login():
     """Demo login endpoint for development - provides real JWT token"""
-    # Create a demo user object
-    demo_user = User(
-        id="demo-user-001",
-        email="demo@fitness.com",
-        display_name="Demo User",
-        created_at=datetime.utcnow()
-    )
-    
-    # Generate real JWT token for demo user
+    # Generate real JWT token for demo user with correct format
     access_token = auth_service.create_access_token(
-        data={"sub": demo_user.email, "user_id": demo_user.id}
+        data={"sub": "demo-user-001", "email": "demo@fitness.com"}
     )
     
     return TokenResponse(
         access_token=access_token,
         token_type="bearer",
         user=UserResponse(
-            id=demo_user.id,
-            email=demo_user.email,
-            display_name=demo_user.display_name,
-            created_at=demo_user.created_at
+            id="demo-user-001",
+            email="demo@fitness.com",
+            username="demouser",
+            first_name="Demo",
+            last_name="User",
+            display_name="Demo User",
+            fitness_level="intermediate",
+            onboarding_completed=True,
+            preferred_coach_id="coach-maya",
+            goals=["muscle_gain", "strength"]
         )
     )
 
@@ -148,7 +146,7 @@ async def login_json(
     if login_data.username == "demo@fitness.com" and login_data.password == "demo123":
         # Generate real JWT token for demo user
         access_token = auth_service.create_access_token(
-            data={"sub": "demo@fitness.com", "user_id": "demo-user-001"}
+            data={"sub": "demo-user-001", "email": "demo@fitness.com"}
         )
         
         return TokenResponse(
@@ -159,7 +157,10 @@ async def login_json(
                 email="demo@fitness.com",
                 display_name="Demo User",
                 username="demo",
-                created_at=datetime.utcnow()
+                first_name="Demo",
+                last_name="User",
+                fitness_level="intermediate",
+                onboarding_completed=True
             )
         )
     

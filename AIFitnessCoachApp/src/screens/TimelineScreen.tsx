@@ -19,8 +19,12 @@ import moment from 'moment';
 import { useThemeStore } from '../store/themeStore';
 import * as Haptics from 'expo-haptics';
 import { workoutScheduleService, WorkoutEvent } from '../services/workoutScheduleService';
+import { appEventEmitter } from '../utils/eventEmitter';
 import { SAFE_BOTTOM_PADDING } from '../constants/layout';
 import { Swipeable } from 'react-native-gesture-handler';
+import { getThemeGradient, THEME_GRADIENTS } from '../utils/themeConsistency';
+import { ThemedGlassCard, ThemedGlassContainer } from '../components/glass/ThemedGlassComponents';
+import { theme } from '../config/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -68,7 +72,24 @@ const TimelineScreen = ({ navigation }: any) => {
     );
     pulseAnimation.start();
     
-    return () => pulseAnimation.stop();
+    // Listen for workout updates from AI actions
+    const handleScheduleChange = () => {
+      console.log('📅 Schedule changed from AI action - refreshing...');
+      generateWeekSchedule();
+    };
+    
+    appEventEmitter.on('schedule_changed', handleScheduleChange);
+    appEventEmitter.on('workout_updated', handleScheduleChange);
+    appEventEmitter.on('workout_added', handleScheduleChange);
+    appEventEmitter.on('workout_removed', handleScheduleChange);
+    
+    return () => {
+      pulseAnimation.stop();
+      appEventEmitter.off('schedule_changed', handleScheduleChange);
+      appEventEmitter.off('workout_updated', handleScheduleChange);
+      appEventEmitter.off('workout_added', handleScheduleChange);
+      appEventEmitter.off('workout_removed', handleScheduleChange);
+    };
   }, []);
 
   // Refresh when screen comes into focus (to pick up AI changes)
@@ -325,7 +346,7 @@ const TimelineScreen = ({ navigation }: any) => {
       return (
         <Animated.View style={[styles.swipeAction, { transform: [{ translateX }] }]}>
           <LinearGradient
-            colors={['#667eea', '#764ba2']}
+            colors={THEME_GRADIENTS.button}
             style={styles.swipeLeftGradient}
           >
             <Icon name="swap-horizontal" size={24} color="white" />
@@ -344,7 +365,7 @@ const TimelineScreen = ({ navigation }: any) => {
       return (
         <Animated.View style={[styles.swipeAction, { transform: [{ translateX }] }]}>
           <LinearGradient
-            colors={['#f44336', '#ff6b6b']}
+            colors={THEME_GRADIENTS.error}
             style={styles.swipeRightGradient}
           >
             <Icon name="bed" size={24} color="white" />
@@ -493,13 +514,9 @@ const TimelineScreen = ({ navigation }: any) => {
     }
   };
 
-  const gradientColors = isDarkMode 
-    ? ['#0f0c29', '#302b63', '#24243e'] as const
-    : ['#667eea', '#764ba2', '#f093fb'] as const;
-
   return (
     <>
-      <LinearGradient colors={gradientColors} style={styles.container}>
+      <LinearGradient colors={theme.colors.primary.gradient as [string, string, string]} style={styles.container}>
         {/* Enhanced Header */}
         <View style={styles.header}>
           <View>
@@ -592,19 +609,6 @@ const TimelineScreen = ({ navigation }: any) => {
         </ScrollView>
 
         {/* Floating Workout Tracking Button */}
-        <Animated.View style={[styles.floatingButton, { transform: [{ scale: fabPulse }] }]}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('WorkoutTracking')}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={['#ff6b6b', '#ff4757']}
-              style={styles.floatingButtonGradient}
-            >
-              <Icon name="barbell" size={28} color="white" />
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
       </LinearGradient>
 
       {/* Day Selection Modal */}

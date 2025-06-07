@@ -9,6 +9,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
+import FitnessMetricsOverlay from '../components/FitnessMetricsOverlay';
+import { fitnessMetricsService } from '../services/fitnessMetricsService';
 // Logger temporarily removed - was causing import errors
 
 const ActiveWorkoutScreen = ({ route, navigation }: any) => {
@@ -20,6 +22,18 @@ const ActiveWorkoutScreen = ({ route, navigation }: any) => {
   const [isPaused, setIsPaused] = useState(false);
   const [volumeEnabled, setVolumeEnabled] = useState(true);
   const [musicEnabled, setMusicEnabled] = useState(true);
+  const [currentSet, setCurrentSet] = useState(1);
+  const [totalSets, setTotalSets] = useState(0);
+  
+  // Fitness metrics state
+  const [fitnessMetrics, setFitnessMetrics] = useState({
+    heartRate: 70,
+    calories: 0,
+    activeMinutes: 0,
+    distance: 0,
+    steps: 0,
+    avgHeartRate: 70,
+  });
 
   const exercises = [
     { name: 'Push-ups', sets: 3, reps: 12, rest: 60 },
@@ -56,6 +70,33 @@ const ActiveWorkoutScreen = ({ route, navigation }: any) => {
     }
   }, [isResting, restTimer]);
 
+  // Initialize total sets
+  useEffect(() => {
+    const total = exercises.reduce((sum, ex) => sum + ex.sets, 0);
+    setTotalSets(total);
+  }, []);
+
+  // Subscribe to fitness metrics
+  useEffect(() => {
+    const unsubscribe = fitnessMetricsService.subscribe((metrics) => {
+      setFitnessMetrics(metrics);
+    });
+
+    // Start tracking when workout begins
+    if (!isPaused && !isResting) {
+      const intensity = currentExercise.name.includes('Plank') ? 'low' : 'medium';
+      fitnessMetricsService.startTracking(currentExercise.name, intensity);
+    } else if (isPaused) {
+      fitnessMetricsService.pauseTracking();
+    } else if (isResting) {
+      fitnessMetricsService.changeExercise('rest', 'low');
+    }
+
+    return () => {
+      unsubscribe();
+    };
+  }, [isPaused, isResting, currentExercise]);
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -80,11 +121,27 @@ const ActiveWorkoutScreen = ({ route, navigation }: any) => {
       duration: workoutTimer,
       exercisesCompleted: currentExerciseIndex + 1 
     });
+    // Stop fitness tracking
+    fitnessMetricsService.stopTracking();
     navigation.navigate('MainTabs');
   };
 
   return (
     <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+      {/* Fitness Metrics Overlay */}
+      <FitnessMetricsOverlay
+        heartRate={fitnessMetrics.heartRate}
+        calories={fitnessMetrics.calories}
+        elapsedTime={formatTime(workoutTimer)}
+        activeMinutes={fitnessMetrics.activeMinutes}
+        currentExercise={currentExercise.name}
+        setsCompleted={currentSet}
+        totalSets={totalSets}
+        style="compact"
+        position="top"
+        showRings={true}
+      />
+      
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>

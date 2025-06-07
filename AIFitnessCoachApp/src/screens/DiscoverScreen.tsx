@@ -31,7 +31,7 @@ interface Exercise {
 }
 
 const DiscoverScreen = ({ navigation }: any) => {
-  const { isDarkMode } = useThemeStore();
+  const { theme, isDarkMode } = useThemeStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [programs, setPrograms] = useState<WorkoutProgram[]>([]);
@@ -258,20 +258,20 @@ const DiscoverScreen = ({ navigation }: any) => {
         navigation.navigate('ExerciseDetail', { exercise: item });
       }}
     >
-      <BlurView intensity={20} tint="light" style={styles.exerciseCard}>
+      <BlurView intensity={20} tint={isDarkMode ? "dark" : "light"} style={styles.exerciseCard}>
         <View style={styles.exerciseHeader}>
-          <Text style={styles.exerciseName}>{item.name}</Text>
-          <Icon name="chevron-forward" size={20} color="white" />
+          <Text style={[styles.exerciseName, { color: textColor }]}>{item.name}</Text>
+          <Icon name="chevron-forward" size={20} color={textColor} />
         </View>
         
         <View style={styles.exerciseDetails}>
           <View style={styles.exerciseTag}>
-            <Icon name="body" size={14} color="white" />
-            <Text style={styles.exerciseTagText}>{item.muscles.join(', ')}</Text>
+            <Icon name="body" size={14} color={textSecondaryColor} />
+            <Text style={[styles.exerciseTagText, { color: textSecondaryColor }]}>{item.muscles.join(', ')}</Text>
           </View>
           <View style={styles.exerciseTag}>
-            <Icon name="barbell" size={14} color="white" />
-            <Text style={styles.exerciseTagText}>{item.equipment}</Text>
+            <Icon name="barbell" size={14} color={textSecondaryColor} />
+            <Text style={[styles.exerciseTagText, { color: textSecondaryColor }]}>{item.equipment}</Text>
           </View>
         </View>
       </BlurView>
@@ -285,11 +285,11 @@ const DiscoverScreen = ({ navigation }: any) => {
         navigation.navigate('ProgramDetail', { program: item });
       }}
     >
-      <BlurView intensity={20} tint="light" style={styles.programCard}>
+      <BlurView intensity={20} tint={isDarkMode ? "dark" : "light"} style={styles.programCard}>
         <View style={styles.programHeader}>
           <View style={styles.programInfo}>
-            <Text style={styles.programName}>{item.name}</Text>
-            <Text style={styles.programDescription} numberOfLines={2}>
+            <Text style={[styles.programName, { color: textColor }]}>{item.name}</Text>
+            <Text style={[styles.programDescription, { color: textSecondaryColor }]} numberOfLines={2}>
               {item.description}
             </Text>
           </View>
@@ -308,16 +308,16 @@ const DiscoverScreen = ({ navigation }: any) => {
         
         <View style={styles.programDetails}>
           <View style={styles.programTag}>
-            <Icon name="time" size={14} color="white" />
-            <Text style={styles.programTagText}>{item.duration}</Text>
+            <Icon name="time" size={14} color={textSecondaryColor} />
+            <Text style={[styles.programTagText, { color: textSecondaryColor }]}>{item.duration}</Text>
           </View>
           <View style={styles.programTag}>
-            <Icon name="fitness" size={14} color="white" />
-            <Text style={styles.programTagText}>{item.exercises.length} exercises</Text>
+            <Icon name="fitness" size={14} color={textSecondaryColor} />
+            <Text style={[styles.programTagText, { color: textSecondaryColor }]}>{item.exercises.length} exercises</Text>
           </View>
           <View style={styles.programTag}>
-            <Icon name="flame" size={14} color="white" />
-            <Text style={styles.programTagText}>{item.estimatedCalories} cal</Text>
+            <Icon name="flame" size={14} color={textSecondaryColor} />
+            <Text style={[styles.programTagText, { color: textSecondaryColor }]}>{item.estimatedCalories} cal</Text>
           </View>
         </View>
         
@@ -327,7 +327,7 @@ const DiscoverScreen = ({ navigation }: any) => {
           </View>
           <View style={styles.ratingContainer}>
             <Icon name="star" size={14} color="#FFD700" />
-            <Text style={styles.ratingText}>{item.rating}</Text>
+            <Text style={[styles.ratingText, { color: textColor }]}>{item.rating}</Text>
           </View>
         </View>
       </BlurView>
@@ -490,25 +490,25 @@ const DiscoverScreen = ({ navigation }: any) => {
       <View style={styles.searchModalOverlay}>
         <BlurView intensity={80} tint={isDarkMode ? "dark" : "light"} style={styles.searchModalContainer}>
           <View style={styles.searchModalHeader}>
-            <Text style={styles.searchModalTitle}>Search {activeTab}</Text>
+            <Text style={[styles.searchModalTitle, { color: textColor }]}>Search {activeTab}</Text>
             <TouchableOpacity onPress={() => setShowSearchModal(false)}>
-              <Icon name="close" size={24} color="white" />
+              <Icon name="close" size={24} color={textColor} />
             </TouchableOpacity>
           </View>
           
-          <View style={styles.searchInputContainer}>
-            <Icon name="search" size={20} color="rgba(255,255,255,0.6)" />
+          <View style={[styles.searchInputContainer, { backgroundColor: surfaceColor }]}>
+            <Icon name="search" size={20} color={textSecondaryColor} />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: textColor }]}
               placeholder={`Search for ${activeTab.toLowerCase()}...`}
-              placeholderTextColor="rgba(255,255,255,0.6)"
+              placeholderTextColor={textSecondaryColor}
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoFocus={true}
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Icon name="close-circle" size={20} color="rgba(255,255,255,0.6)" />
+                <Icon name="close-circle" size={20} color={textSecondaryColor} />
               </TouchableOpacity>
             )}
           </View>
@@ -530,8 +530,13 @@ const DiscoverScreen = ({ navigation }: any) => {
   );
 
   const gradientColors = isDarkMode 
-    ? ['#0f0c29', '#302b63', '#24243e'] as const
-    : ['#667eea', '#764ba2'] as const;
+    ? [theme.colors.background, theme.colors.surface, '#24243e'] as const
+    : [theme.colors.primary, theme.colors.secondary] as const;
+
+  const textColor = theme.colors.text;
+  const textSecondaryColor = theme.colors.textSecondary;
+  const surfaceColor = theme.colors.surface;
+  const borderColor = theme.colors.border;
 
   return (
     <LinearGradient colors={gradientColors} style={styles.container}>
@@ -539,13 +544,13 @@ const DiscoverScreen = ({ navigation }: any) => {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>Discover</Text>
-            <Text style={styles.headerSubtitle}>AI-Powered Fitness</Text>
+            <Text style={[styles.headerTitle, { color: textColor }]}>Discover</Text>
+            <Text style={[styles.headerSubtitle, { color: textSecondaryColor }]}>AI-Powered Fitness</Text>
           </View>
           <TouchableOpacity onPress={() => navigation.navigate('ExerciseLibrary')}>
-            <BlurView intensity={25} tint="light" style={styles.libraryButton}>
-              <Icon name="library-outline" size={20} color="white" />
-              <Text style={styles.libraryButtonText}>Full Library</Text>
+            <BlurView intensity={25} tint={isDarkMode ? "dark" : "light"} style={styles.libraryButton}>
+              <Icon name="library-outline" size={20} color={textColor} />
+              <Text style={[styles.libraryButtonText, { color: textColor }]}>Full Library</Text>
             </BlurView>
           </TouchableOpacity>
         </View>
@@ -556,13 +561,13 @@ const DiscoverScreen = ({ navigation }: any) => {
             onPress={() => setShowSearchModal(true)}
             style={styles.searchButtonContainer}
           >
-            <BlurView intensity={30} tint="light" style={styles.searchButtonContent}>
-              <Icon name="search" size={18} color="rgba(255,255,255,0.8)" />
-              <Text style={styles.searchInputText}>Search {activeTab.toLowerCase()}...</Text>
+            <BlurView intensity={30} tint={isDarkMode ? "dark" : "light"} style={styles.searchButtonContent}>
+              <Icon name="search" size={18} color={textSecondaryColor} />
+              <Text style={[styles.searchInputText, { color: textSecondaryColor }]}>Search {activeTab.toLowerCase()}...</Text>
             </BlurView>
           </TouchableOpacity>
 
-          <BlurView intensity={30} tint="light" style={styles.compactTabContainer}>
+          <BlurView intensity={30} tint={isDarkMode ? "dark" : "light"} style={styles.compactTabContainer}>
             <TouchableOpacity
               onPress={() => {
                 setActiveTab('Programs');
@@ -576,6 +581,7 @@ const DiscoverScreen = ({ navigation }: any) => {
               <Text style={[
                 styles.compactTabText,
                 activeTab === 'Programs' && styles.activeCompactTabText,
+                { color: activeTab === 'Programs' ? textColor : textSecondaryColor }
               ]}>Programs</Text>
             </TouchableOpacity>
             
@@ -592,6 +598,7 @@ const DiscoverScreen = ({ navigation }: any) => {
               <Text style={[
                 styles.compactTabText,
                 activeTab === 'Exercises' && styles.activeCompactTabText,
+                { color: activeTab === 'Exercises' ? textColor : textSecondaryColor }
               ]}>Exercises</Text>
             </TouchableOpacity>
           </BlurView>
@@ -600,7 +607,7 @@ const DiscoverScreen = ({ navigation }: any) => {
         {/* AI Suggestions */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>AI Suggestions</Text>
+            <Text style={[styles.sectionTitle, { color: textColor }]}>AI Suggestions</Text>
             <View style={styles.aiIconBadge}>
               <Icon name="sparkles" size={14} color="#FFD700" />
             </View>
@@ -618,7 +625,7 @@ const DiscoverScreen = ({ navigation }: any) => {
         {/* Trending Now */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Trending Now</Text>
+            <Text style={[styles.sectionTitle, { color: textColor }]}>Trending Now</Text>
             <View style={styles.trendingBadgeSmall}>
               <Icon name="trending-up" size={14} color="#4CAF50" />
               <Text style={styles.trendingBadgeText}>HOT</Text>
@@ -637,9 +644,9 @@ const DiscoverScreen = ({ navigation }: any) => {
         {/* Active Challenges */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Active Challenges</Text>
+            <Text style={[styles.sectionTitle, { color: textColor }]}>Active Challenges</Text>
             <TouchableOpacity>
-              <Text style={styles.viewAllText}>View All</Text>
+              <Text style={[styles.viewAllText, { color: textSecondaryColor }]}>View All</Text>
             </TouchableOpacity>
           </View>
           <FlatList
@@ -654,7 +661,7 @@ const DiscoverScreen = ({ navigation }: any) => {
 
         {/* Muscle Groups */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Target Muscle Groups</Text>
+          <Text style={[styles.sectionTitle, { color: textColor }]}>Target Muscle Groups</Text>
           <FlatList
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -669,7 +676,7 @@ const DiscoverScreen = ({ navigation }: any) => {
               >
                 <BlurView
                   intensity={selectedMuscle === muscle ? 40 : 25}
-                  tint="light"
+                  tint={isDarkMode ? "dark" : "light"}
                   style={[
                     styles.muscleChip,
                     selectedMuscle === muscle && styles.selectedMuscleChip,
@@ -677,7 +684,8 @@ const DiscoverScreen = ({ navigation }: any) => {
                 >
                   <Text style={[
                     styles.muscleText,
-                    selectedMuscle === muscle && styles.selectedMuscleText
+                    selectedMuscle === muscle && styles.selectedMuscleText,
+                    { color: textColor }
                   ]}>{muscle}</Text>
                 </BlurView>
               </TouchableOpacity>
@@ -689,14 +697,14 @@ const DiscoverScreen = ({ navigation }: any) => {
 
         {/* Main Content */}
         <View style={styles.mainContentSection}>
-          <Text style={styles.sectionTitle}>
+          <Text style={[styles.sectionTitle, { color: textColor }]}>
             {activeTab} {selectedMuscle !== 'All' ? `• ${selectedMuscle}` : ''}
           </Text>
           
           {loading && page === 1 ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="white" />
-              <Text style={styles.loadingText}>Loading {activeTab.toLowerCase()}...</Text>
+              <ActivityIndicator size="large" color={textColor} />
+              <Text style={[styles.loadingText, { color: textSecondaryColor }]}>Loading {activeTab.toLowerCase()}...</Text>
             </View>
           ) : (
             <View style={styles.contentGrid}>
@@ -711,8 +719,8 @@ const DiscoverScreen = ({ navigation }: any) => {
               
               {loading && page > 1 && (
                 <View style={styles.loadMoreContainer}>
-                  <ActivityIndicator color="white" />
-                  <Text style={styles.loadMoreText}>Loading more...</Text>
+                  <ActivityIndicator color={textColor} />
+                  <Text style={[styles.loadMoreText, { color: textSecondaryColor }]}>Loading more...</Text>
                 </View>
               )}
               
@@ -721,12 +729,12 @@ const DiscoverScreen = ({ navigation }: any) => {
                   <Icon 
                     name={activeTab === 'Exercises' ? "barbell-outline" : "list-outline"} 
                     size={60} 
-                    color="rgba(255,255,255,0.5)" 
+                    color={textSecondaryColor} 
                   />
-                  <Text style={styles.emptyText}>
+                  <Text style={[styles.emptyText, { color: textColor }]}>
                     No {activeTab.toLowerCase()} found
                   </Text>
-                  <Text style={styles.emptySubtext}>
+                  <Text style={[styles.emptySubtext, { color: textSecondaryColor }]}>
                     Try adjusting your search or filters
                   </Text>
                 </View>

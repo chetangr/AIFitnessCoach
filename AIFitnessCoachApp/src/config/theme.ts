@@ -1,157 +1,299 @@
 import { Platform } from 'react-native';
 
-export const theme = {
-  colors: {
-    // Primary gradient colors
-    gradientStart: '#667eea',
-    gradientMiddle: '#764ba2',
-    gradientEnd: '#f093fb',
-    
-    // Dark mode gradient colors
-    darkGradientStart: '#0f0c29',
-    darkGradientMiddle: '#302b63',
-    darkGradientEnd: '#24243e',
-    
-    // Glass effects
-    glassBackground: 'rgba(255, 255, 255, 0.1)',
-    glassBorder: 'rgba(255, 255, 255, 0.2)',
-    glassBackgroundDark: 'rgba(30, 30, 46, 0.85)',
-    
-    // Text colors
-    textPrimary: '#ffffff',
-    textSecondary: 'rgba(255, 255, 255, 0.8)',
-    textTertiary: 'rgba(255, 255, 255, 0.6)',
-    
-    // Accent colors
-    accent: '#764ba2',
-    success: '#4CAF50',
-    warning: '#FF9800',
-    error: '#F44336',
-    
-    // FAB colors
-    fabOrange: ['#ff6b6b', '#ff8787'],
-    fabTeal: ['#4ecdc4', '#44a39a'],
-    fabPurple: ['#764ba2', '#667eea'],
+// Typography Scale based on Apple's Human Interface Guidelines
+export const typography = {
+  largeTitle: {
+    fontSize: 34,
+    lineHeight: 41,
+    fontWeight: '700' as const,
+    letterSpacing: 0.37,
+  },
+  title1: {
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '700' as const,
+    letterSpacing: 0.36,
+  },
+  title2: {
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '700' as const,
+    letterSpacing: 0.35,
+  },
+  title3: {
+    fontSize: 20,
+    lineHeight: 25,
+    fontWeight: '600' as const,
+    letterSpacing: 0.38,
+  },
+  headline: {
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: '600' as const,
+    letterSpacing: -0.41,
+  },
+  body: {
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: '400' as const,
+    letterSpacing: -0.41,
+  },
+  callout: {
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: '400' as const,
+    letterSpacing: -0.32,
+  },
+  subheadline: {
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '400' as const,
+    letterSpacing: -0.24,
+  },
+  footnote: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '400' as const,
+    letterSpacing: -0.08,
+  },
+  caption1: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '400' as const,
+    letterSpacing: 0,
+  },
+  caption2: {
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: '400' as const,
+    letterSpacing: 0.07,
+  },
+};
+
+// Glass Effects
+export const glassEffects = {
+  light: {
+    blur: 10,
+    intensity: Platform.OS === 'ios' ? 50 : 60,
+    tint: 'light' as const,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  medium: {
+    blur: 20,
+    intensity: Platform.OS === 'ios' ? 70 : 80,
+    tint: 'light' as const,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  dark: {
+    blur: 30,
+    intensity: Platform.OS === 'ios' ? 80 : 90,
+    tint: 'dark' as const,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+  },
+  heavy: {
+    blur: 40,
+    intensity: Platform.OS === 'ios' ? 90 : 95,
+    tint: 'dark' as const,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+};
+
+// Colors
+export const colors = {
+  // Primary brand colors
+  primary: {
+    purple: '#667eea',
+    purpleDark: '#764ba2',
+    pink: '#f093fb',
+    gradient: ['#667eea', '#764ba2', '#f093fb'],
   },
   
+  // Semantic colors
+  semantic: {
+    success: '#4CD964',
+    warning: '#FF9500',
+    error: '#FF3B30',
+    info: '#5AC8FA',
+  },
+  
+  // Activity colors (Apple Fitness+ style)
+  activity: {
+    move: '#FA114F',
+    exercise: '#92E82A',
+    stand: '#1EEAEF',
+  },
+  
+  // Neutral colors
+  neutral: {
+    white: '#FFFFFF',
+    black: '#000000',
+    gray100: '#F2F2F7',
+    gray200: '#E5E5EA',
+    gray300: '#D1D1D6',
+    gray400: '#C7C7CC',
+    gray500: '#AEAEB2',
+    gray600: '#8E8E93',
+    gray700: '#636366',
+    gray800: '#48484A',
+    gray900: '#2C2C2E',
+  },
+  
+  // Glass overlays
   glass: {
-    // Glass morphism presets
-    light: {
-      intensity: Platform.OS === 'ios' ? 80 : 100,
-      tint: 'light' as const,
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-      borderColor: 'rgba(255, 255, 255, 0.2)',
-      borderWidth: 1,
-    },
-    
-    dark: {
-      intensity: Platform.OS === 'ios' ? 95 : 100,
-      tint: 'dark' as const,
-      backgroundColor: 'rgba(30, 30, 46, 0.85)',
-      borderColor: 'rgba(255, 255, 255, 0.2)',
-      borderWidth: 1,
-    },
-    
-    medium: {
-      intensity: Platform.OS === 'ios' ? 60 : 80,
-      tint: 'light' as const,
-      backgroundColor: 'rgba(255, 255, 255, 0.15)',
-      borderColor: 'rgba(255, 255, 255, 0.25)',
-      borderWidth: 1,
-    },
-    
-    heavy: {
-      intensity: Platform.OS === 'ios' ? 100 : 100,
-      tint: 'dark' as const,
-      backgroundColor: 'rgba(0, 0, 0, 0.9)',
-      borderColor: 'rgba(255, 255, 255, 0.1)',
-      borderWidth: 1,
-    },
+    lightOverlay: 'rgba(255, 255, 255, 0.1)',
+    mediumOverlay: 'rgba(255, 255, 255, 0.2)',
+    darkOverlay: 'rgba(0, 0, 0, 0.2)',
+    heavyOverlay: 'rgba(0, 0, 0, 0.4)',
   },
-  
-  shadows: {
-    small: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    },
-    
-    medium: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
+};
+
+// Spacing scale
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 48,
+  xxxl: 64,
+};
+
+// Border radius
+export const borderRadius = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  round: 9999,
+};
+
+// Shadows
+export const shadows = {
+  sm: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  md: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  lg: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  xl: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  glow: {
+    purple: {
+      shadowColor: '#667eea',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.5,
       shadowRadius: 8,
-      elevation: 6,
+      elevation: 0,
     },
-    
-    large: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.2,
-      shadowRadius: 16,
-      elevation: 12,
-    },
-    
-    colored: {
-      shadowColor: '#764ba2',
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.3,
-      shadowRadius: 16,
-      elevation: 12,
+    pink: {
+      shadowColor: '#f093fb',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.5,
+      shadowRadius: 8,
+      elevation: 0,
     },
   },
-  
-  spacing: {
-    xs: 4,
-    sm: 8,
-    md: 16,
-    lg: 24,
-    xl: 32,
-    xxl: 48,
-  },
-  
-  borderRadius: {
-    sm: 8,
-    md: 12,
-    lg: 16,
-    xl: 24,
-    xxl: 32,
-    round: 9999,
-  },
-  
-  animation: {
+};
+
+// Animation timing
+export const animations = {
+  timing: {
     fast: 200,
     normal: 300,
     slow: 500,
   },
+  spring: {
+    default: {
+      tension: 40,
+      friction: 7,
+    },
+    bouncy: {
+      tension: 50,
+      friction: 5,
+    },
+    stiff: {
+      tension: 100,
+      friction: 10,
+    },
+  },
 };
 
-// Helper function to get gradient colors based on theme
-export const getGradientColors = (isDarkMode: boolean): readonly [string, string, string] => {
-  return isDarkMode
-    ? [theme.colors.darkGradientStart, theme.colors.darkGradientMiddle, theme.colors.darkGradientEnd]
-    : [theme.colors.gradientStart, theme.colors.gradientMiddle, theme.colors.gradientEnd];
-};
-
-// Helper function to get glass style based on intensity
-export const getGlassStyle = (preset: keyof typeof theme.glass = 'medium', customStyles?: any) => {
-  const glassPreset = theme.glass[preset];
+// Glass style helper
+export const getGlassStyle = (variant: keyof typeof glassEffects = 'medium') => {
+  const effect = glassEffects[variant];
   return {
-    backgroundColor: glassPreset.backgroundColor,
-    borderColor: glassPreset.borderColor,
-    borderWidth: glassPreset.borderWidth,
+    backgroundColor: effect.backgroundColor,
     overflow: 'hidden' as const,
-    ...customStyles,
+    ...Platform.select({
+      ios: {
+        backdropFilter: `blur(${effect.blur}px)`,
+      },
+      android: {
+        // Android doesn't support backdrop filter
+        backgroundColor: variant === 'dark' || variant === 'heavy' 
+          ? 'rgba(0, 0, 0, 0.4)' 
+          : 'rgba(255, 255, 255, 0.3)',
+      },
+    }),
   };
 };
 
-// Get glass props for BlurView
-export const getGlassProps = (preset: keyof typeof theme.glass = 'medium') => {
-  const glassPreset = theme.glass[preset];
+// Glass props helper
+export const getGlassProps = (variant: keyof typeof glassEffects = 'medium') => {
+  const effect = glassEffects[variant];
   return {
-    intensity: glassPreset.intensity,
-    tint: glassPreset.tint,
+    intensity: effect.intensity,
+    tint: effect.tint,
   };
 };
+
+// Extended theme colors for glassmorphism
+export const glassThemeColors = {
+  gradientStart: '#667eea',
+  gradientMiddle: '#764ba2',
+  gradientEnd: '#f093fb',
+  glassBorder: 'rgba(255, 255, 255, 0.2)',
+  glassBackground: 'rgba(255, 255, 255, 0.1)',
+  textPrimary: '#FFFFFF',
+  textSecondary: 'rgba(255, 255, 255, 0.8)',
+};
+
+// Theme object
+export const theme = {
+  typography,
+  colors: {
+    ...colors,
+    ...glassThemeColors,
+  },
+  spacing,
+  borderRadius,
+  shadows,
+  animations,
+  glassEffects,
+  glass: glassEffects, // Add alias for compatibility
+  getGlassStyle,
+  getGlassProps,
+};
+
+export default theme;

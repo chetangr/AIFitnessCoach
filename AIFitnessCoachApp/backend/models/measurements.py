@@ -2,13 +2,13 @@
 Models for body measurements, progress photos, and fasting tracking
 """
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, ForeignKey, JSON, Text, Enum
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime
 import enum
 
 from .base import Base
+from .database_types import UUID
 
 class MeasurementType(str, enum.Enum):
     WEIGHT = "weight"

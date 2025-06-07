@@ -15,6 +15,7 @@ from agents.recovery_wellness_agent import RecoveryWellnessAgent
 from agents.goal_achievement_agent import GoalAchievementAgent
 from agents.form_safety_agent import FormSafetyAgent
 from agents.fitness_action_agent import FitnessActionAgent
+from agents.ai_action_extractor import ai_action_extractor
 from utils.logger import setup_logger
 from utils.cache_manager import response_cache
 from services.conversation_service import conversation_service
@@ -155,6 +156,9 @@ class MultiAgentCoordinator:
                 context = {}
             context.update(full_context)
             context["workout_timeline"] = timeline_data
+            
+            # Store context for action extraction
+            self._current_context = context
             
             # Determine which agents to consult
             agents_to_consult = required_agents or await self._determine_relevant_agents(query, context)
@@ -534,132 +538,74 @@ If unsure, include multiple relevant agents. PRIMARY_COACH will be included auto
         return resolved
     
     def _extract_action_items(self, responses: List[AgentResponse]) -> List[Dict[str, Any]]:
-        """Extract actionable items from all agent responses"""
-        action_items = []
+        """Extract actionable items from all agent responses using AI"""
+        all_action_items = []
         
-        # Priority order for action items
-        priority_map = {
-            AgentType.FORM_SAFETY: 1,  # Safety first
-            AgentType.RECOVERY: 2,      # Recovery second
-            AgentType.PRIMARY_COACH: 3, # General coaching
-            AgentType.NUTRITION: 4,     # Nutrition
-            AgentType.GOAL: 5          # Goal adjustments
+        # Get context from the conversation
+        context = getattr(self, '_current_context', {})
+        
+        # Use AI action extractor for each agent response
+        for response in responses:
+            # Extract actions using AI
+            extracted_actions = ai_action_extractor.extract_actions(
+                message=response.message,
+                agent_type=response.agent_type.value,
+                context=context
+            )
+            
+            # Add agent-specific priority boost
+            priority_boost = {
+                AgentType.FORM_SAFETY: -2,      # Safety first (lower number = higher priority)
+                AgentType.RECOVERY: -1,         # Recovery second
+                AgentType.FITNESS_ACTION: 0,    # Fitness actions
+                AgentType.PRIMARY_COACH: 1,     # General coaching
+                AgentType.NUTRITION: 2,         # Nutrition
+                AgentType.GOAL: 3              # Goal adjustments
+            }.get(response.agent_type, 0)
+            
+            # Adjust priorities based on agent type
+            for action in extracted_actions:
+                action["priority"] = action.get("priority", 5) + priority_boost
+                action["agent_confidence"] = response.confidence
+                all_action_items.append(action)
+        
+        # Deduplicate actions - keep highest confidence version of each type
+        action_map = {}
+        for action in all_action_items:
+            action_type = action["type"]
+            if action_type not in action_map or action.get("confidence", 0) > action_map[action_type].get("confidence", 0):
+                action_map[action_type] = action
+        
+        # Sort by priority and return as list
+        final_actions = list(action_map.values())
+        final_actions.sort(key=lambda x: (x.get("priority", 99), -x.get("confidence", 0)))
+        
+        # Log extracted actions for debugging
+        logger.info(f"Extracted {len(final_actions)} actions from {len(responses)} agent responses")
+        for action in final_actions:
+            logger.debug(f"Action: {action['type']} - {action['label']} (priority: {action['priority']}, confidence: {action.get('confidence', 0)})")
+        
+        return final_actions[:5]  # Limit to 5 most relevant actions
+    
+    def _analyze_message_for_actions(self, message: str, agent_type: AgentType) -> List[str]:
+        """Analyze message content to extract implied actions"""
+        actions = []
+        
+        # Common action patterns
+        action_patterns = {
+            "add": ["add", "include", "incorporate", "put in"],
+            "remove": ["remove", "take out", "delete", "skip"],
+            "modify": ["change", "adjust", "modify", "update"],
+            "schedule": ["schedule", "plan", "set up", "arrange"],
+            "create": ["create", "make", "build", "design"],
+            "view": ["show", "display", "view", "see"]
         }
         
-        # Extract context-aware actions based on responses
-        for response in responses:
-            agent_type = response.agent_type
-            message_lower = response.message.lower()
-            
-            # Generate specific actionable buttons based on content
-            if agent_type == AgentType.FITNESS_ACTION:
-                if "workout" in message_lower or "schedule" in message_lower:
-                    action_items.extend([
-                        {
-                            "id": f"add_workout_{datetime.now().timestamp()}",
-                            "type": "add_workout",
-                            "label": "Add to Today",
-                            "icon": "add-circle",
-                            "color": "#4CAF50",
-                            "source": agent_type.value,
-                            "priority": 1
-                        },
-                        {
-                            "id": f"schedule_workout_{datetime.now().timestamp()}",
-                            "type": "schedule_workout",
-                            "label": "Schedule for Later",
-                            "icon": "calendar",
-                            "color": "#2196F3",
-                            "source": agent_type.value,
-                            "priority": 2
-                        }
-                    ])
-                
-                if "rest" in message_lower:
-                    action_items.append({
-                        "id": f"schedule_rest_{datetime.now().timestamp()}",
-                        "type": "schedule_rest",
-                        "label": "Schedule Rest Day",
-                        "icon": "bed",
-                        "color": "#FF9800",
-                        "source": agent_type.value,
-                        "priority": 1
-                    })
-            
-            elif agent_type == AgentType.RECOVERY:
-                if "pain" in message_lower or "injury" in message_lower:
-                    action_items.extend([
-                        {
-                            "id": f"modify_workout_{datetime.now().timestamp()}",
-                            "type": "modify_workout",
-                            "label": "Modify Workout",
-                            "icon": "build",
-                            "color": "#FF5722",
-                            "source": agent_type.value,
-                            "priority": 1
-                        },
-                        {
-                            "id": f"substitute_exercises_{datetime.now().timestamp()}",
-                            "type": "substitute_exercises",
-                            "label": "Substitute Exercises",
-                            "icon": "swap-horizontal",
-                            "color": "#9C27B0",
-                            "source": agent_type.value,
-                            "priority": 2
-                        }
-                    ])
-            
-            elif agent_type == AgentType.NUTRITION:
-                if "meal" in message_lower or "nutrition" in message_lower:
-                    action_items.append({
-                        "id": f"meal_plan_{datetime.now().timestamp()}",
-                        "type": "create_meal_plan",
-                        "label": "Create Meal Plan",
-                        "icon": "restaurant",
-                        "color": "#4CAF50",
-                        "source": agent_type.value,
-                        "priority": 2
-                    })
-            
-            elif agent_type == AgentType.GOAL:
-                if "goal" in message_lower or "progress" in message_lower:
-                    action_items.extend([
-                        {
-                            "id": f"update_goals_{datetime.now().timestamp()}",
-                            "type": "update_goals",
-                            "label": "Update Goals",
-                            "icon": "flag",
-                            "color": "#3F51B5",
-                            "source": agent_type.value,
-                            "priority": 3
-                        },
-                        {
-                            "id": f"view_progress_{datetime.now().timestamp()}",
-                            "type": "view_progress",
-                            "label": "View Progress",
-                            "icon": "trending-up",
-                            "color": "#00BCD4",
-                            "source": agent_type.value,
-                            "priority": 3
-                        }
-                    ])
-            
-            # Add generic recommendations as text actions
-            if response.recommendations:
-                for rec in response.recommendations:
-                    action_items.append({
-                        "id": f"rec_{datetime.now().timestamp()}",
-                        "type": "recommendation",
-                        "action": rec,
-                        "source": response.agent_type.value,
-                        "priority": priority_map.get(response.agent_type, 99),
-                        "confidence": response.confidence
-                    })
+        for action, keywords in action_patterns.items():
+            if any(keyword in message for keyword in keywords):
+                actions.append(action)
         
-        # Sort by priority
-        action_items.sort(key=lambda x: x["priority"])
-        
-        return action_items[:10]  # Top 10 actions
+        return actions
     
     def _calculate_confidence(self, responses: List[AgentResponse]) -> float:
         """Calculate overall confidence score from all agents"""
@@ -865,4 +811,46 @@ If unsure, include multiple relevant agents. PRIMARY_COACH will be included auto
             "next_week_focus": response.consensus_recommendations[:5],
             "key_achievements": week_data.get("achievements", []),
             "areas_for_improvement": response.action_items[:5]
+        }
+    
+    async def process_message(self, message: str, context: Optional[Dict[str, Any]] = None, agents_to_consult: Optional[List[str]] = None) -> Dict[str, Any]:
+        """
+        Process message and return a dictionary response (wrapper for process_user_query)
+        """
+        # Convert agent strings to AgentType enums
+        agent_types = None
+        if agents_to_consult:
+            agent_types = []
+            for agent_str in agents_to_consult:
+                if agent_str == "primary_coach":
+                    agent_types.append(AgentType.PRIMARY_COACH)
+                elif agent_str == "nutrition":
+                    agent_types.append(AgentType.NUTRITION)
+                elif agent_str == "recovery":
+                    agent_types.append(AgentType.RECOVERY)
+                elif agent_str == "goal":
+                    agent_types.append(AgentType.GOAL)
+                elif agent_str == "form_safety":
+                    agent_types.append(AgentType.FORM_SAFETY)
+        
+        # Get coordinated response
+        response = await self.process_user_query(message, context, agent_types)
+        
+        # Convert to dictionary format expected by API
+        return {
+            "primary_message": response.primary_message,
+            "agent_insights": [
+                {
+                    "agent": insight.agent_type.value,
+                    "message": insight.message,
+                    "confidence": insight.confidence,
+                    "recommendations": insight.recommendations
+                }
+                for insight in response.agent_insights
+            ],
+            "consensus_recommendations": response.consensus_recommendations,
+            "action_items": response.action_items,
+            "confidence_score": response.confidence_score,
+            "timestamp": datetime.now(),
+            "responding_agents": response.responding_agents
         }

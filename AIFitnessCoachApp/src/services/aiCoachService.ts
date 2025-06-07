@@ -4,8 +4,25 @@ import { Platform } from 'react-native';
 
 class AICoachService {
   private conversationHistory: any[] = [];
+  private userContext: any = null;
+
+  async loadUserContext() {
+    try {
+      // Load user profile data
+      const userDataStr = await AsyncStorage.getItem('userData');
+      if (userDataStr) {
+        this.userContext = JSON.parse(userDataStr);
+      }
+    } catch (error) {
+      console.error('Error loading user context:', error);
+    }
+  }
 
   async sendMessage(message: string, imageUri?: string): Promise<string> {
+    // Ensure user context is loaded
+    if (!this.userContext) {
+      await this.loadUserContext();
+    }
     try {
       // Get user token
       const token = await AsyncStorage.getItem('token');
@@ -70,6 +87,11 @@ class AICoachService {
       return "I can see you've uploaded an image! While I can't analyze images in the local mode, I can help you with:\n\n• Form checks and technique tips\n• Exercise recommendations\n• Workout plans\n• Nutrition advice\n\nWhat would you like to know about?";
     }
     const lowerMessage = message.toLowerCase();
+    
+    // Get user context for personalized responses
+    const fitnessLevel = this.userContext?.fitnessLevel || 'intermediate';
+    const goals = this.userContext?.goals || ['general fitness'];
+    const name = this.userContext?.name || 'there';
 
     // Workout creation
     if (lowerMessage.includes('workout') && (lowerMessage.includes('create') || lowerMessage.includes('plan'))) {
@@ -91,9 +113,22 @@ class AICoachService {
       return "For strong, visible abs:\n\n🎯 **Core Exercises**:\n- Planks (3 sets, 60s)\n- Russian Twists (3x20)\n- Bicycle Crunches (3x25)\n- Leg Raises (3x15)\n\n🥗 **Remember**: Abs are made in the kitchen! You need low body fat (10-15% for men, 16-20% for women) to see definition.\n\nWant a complete 30-day abs challenge?";
     }
 
-    // Nutrition
+    // Nutrition - Personalized based on goals
     if (lowerMessage.includes('nutrition') || lowerMessage.includes('diet') || lowerMessage.includes('eat')) {
-      return "Here are my top nutrition tips:\n\n🥦 **Whole Foods**: Base your diet on unprocessed foods\n⚖️ **Balanced Meals**: Include protein, carbs, and healthy fats\n⏰ **Meal Timing**: Eat every 3-4 hours to maintain energy\n💧 **Hydration**: Drink water before, during, and after workouts\n\nWould you like a personalized meal plan based on your goals?";
+      const isWeightLoss = goals.some((g: string) => g.toLowerCase().includes('weight loss') || g.toLowerCase().includes('lose weight'));
+      const isMuscleGain = goals.some((g: string) => g.toLowerCase().includes('muscle') || g.toLowerCase().includes('gain'));
+      
+      let nutritionAdvice = `Hey ${name}! Based on your ${fitnessLevel} fitness level`;
+      
+      if (isWeightLoss) {
+        nutritionAdvice += " and weight loss goals:\n\n📉 **Calorie Deficit**: Aim for 300-500 calorie deficit\n🥗 **High Protein**: 0.8-1g per lb bodyweight to preserve muscle\n🥦 **Volume Eating**: Fill up on low-calorie, high-volume foods\n⏰ **Intermittent Fasting**: Consider 16:8 IF for easier adherence\n💧 **Hydration**: Drink water before meals to help with satiety";
+      } else if (isMuscleGain) {
+        nutritionAdvice += " and muscle gain goals:\n\n📈 **Calorie Surplus**: Eat 200-300 calories above maintenance\n🍖 **Protein Power**: 1g per lb bodyweight minimum\n🍚 **Carb Timing**: Eat carbs around workouts for energy\n🥜 **Healthy Fats**: 25-30% of total calories\n🍌 **Post-Workout**: Protein + carbs within 2 hours";
+      } else {
+        nutritionAdvice += ":\n\n🥦 **Whole Foods**: Base your diet on unprocessed foods\n⚖️ **Balanced Meals**: Include protein, carbs, and healthy fats\n⏰ **Meal Timing**: Eat every 3-4 hours to maintain energy\n💧 **Hydration**: Drink water before, during, and after workouts";
+      }
+      
+      return nutritionAdvice + "\n\nWould you like specific meal suggestions for today?";
     }
 
     // Exercises
@@ -101,8 +136,32 @@ class AICoachService {
       return "Here are some of the best exercises by muscle group:\n\n🏋️ **Chest**: Bench press, push-ups, dips\n💪 **Back**: Pull-ups, rows, deadlifts\n🦵 **Legs**: Squats, lunges, leg press\n🤸 **Core**: Planks, crunches, mountain climbers\n\nWhich muscle group would you like to focus on?";
     }
 
-    // Default response
-    return "I'm here to help with all your fitness needs! I can:\n\n✅ Create personalized workout plans\n✅ Provide nutrition guidance\n✅ Suggest exercises for specific muscles\n✅ Help with weight loss or muscle gain\n✅ Track your progress\n\nWhat aspect of your fitness journey can I help with today?";
+    // Schedule queries
+    if (lowerMessage.includes('schedule') || lowerMessage.includes('today') || lowerMessage.includes('what should i do')) {
+      const dayOfWeek = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+      return `Happy ${dayOfWeek}, ${name}! Based on your ${fitnessLevel} level and goals (${goals.join(', ')}), here's what I recommend:\n\n${this.getScheduleRecommendation(dayOfWeek, fitnessLevel, goals)}\n\nRemember to listen to your body and adjust intensity as needed!`;
+    }
+
+    // Default response - Personalized greeting
+    return `Hey ${name}! I'm your AI fitness coach, ready to help you with your ${goals.join(' and ')} goals. As a${fitnessLevel === 'advanced' ? 'n' : ''} ${fitnessLevel} athlete, I can assist you with:\n\n• Creating personalized workout plans\n• Exercise form and technique\n• Nutrition advice tailored to your goals\n• Recovery strategies\n• Progress tracking\n\nWhat would you like to work on today?`;
+  }
+  
+  private getScheduleRecommendation(day: string, level: string, goals: string[]): string {
+    const isRestDay = day === 'Sunday' || day === 'Wednesday';
+    
+    if (isRestDay) {
+      return "🧘‍♀️ **Rest Day**:\n• Light stretching or yoga (15-20 min)\n• Focus on nutrition and hydration\n• Optional: 20-30 min walk\n• Foam rolling for recovery";
+    }
+    
+    const workoutSplit: { [key: string]: string } = {
+      'Monday': "🏋️ **Upper Body Push** (Chest, Shoulders, Triceps)",
+      'Tuesday': "🦵 **Lower Body** (Quads, Hamstrings, Glutes)",
+      'Thursday': "💪 **Upper Body Pull** (Back, Biceps)",
+      'Friday': "🏃 **Cardio & Core**",
+      'Saturday': "💥 **Full Body HIIT**"
+    };
+    
+    return workoutSplit[day] || "🏋️ **Active Recovery** - Light activity of your choice";
   }
 
   clearHistory() {

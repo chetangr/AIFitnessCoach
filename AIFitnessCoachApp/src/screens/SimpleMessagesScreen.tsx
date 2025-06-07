@@ -21,8 +21,14 @@ import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { backendAgentService } from '../services/backendAgentService';
+import { workoutScheduleService } from '../services/workoutScheduleService';
+import { workoutActionService } from '../services/workoutActionService';
+import { aiCoachService } from '../services/aiCoachService';
 import { SAFE_BOTTOM_PADDING } from '../constants/layout';
 import { useThemeStore } from '../store/themeStore';
+import { useAISettingsStore } from '../store/aiSettingsStore';
+import { ThemedGlassCard, ThemedGlassContainer } from '../components/glass/ThemedGlassComponents';
+import { theme } from '../config/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -55,6 +61,7 @@ interface Message {
 
 const SimpleMessagesScreen = ({ route }: any) => {
   const { isDarkMode } = useThemeStore();
+  const { actionMode, isTurboMode, isQuantumMode } = useAISettingsStore();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -83,10 +90,10 @@ const SimpleMessagesScreen = ({ route }: any) => {
 
   useEffect(() => {
     console.log('AI Coach Chat Opened');
-    // Load previous conversation from backend if available
-    if (backendAgentService.isConfigured()) {
-      loadConversationHistory();
-    }
+    // Skip loading conversation history for now as the endpoint might not exist
+    // if (backendAgentService.isConfigured()) {
+    //   loadConversationHistory();
+    // }
     
     // Animate messages in
     Animated.timing(messageSlide, {
@@ -177,6 +184,144 @@ const SimpleMessagesScreen = ({ route }: any) => {
     }).start();
   };
 
+  // Helper function to parse workout suggestions from AI response
+  const parseWorkoutActions = (message: string): ActionItem[] => {
+    const actions: ActionItem[] = [];
+    
+    // Check if message contains workout suggestions
+    const workoutPatterns = [
+      /(\d+)\.\s*\*\*([^*]+)\*\*:/gi,  // Matches "1. **Squats with Barbell**:"
+      /•\s*\*\*([^*]+)\*\*:/gi,         // Matches "• **Exercise Name**:"
+      /[-]\s*\*\*([^*]+)\*\*:/gi,       // Matches "- **Exercise Name**:"
+      /(\d+)\.\s+([A-Z][^:]+):/gi,      // Matches "1. Exercise Name:"
+      /workout|exercise|sets|reps/gi,   // General workout keywords
+    ];
+    
+    let hasWorkoutSuggestions = false;
+    for (const pattern of workoutPatterns) {
+      if (pattern.test(message)) {
+        hasWorkoutSuggestions = true;
+        break;
+      }
+    }
+    
+    // Also check for specific workout modification contexts
+    const modificationKeywords = /increase.*difficulty|step.*up|advanced.*workout|challenging.*weight|extra.*weight/gi;
+    const hasModificationContext = modificationKeywords.test(message);
+    
+    // Check for nutrition context
+    const nutritionKeywords = /eat|food|diet|nutrition|meal|breakfast|lunch|dinner|snack|protein|carb|calorie|hungry|recipe|cook/gi;
+    const hasNutritionContext = nutritionKeywords.test(message);
+    
+    // Check for pain/injury context
+    const painKeywords = /pain|injury|hurt|sore|strain|sprain|discomfort|ache/gi;
+    const hasPainContext = painKeywords.test(message);
+    
+    if (hasNutritionContext) {
+      // Don't show workout actions for nutrition queries
+      return actions;
+    } else if (hasPainContext) {
+      // Add pain/injury specific actions
+      actions.push({
+        id: `action_${Date.now()}_remove`,
+        type: 'remove_workout',
+        label: 'Cancel Today\'s Workout',
+        icon: 'close-circle',
+        color: '#F44336',
+        priority: 1,
+        action: 'remove_workout'
+      });
+      
+      actions.push({
+        id: `action_${Date.now()}_substitute`,
+        type: 'substitute_exercises',
+        label: 'Get Safe Alternatives',
+        icon: 'medkit',
+        color: '#FF9800',
+        priority: 2,
+        action: 'substitute_safe'
+      });
+      
+      actions.push({
+        id: `action_${Date.now()}_rest`,
+        type: 'schedule_rest',
+        label: 'Take Rest Day',
+        icon: 'bed',
+        color: '#4CAF50',
+        priority: 3,
+        action: 'schedule_rest'
+      });
+    } else if (hasWorkoutSuggestions || hasModificationContext) {
+      // Add action to add all suggested workouts
+      actions.push({
+        id: `action_${Date.now()}_add_all`,
+        type: 'add_workout',
+        label: 'Add All Workouts',
+        icon: 'add-circle',
+        color: '#4CAF50',
+        priority: 1,
+        action: 'add_all_workouts'
+      });
+      
+      // Add action to modify current workout
+      actions.push({
+        id: `action_${Date.now()}_modify`,
+        type: 'modify_workout',
+        label: 'Replace Today\'s Workout',
+        icon: 'swap-horizontal',
+        color: '#FF9800',
+        priority: 2,
+        action: 'modify_workout'
+      });
+      
+      // Add action to schedule for another day
+      actions.push({
+        id: `action_${Date.now()}_schedule`,
+        type: 'schedule_workout',
+        label: 'Schedule for Later',
+        icon: 'calendar',
+        color: '#2196F3',
+        priority: 3,
+        action: 'schedule_workout'
+      });
+    }
+    
+    return actions;
+  };
+
+  // Helper function to generate AI response actions for local AI service
+  const generateAIResponseActions = (responseText: string): ActionItem[] => {
+    const actions: ActionItem[] = [];
+    
+    // Check if response contains workout suggestions
+    if (responseText.toLowerCase().includes('workout') || 
+        responseText.toLowerCase().includes('exercise') ||
+        responseText.toLowerCase().includes('routine')) {
+      
+      actions.push({
+        id: `action_${Date.now()}_add`,
+        type: 'add_workout',
+        label: 'Add to Schedule',
+        icon: 'add-circle',
+        color: '#4CAF50',
+        priority: 1,
+        action: 'add_workout'
+      });
+      
+      actions.push({
+        id: `action_${Date.now()}_view`,
+        type: 'view_schedule',
+        label: 'View Schedule',
+        icon: 'calendar',
+        color: '#2196F3',
+        priority: 2,
+        action: 'view_schedule'
+      });
+    }
+    
+    return actions;
+  };
+
   const sendMessage = async (messageText?: string, imageUri?: string) => {
     const textToSend = messageText || inputText.trim();
     if (!textToSend && !imageUri) return;
@@ -220,18 +365,172 @@ const SimpleMessagesScreen = ({ route }: any) => {
       let response;
       let respondingAgents;
       
+      // Debug logging
+      console.log('Backend Service Config:', backendAgentService.getConfig());
+      console.log('Is Configured:', backendAgentService.isConfigured());
+      
       if (backendAgentService.isConfigured()) {
         // Use backend with multi-agent support
         if (useMultiAgent) {
+          // Get today's workout schedule for context
+          const today = new Date();
+          const todayWorkouts = await workoutScheduleService.getWorkoutForDate(today);
+          
+          // Check if today is a rest day
+          const isRestDay = !todayWorkouts || todayWorkouts.type === 'rest' || todayWorkouts.exercises?.length === 0;
+          
+          // Check if message is nutrition-related
+          const nutritionKeywords = /eat|food|diet|nutrition|meal|breakfast|lunch|dinner|snack|protein|carb|calorie|hungry|recipe|cook/gi;
+          const isNutritionQuery = nutritionKeywords.test(textToSend);
+          
+          const context = {
+            date: today.toISOString(),
+            day_of_week: today.toLocaleDateString('en-US', { weekday: 'long' }),
+            scheduled_workouts: todayWorkouts,
+            is_rest_day: isRestDay,
+            is_nutrition_query: isNutritionQuery,
+            workout_type: todayWorkouts?.type || 'rest',
+            message_contains_schedule_query: textToSend.toLowerCase().includes('schedule') || 
+                                           textToSend.toLowerCase().includes('today') ||
+                                           textToSend.toLowerCase().includes('workout')
+          };
+          
+          console.log('Sending context to AI:', JSON.stringify(context, null, 2));
+          
+          // Auto-select nutrition specialist for nutrition queries
+          let agentsToUse = selectedAgentsForChat.length > 0 ? selectedAgentsForChat : undefined;
+          if (isNutritionQuery && (!agentsToUse || agentsToUse.length === 0)) {
+            agentsToUse = ['nutrition_specialist'];
+            console.log('Auto-selecting nutrition specialist for nutrition query');
+          }
+          
+          console.log('Selected agents:', agentsToUse);
+          
+          // TURBO MODE: Use local AI immediately for faster response
+          if (isTurboMode) {
+            console.log('Turbo Mode: Getting quick response from local AI');
+            
+            // Get immediate response from local AI
+            try {
+              const localResponse = await aiCoachService.sendMessage(textToSend, imageUri);
+              
+              // Determine agent type based on query
+              let agentType = 'primary';
+              let agentName = 'AI Coach (Turbo)';
+              let agentEmoji = '⚡';
+              
+              if (isNutritionQuery) {
+                agentType = 'nutrition';
+                agentName = 'Nutrition Expert (Turbo)';
+                agentEmoji = '🥗';
+              }
+              
+              // Create immediate response
+              const turboMessage: Message = {
+                id: (Date.now() + 1).toString(),
+                text: localResponse,
+                sender: 'ai',
+                timestamp: new Date(),
+                actions: parseWorkoutActions(localResponse),
+                confirmations: [],
+                respondingAgents: [{
+                  type: agentType,
+                  name: agentName,
+                  emoji: agentEmoji,
+                  confidence: 'turbo'
+                }],
+              };
+              
+              setMessages((prev) => [...prev, turboMessage]);
+              setIsTyping(false);
+              
+              // Still send to backend for better response later
+              backendAgentService.sendMultiAgentMessage(
+                textToSend,
+                'supportive',
+                context,
+                agentsToUse,
+                { fastMode: true }
+              ).then((betterResponse) => {
+                if (betterResponse.response && !betterResponse.response.includes("I'm taking a bit longer")) {
+                  // Update with better response if available
+                  console.log('Turbo Mode: Received enhanced response from backend');
+                  // You could optionally update the message here
+                }
+              }).catch(() => {
+                // Ignore backend errors in turbo mode
+                console.log('Turbo Mode: Backend response failed, but local response already shown');
+              });
+              
+              return; // Exit early in turbo mode
+            } catch (error) {
+              console.error('Turbo Mode local AI failed, falling back to backend:', error);
+            }
+          }
+          
+          // Regular mode or if turbo mode failed
           const multiResponse = await backendAgentService.sendMultiAgentMessage(
             textToSend,
             'supportive', // Can be made configurable
-            undefined, // context
-            selectedAgentsForChat.length > 0 ? selectedAgentsForChat : undefined,  // Use selected agents or let system auto-determine
-            { fastMode: true } // Enable fast mode for quicker responses
+            context,
+            agentsToUse,
+            { fastMode: false } // Disable fast mode for better responses
           );
           response = multiResponse;
           respondingAgents = multiResponse.responding_agents;
+          
+          // Check if we got a generic response
+          if (response.response && response.response.includes("I'm taking a bit longer to process")) {
+            console.log('Received timeout response, falling back to local AI service');
+            
+            try {
+              // Use the local AI service for a personalized response
+              const localResponse = await aiCoachService.sendMessage(textToSend, imageUri);
+              
+              // Determine agent type based on query
+              let agentType = 'primary';
+              let agentName = 'AI Coach';
+              let agentEmoji = '💪';
+              
+              if (isNutritionQuery) {
+                agentType = 'nutrition';
+                agentName = 'Nutrition Specialist';
+                agentEmoji = '🥗';
+              } else if (textToSend.toLowerCase().includes('recovery') || textToSend.toLowerCase().includes('pain')) {
+                agentType = 'recovery';
+                agentName = 'Recovery Specialist';
+                agentEmoji = '🧘‍♀️';
+              } else if (textToSend.toLowerCase().includes('form') || textToSend.toLowerCase().includes('technique')) {
+                agentType = 'form';
+                agentName = 'Form Expert';
+                agentEmoji = '📐';
+              }
+              
+              response.response = localResponse;
+              response.responding_agents = [{
+                type: agentType,
+                name: agentName,
+                emoji: agentEmoji,
+                confidence: 'high'
+              }];
+              
+              // Add context-aware action items based on the response
+              if (localResponse.includes('workout') || localResponse.includes('exercise')) {
+                response.action_items = generateAIResponseActions(localResponse);
+              }
+              
+            } catch (localError) {
+              console.error('Local AI service also failed:', localError);
+              // Only use generic fallback if local AI also fails
+              response.response = "I'm having trouble processing your request right now. Please try again in a moment. If you have an urgent question, please be as specific as possible.";
+              response.responding_agents = [{
+                type: 'primary',
+                name: 'AI Coach',
+                emoji: '💪',
+                confidence: 'low'
+              }];
+            }
+          }
         } else {
           // Single agent mode via backend
           response = await backendAgentService.sendMessage(textToSend, 'supportive');
@@ -247,19 +546,44 @@ const SimpleMessagesScreen = ({ route }: any) => {
       
       console.log('AI Response Received', { response, respondingAgents });
 
+      const responseText = (response as any).text || (response as any).response || 'No response received';
+      let actionItems = (response as any).action_items || (response as any).actions || [];
+      
+      // Action mode logic based on user settings
+      if (actionMode === 'hybrid' || isTurboMode) {
+        // Turbo Mode (Hybrid): Always parse actions from text for speed
+        const parsedActions = parseWorkoutActions(responseText);
+        
+        // Merge backend action items with parsed actions (avoid duplicates)
+        const actionTypes = new Set(actionItems.map((a: ActionItem) => a.type));
+        for (const parsedAction of parsedActions) {
+          if (!actionTypes.has(parsedAction.type)) {
+            actionItems.push(parsedAction);
+          }
+        }
+        
+        if (parsedActions.length > 0) {
+          console.log(`Turbo Mode: Generated ${parsedActions.length} quick actions`);
+        }
+      } else if (actionMode === 'pure_ai' || isQuantumMode) {
+        // Quantum Mode (Pure AI): Only use backend-provided actions
+        // Trust the AI to determine appropriate actions
+        console.log('Quantum Mode: Using pure AI actions only', actionItems);
+        
+        if (actionItems.length === 0 && responseText.toLowerCase().includes('workout')) {
+          // Provide feedback if no actions were generated in Quantum mode
+          console.log('Quantum Mode: No AI actions detected. AI may need more context.');
+        }
+      }
+      
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: (response as any).text || (response as any).response || 'No response received',
+        text: responseText,
         sender: 'ai',
         timestamp: new Date(),
-        actions: (response as any).action_items || (response as any).actions || [],
+        actions: actionItems,
         confirmations: (response as any).confirmations || [],
-        respondingAgents: respondingAgents?.map(agent => ({
-          type: agent,
-          name: agent.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-          emoji: '🤖',
-          confidence: 'high'
-        })),
+        respondingAgents: respondingAgents || [],
       };
 
       setMessages((prev) => [...prev, aiMessage]);
@@ -284,7 +608,7 @@ const SimpleMessagesScreen = ({ route }: any) => {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'Images' as any, // Use string directly to avoid deprecated warning
+      mediaTypes: 'images' as any,
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
@@ -297,46 +621,55 @@ const SimpleMessagesScreen = ({ route }: any) => {
 
   const handleActionItem = async (action: ActionItem, messageId: string) => {
     try {
-      setIsTyping(true);
+      // Find the message to get the workout suggestions
+      const message = messages.find(m => m.id === messageId);
+      const workoutText = message?.text || '';
       
-      // Create action context message
-      let actionMessage = '';
-      switch (action.type) {
-        case 'add_workout':
-          actionMessage = `Please add the suggested workout to my schedule for today.`;
-          break;
-        case 'schedule_workout':
-          actionMessage = `I'd like to schedule this workout. Can you help me pick a good day?`;
-          break;
-        case 'schedule_rest':
-          actionMessage = `Please schedule a rest day for me.`;
-          break;
-        case 'modify_workout':
-          actionMessage = `Please modify my workout to accommodate my current condition.`;
-          break;
-        case 'substitute_exercises':
-          actionMessage = `Please suggest alternative exercises that won't aggravate my condition.`;
-          break;
-        case 'create_meal_plan':
-          actionMessage = `Please create a meal plan for me.`;
-          break;
-        case 'update_goals':
-          actionMessage = `I'd like to update my fitness goals.`;
-          break;
-        case 'view_progress':
-          actionMessage = `Show me my fitness progress.`;
-          break;
-        default:
-          actionMessage = `Execute action: ${action.label}`;
+      // Check if this is a workout-related action that can be executed directly
+      const workoutActions = ['add_workout', 'modify_workout', 'schedule_workout', 'schedule_rest', 'substitute_exercises'];
+      
+      if (workoutActions.includes(action.type)) {
+        // Execute the action directly using workoutActionService
+        const success = await workoutActionService.executeAction({
+          type: action.type,
+          workoutSuggestions: workoutText,
+          data: action
+        });
+        
+        if (success) {
+          // Send a confirmation message to the AI
+          const confirmationMessage = `I've ${action.type === 'add_workout' ? 'added the workouts' : 
+                                        action.type === 'modify_workout' ? 'modified today\'s workout' :
+                                        action.type === 'schedule_workout' ? 'scheduled the workouts' :
+                                        action.type === 'schedule_rest' ? 'scheduled a rest day' :
+                                        'completed the action'}.`;
+          await sendMessage(confirmationMessage);
+        }
+      } else {
+        // For non-workout actions, send a message to the AI
+        setIsTyping(true);
+        
+        let actionMessage = '';
+        switch (action.type) {
+          case 'create_meal_plan':
+            actionMessage = `Please create a meal plan for me.`;
+            break;
+          case 'update_goals':
+            actionMessage = `I'd like to update my fitness goals.`;
+            break;
+          case 'view_progress':
+            actionMessage = `Show me my fitness progress.`;
+            break;
+          default:
+            actionMessage = `Execute action: ${action.label}`;
+        }
+        
+        await sendMessage(actionMessage);
+        setIsTyping(false);
       }
-      
-      // Send the action request
-      await sendMessage(actionMessage);
-      
     } catch (error) {
       console.error('Error handling action:', error);
       Alert.alert('Error', 'Failed to execute action. Please try again.');
-    } finally {
       setIsTyping(false);
     }
   };
@@ -502,12 +835,7 @@ const SimpleMessagesScreen = ({ route }: any) => {
               timestamp: new Date(),
               actions: [], // MultiAgentResponse doesn't include actions
               confirmations: [], // MultiAgentResponse doesn't include confirmations
-              respondingAgents: response.responding_agents?.map(agent => ({
-                type: agent,
-                name: agent.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-                emoji: getAgentEmoji(agent),
-                confidence: 'high'
-              })),
+              respondingAgents: response.responding_agents,
             };
 
             setMessages((prev) => [...prev, aiMessage]);
@@ -538,17 +866,6 @@ const SimpleMessagesScreen = ({ route }: any) => {
     }
   };
 
-  const getAgentEmoji = (agentType: string): string => {
-    const emojiMap: { [key: string]: string } = {
-      'fitness_coach': '💪',
-      'nutrition_specialist': '🥗',
-      'recovery_wellness': '🧘',
-      'goal_achievement': '🎯',
-      'form_safety': '🛡️',
-      'fitness_action': '🏃',
-    };
-    return emojiMap[agentType] || '🤖';
-  };
 
   const availableAgents = [
     { type: 'fitness_coach', name: 'Fitness Coach', emoji: '💪' },
@@ -675,7 +992,7 @@ const SimpleMessagesScreen = ({ route }: any) => {
     : ['#667eea', '#764ba2', '#f093fb'] as const;
 
   return (
-    <LinearGradient colors={gradientColors} style={styles.container}>
+    <LinearGradient colors={theme.colors.primary.gradient as [string, string, string]} style={styles.container}>
       {/* Enhanced Header with Glow Effect */}
       <LinearGradient
         colors={['rgba(102, 126, 234, 0.1)', 'transparent']}
@@ -683,12 +1000,25 @@ const SimpleMessagesScreen = ({ route }: any) => {
       >
         <View style={styles.headerContent}>
           <Icon name="flash" size={24} color="#f093fb" />
-          <Text style={styles.compactTitle}>
-            {selectedAgentsForChat.length > 0 
-              ? `AI Coach (${selectedAgentsForChat.length} agents)`
-              : 'AI Coach'
-            }
-          </Text>
+          <View style={styles.titleContainer}>
+            <Text style={styles.compactTitle}>
+              {selectedAgentsForChat.length > 0 
+                ? `AI Coach (${selectedAgentsForChat.length} agents)`
+                : 'AI Coach'
+              }
+            </Text>
+            {/* Mode indicator */}
+            <View style={styles.modeIndicator}>
+              <Icon 
+                name={isTurboMode ? "flash" : "planet"} 
+                size={14} 
+                color={isTurboMode ? "#FF9800" : "#667eea"} 
+              />
+              <Text style={styles.modeText}>
+                {isTurboMode ? 'Turbo' : 'Quantum'}
+              </Text>
+            </View>
+          </View>
           <View style={styles.onlineIndicator}>
             <View style={styles.onlineDot} />
           </View>
@@ -999,6 +1329,26 @@ const styles = StyleSheet.create({
     textShadowColor: '#f093fb',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 10,
+  },
+  titleContainer: {
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  modeIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  modeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#fff',
+    opacity: 0.9,
   },
   onlineIndicator: {
     width: 12,
@@ -1396,7 +1746,7 @@ const styles = StyleSheet.create({
     color: '#667eea',
   },
   selectedCheckmark: {
-    position: 'absolute' as const,
+    position: 'absolute',
     top: 8,
     right: 8,
     width: 20,
@@ -1412,7 +1762,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 20,
-    alignSelf: 'center' as const,
+    alignSelf: 'center',
   },
   clearSelectionText: {
     color: '#667eea',

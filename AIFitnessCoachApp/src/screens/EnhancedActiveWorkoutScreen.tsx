@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { completeExercisesDatabase, getExerciseById } from '../data/exercisesDatabase';
+import FitnessMetricsOverlay from '../components/FitnessMetricsOverlay';
 
 const { width, height } = Dimensions.get('window');
 
@@ -32,6 +33,10 @@ const EnhancedActiveWorkoutScreen = ({ route, navigation }: any) => {
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
   const [heartRate, setHeartRate] = useState(0);
   const [calories, setCalories] = useState(0);
+  const [currentSet, setCurrentSet] = useState(1);
+  const [totalSets] = useState(3);
+  const [activeMinutes, setActiveMinutes] = useState(0);
+  const [metricsStyle, setMetricsStyle] = useState<'minimal' | 'full' | 'compact'>('full');
 
   // Animation values
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -60,6 +65,16 @@ const EnhancedActiveWorkoutScreen = ({ route, navigation }: any) => {
     return () => clearInterval(interval);
   }, []);
 
+  // Active minutes tracker
+  useEffect(() => {
+    if (!isPaused && !isResting) {
+      const interval = setInterval(() => {
+        setActiveMinutes(prev => prev + 1/60);
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isPaused, isResting]);
+
   // Workout timer
   useEffect(() => {
     if (!isPaused && !isResting) {
@@ -79,7 +94,7 @@ const EnhancedActiveWorkoutScreen = ({ route, navigation }: any) => {
       return () => clearTimeout(timer);
     } else if (isResting && restTimer === 0) {
       setIsResting(false);
-      setRestTimer(currentExercise?.rest || 60);
+      setRestTimer(60);
     }
   }, [isResting, restTimer, isPaused]);
 
@@ -127,7 +142,8 @@ const EnhancedActiveWorkoutScreen = ({ route, navigation }: any) => {
     if (currentExerciseIndex < exercises.length - 1) {
       setCurrentExerciseIndex(currentExerciseIndex + 1);
       setIsResting(true);
-      setRestTimer(currentExercise?.rest || 60);
+      setRestTimer(60);
+      setCurrentSet(currentSet + 1);
     } else {
       handleFinishWorkout();
     }
@@ -193,41 +209,45 @@ const EnhancedActiveWorkoutScreen = ({ route, navigation }: any) => {
         />
       </ImageBackground>
 
-      {/* Transparent Header */}
-      <BlurView intensity={80} tint="dark" style={styles.transparentHeader}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity onPress={handleExitWorkout} style={styles.closeButton}>
-            <Icon name="close" size={28} color="white" />
-          </TouchableOpacity>
-          
-          <View style={styles.headerCenter}>
-            <Text style={styles.workoutTitle}>{workout?.name || currentExercise.name}</Text>
-            <Text style={styles.workoutTime}>{formatTime(workoutTimer)}</Text>
-          </View>
+      {/* Fitness Metrics Overlay */}
+      <FitnessMetricsOverlay
+        heartRate={heartRate}
+        calories={calories}
+        elapsedTime={formatTime(workoutTimer)}
+        activeMinutes={activeMinutes}
+        currentExercise={currentExercise?.name}
+        setsCompleted={currentSet - 1}
+        totalSets={totalSets}
+        style={metricsStyle}
+        theme="dark"
+        showRings={true}
+        position="top"
+      />
 
-          <View style={styles.headerRight}>
-            <Animated.View style={[styles.heartRateContainer, { transform: [{ scale: pulseAnim }] }]}>
-              <Icon name="heart" size={20} color="#ff6b6b" />
-              <Text style={styles.heartRateText}>{heartRate}</Text>
-            </Animated.View>
-          </View>
-        </View>
+      {/* Close Button */}
+      <TouchableOpacity 
+        onPress={handleExitWorkout} 
+        style={styles.floatingCloseButton}
+      >
+        <BlurView intensity={80} tint="dark" style={styles.closeButtonBlur}>
+          <Icon name="close" size={24} color="white" />
+        </BlurView>
+      </TouchableOpacity>
 
-        {/* Progress Bar */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <Animated.View 
-              style={[
-                styles.progressFill, 
-                { width: `${progress}%` }
-              ]} 
-            />
-          </View>
-          <Text style={styles.progressText}>
-            Exercise {currentExerciseIndex + 1} of {exercises.length}
-          </Text>
-        </View>
-      </BlurView>
+      {/* Style Toggle Button */}
+      <TouchableOpacity 
+        onPress={() => {
+          const styles: Array<'minimal' | 'full' | 'compact'> = ['minimal', 'compact', 'full'];
+          const currentIndex = styles.indexOf(metricsStyle);
+          setMetricsStyle(styles[(currentIndex + 1) % 3]);
+        }} 
+        style={styles.styleToggleButton}
+      >
+        <BlurView intensity={80} tint="dark" style={styles.styleToggleBlur}>
+          <Icon name="options" size={20} color="white" />
+        </BlurView>
+      </TouchableOpacity>
+
 
       {/* Scrollable Content */}
       <ScrollView 
@@ -258,7 +278,7 @@ const EnhancedActiveWorkoutScreen = ({ route, navigation }: any) => {
                 <View style={styles.statDivider} />
                 <View style={styles.statItem}>
                   <Icon name="time" size={24} color="#FF9800" />
-                  <Text style={styles.statValue}>{currentExercise.rest || 60}s</Text>
+                  <Text style={styles.statValue}>60s</Text>
                   <Text style={styles.statLabel}>Rest</Text>
                 </View>
               </View>
@@ -308,7 +328,7 @@ const EnhancedActiveWorkoutScreen = ({ route, navigation }: any) => {
                 style={styles.skipRestButton}
                 onPress={() => {
                   setIsResting(false);
-                  setRestTimer(currentExercise?.rest || 60);
+                  setRestTimer(60);
                 }}
               >
                 <Text style={styles.skipRestText}>Skip Rest</Text>
@@ -849,6 +869,34 @@ const styles = StyleSheet.create({
   errorText: {
     color: 'white',
     fontSize: 18,
+  },
+  floatingCloseButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 30,
+    left: 20,
+    zIndex: 200,
+    borderRadius: 22,
+    overflow: 'hidden',
+  },
+  closeButtonBlur: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  styleToggleButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 30,
+    right: 20,
+    zIndex: 200,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  styleToggleBlur: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
