@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -40,6 +41,7 @@ const ModernMessagesScreen = () => {
   ]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const selectedPersonality = isQuantumMode ? 'dr_progress' : (isTurboMode ? 'max' : 'emma');
 
@@ -190,6 +192,20 @@ const ModernMessagesScreen = () => {
     scrollViewRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
 
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+    });
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false);
+    });
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
   const handleMessageLongPress = (message: Message) => {
     if (message.isUser) {
       // User message options: Edit, Copy, Delete
@@ -270,14 +286,16 @@ const ModernMessagesScreen = () => {
       color: theme.colors.primary,
       fontWeight: '600' as '600',
     },
-    chatContainer: {
+    keyboardAvoidingContainer: {
       flex: 1,
+      marginBottom: 83,
     },
     messagesScrollView: {
       flex: 1,
     },
     messagesContent: {
       paddingHorizontal: theme.spacing.md,
+      paddingTop: theme.spacing.md,
       paddingBottom: theme.spacing.md,
     },
     messageContainer: {
@@ -339,7 +357,7 @@ const ModernMessagesScreen = () => {
     inputContainer: {
       paddingHorizontal: theme.spacing.md,
       paddingTop: theme.spacing.sm,
-      paddingBottom: Platform.OS === 'ios' ? 90 : 80,
+      paddingBottom: theme.spacing.sm,
       backgroundColor: theme.colors.background,
       borderTopWidth: 1,
       borderTopColor: theme.colors.border,
@@ -390,9 +408,9 @@ const ModernMessagesScreen = () => {
       />
 
       <KeyboardAvoidingView
-        style={styles.chatContainer}
+        style={styles.keyboardAvoidingContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <ScrollView
           ref={scrollViewRef}
