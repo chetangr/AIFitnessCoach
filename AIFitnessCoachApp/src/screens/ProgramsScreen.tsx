@@ -1,487 +1,305 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
-  Modal,
-  Alert,
-  ActivityIndicator,
-  Animated,
-  Platform,
+  Image,
+  FlatList,
+  RefreshControl,
+  Dimensions,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useThemeStore } from '../store/themeStore';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuthStore } from '../store/authStore';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '../config/api';
+import { 
+  LiquidGlassView, 
+  LiquidButton, 
+  LiquidCard,
+  LiquidEmptyState,
+  LiquidLoading,
+  LiquidProgressIndicator
+} from '../components/glass';
+
+const { width } = Dimensions.get('window');
+
+interface LiquidProgramsScreenProps {
+  navigation: NativeStackNavigationProp<any>;
+}
 
 interface Program {
-  id: number;
+  id: string;
   name: string;
   description: string;
-  difficulty_level: string;
-  duration_weeks: number;
+  duration: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
   category: string;
-  target_goals: string[];
-  equipment_needed: string[];
-  workouts_per_week: number;
-  is_public: boolean;
-  is_mine: boolean;
-  created_at: string;
+  image: string;
+  workoutsPerWeek: number;
+  totalWorkouts: number;
+  completedWorkouts: number;
+  isActive: boolean;
 }
 
-interface ProgramFormData {
-  name: string;
-  description: string;
-  difficulty_level: string;
-  duration_weeks: string;
-  category: string;
-  target_goals: string;
-  equipment_needed: string;
-  workouts_per_week: string;
-  is_public: boolean;
-}
+const mockPrograms: Program[] = [
+  {
+    id: '1',
+    name: 'Strength Builder',
+    description: 'Build muscle and increase strength with progressive overload',
+    duration: '12 weeks',
+    difficulty: 'intermediate',
+    category: 'Strength',
+    image: 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=400',
+    workoutsPerWeek: 4,
+    totalWorkouts: 48,
+    completedWorkouts: 12,
+    isActive: true,
+  },
+  {
+    id: '2',
+    name: 'Fat Loss Accelerator',
+    description: 'High-intensity workouts designed for maximum fat burn',
+    duration: '8 weeks',
+    difficulty: 'advanced',
+    category: 'Weight Loss',
+    image: 'https://images.unsplash.com/photo-1517963879433-6ad2b056d712?w=400',
+    workoutsPerWeek: 5,
+    totalWorkouts: 40,
+    completedWorkouts: 0,
+    isActive: false,
+  },
+  {
+    id: '3',
+    name: 'Beginner Fitness',
+    description: 'Perfect starting point for your fitness journey',
+    duration: '6 weeks',
+    difficulty: 'beginner',
+    category: 'General Fitness',
+    image: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=400',
+    workoutsPerWeek: 3,
+    totalWorkouts: 18,
+    completedWorkouts: 0,
+    isActive: false,
+  },
+  {
+    id: '4',
+    name: 'Muscle Definition',
+    description: 'Sculpt and define your muscles with targeted training',
+    duration: '10 weeks',
+    difficulty: 'intermediate',
+    category: 'Bodybuilding',
+    image: 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=400',
+    workoutsPerWeek: 5,
+    totalWorkouts: 50,
+    completedWorkouts: 0,
+    isActive: false,
+  },
+];
 
-const ProgramsScreen = ({ navigation }: any) => {
-  const { isDarkMode } = useThemeStore();
-  const { getAuthToken } = useAuthStore();
-  const [programs, setPrograms] = useState<Program[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedTab, setSelectedTab] = useState<'all' | 'mine'>('all');
-  const [formData, setFormData] = useState<ProgramFormData>({
-    name: '',
-    description: '',
-    difficulty_level: 'intermediate',
-    duration_weeks: '4',
-    category: 'general',
-    target_goals: '',
-    equipment_needed: '',
-    workouts_per_week: '3',
-    is_public: false,
-  });
+const LiquidProgramsScreen: React.FC<LiquidProgramsScreenProps> = ({ navigation }) => {
+  const { user } = useAuthStore();
+  const [programs, setPrograms] = useState<Program[]>(mockPrograms);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [isLoading, setIsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const categories = ['All', 'Strength', 'Weight Loss', 'General Fitness', 'Bodybuilding'];
 
-  useEffect(() => {
-    fetchPrograms();
-  }, []);
-
-  useEffect(() => {
-    // Animate modal appearance
-    if (showCreateModal) {
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        tension: 50,
-        friction: 7,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      scaleAnim.setValue(0);
-    }
-  }, [showCreateModal]);
-
-  const fetchPrograms = async () => {
-    try {
-      setLoading(true);
-      const token = await getAuthToken();
-      
-      const response = await fetch(`${API_BASE_URL}/api/programs/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setPrograms(data.programs);
-      } else {
-        console.error('Failed to fetch programs');
-      }
-    } catch (error) {
-      console.error('Error fetching programs:', error);
-      Alert.alert('Error', 'Failed to load programs');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const createProgram = async () => {
-    try {
-      const token = await getAuthToken();
-      
-      const programData = {
-        name: formData.name,
-        description: formData.description,
-        difficulty_level: formData.difficulty_level,
-        duration_weeks: parseInt(formData.duration_weeks),
-        category: formData.category,
-        target_goals: formData.target_goals.split(',').map(g => g.trim()).filter(g => g),
-        equipment_needed: formData.equipment_needed.split(',').map(e => e.trim()).filter(e => e),
-        workouts_per_week: parseInt(formData.workouts_per_week),
-        is_public: formData.is_public,
-        weekly_schedule: {},
-      };
-
-      const response = await fetch(`${API_BASE_URL}/api/programs/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(programData),
-      });
-
-      if (response.ok) {
-        Alert.alert('Success', 'Program created successfully!');
-        setShowCreateModal(false);
-        resetForm();
-        fetchPrograms();
-      } else {
-        const error = await response.json();
-        Alert.alert('Error', error.detail || 'Failed to create program');
-      }
-    } catch (error) {
-      console.error('Error creating program:', error);
-      Alert.alert('Error', 'Failed to create program');
-    }
-  };
-
-  const subscribeToProgram = async (programId: number) => {
-    try {
-      const token = await getAuthToken();
-      
-      const response = await fetch(`${API_BASE_URL}/api/programs/${programId}/subscribe`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        Alert.alert('Success', 'Successfully subscribed to program!');
-        // Update local storage with active program
-        await AsyncStorage.setItem('active_program_id', programId.toString());
-      } else {
-        const error = await response.json();
-        Alert.alert('Error', error.detail || 'Failed to subscribe to program');
-      }
-    } catch (error) {
-      console.error('Error subscribing to program:', error);
-      Alert.alert('Error', 'Failed to subscribe to program');
-    }
-  };
-
-  const duplicateProgram = async (programId: number) => {
-    try {
-      const token = await getAuthToken();
-      
-      const response = await fetch(`${API_BASE_URL}/api/programs/${programId}/duplicate`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        Alert.alert('Success', 'Program duplicated successfully!');
-        fetchPrograms();
-      } else {
-        const error = await response.json();
-        Alert.alert('Error', error.detail || 'Failed to duplicate program');
-      }
-    } catch (error) {
-      console.error('Error duplicating program:', error);
-      Alert.alert('Error', 'Failed to duplicate program');
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      difficulty_level: 'intermediate',
-      duration_weeks: '4',
-      category: 'general',
-      target_goals: '',
-      equipment_needed: '',
-      workouts_per_week: '3',
-      is_public: false,
-    });
-  };
-
-  const filteredPrograms = selectedTab === 'mine' 
-    ? programs.filter(p => p.is_mine)
-    : programs;
+  const filteredPrograms = programs.filter(program => 
+    selectedCategory === 'All' || program.category === selectedCategory
+  );
 
   const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty.toLowerCase()) {
-      case 'beginner':
-        return '#4CAF50';
-      case 'intermediate':
-        return '#FF9800';
-      case 'advanced':
-        return '#F44336';
-      default:
-        return '#9E9E9E';
+    switch (difficulty) {
+      case 'beginner': return '#4CD964';
+      case 'intermediate': return '#FF9500';
+      case 'advanced': return '#FF3B30';
+      default: return '#8E8E93';
     }
   };
 
-  const gradientColors = isDarkMode 
-    ? ['#0f0c29', '#302b63', '#24243e'] as const
-    : ['#667eea', '#764ba2', '#f093fb'] as const;
+  const onRefresh = async () => {
+    setRefreshing(true);
+    // Simulate API call
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  };
+
+  const startProgram = (program: Program) => {
+    // Update active program
+    const updatedPrograms = programs.map(p => ({
+      ...p,
+      isActive: p.id === program.id
+    }));
+    setPrograms(updatedPrograms);
+    
+    navigation.navigate('ProgramDetail', { program });
+  };
+
+  const renderProgram = ({ item }: { item: Program }) => {
+    const progress = item.totalWorkouts > 0 
+      ? item.completedWorkouts / item.totalWorkouts 
+      : 0;
+
+    return (
+      <TouchableOpacity
+        onPress={() => navigation.navigate('ProgramDetail', { program: item })}
+        activeOpacity={0.8}
+      >
+        <LiquidCard style={styles.programCard}>
+          {/* Program Image */}
+          <View style={styles.imageContainer}>
+            <Image source={{ uri: item.image }} style={styles.programImage} />
+            {item.isActive && (
+              <LiquidGlassView style={styles.activeBadge} intensity={95}>
+                <Text style={styles.activeBadgeText}>ACTIVE</Text>
+              </LiquidGlassView>
+            )}
+            <LiquidGlassView style={styles.difficultyBadge} intensity={90}>
+              <View 
+                style={[
+                  styles.difficultyDot, 
+                  { backgroundColor: getDifficultyColor(item.difficulty) }
+                ]} 
+              />
+              <Text style={styles.difficultyText}>
+                {item.difficulty.charAt(0).toUpperCase() + item.difficulty.slice(1)}
+              </Text>
+            </LiquidGlassView>
+          </View>
+
+          {/* Program Info */}
+          <View style={styles.programInfo}>
+            <Text style={styles.programName}>{item.name}</Text>
+            <Text style={styles.programDescription} numberOfLines={2}>
+              {item.description}
+            </Text>
+
+            {/* Program Stats */}
+            <View style={styles.programStats}>
+              <View style={styles.stat}>
+                <Icon name="calendar-outline" size={16} color="#8E8E93" />
+                <Text style={styles.statText}>{item.duration}</Text>
+              </View>
+              <View style={styles.stat}>
+                <Icon name="barbell-outline" size={16} color="#8E8E93" />
+                <Text style={styles.statText}>{item.workoutsPerWeek}x/week</Text>
+              </View>
+            </View>
+
+            {/* Progress */}
+            {item.isActive && (
+              <View style={styles.progressContainer}>
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressText}>Progress</Text>
+                  <Text style={styles.progressValue}>
+                    {item.completedWorkouts}/{item.totalWorkouts}
+                  </Text>
+                </View>
+                <View style={styles.progressBar}>
+                  <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+                </View>
+              </View>
+            )}
+
+            {/* Action Button */}
+            <LiquidButton
+              label={item.isActive ? 'Continue' : 'Start Program'}
+              onPress={() => startProgram(item)}
+              style={styles.actionButton}
+              variant={item.isActive ? 'primary' : 'secondary'}
+              size="small"
+            />
+          </View>
+        </LiquidCard>
+      </TouchableOpacity>
+    );
+  };
+
+  if (isLoading) {
+    return <LiquidLoading message="Loading programs..." />;
+  }
 
   return (
-    <LinearGradient colors={gradientColors} style={styles.container}>
+    <LiquidGlassView style={styles.container} intensity={95}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-back" size={24} color="white" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Training Programs</Text>
-        <TouchableOpacity onPress={() => setShowCreateModal(true)} style={styles.createButton}>
-          <Icon name="add" size={24} color="white" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Tab Selector */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, selectedTab === 'all' && styles.activeTab]}
-          onPress={() => setSelectedTab('all')}
+      <LiquidGlassView style={styles.header} intensity={90}>
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
         >
-          <Text style={[styles.tabText, selectedTab === 'all' && styles.activeTabText]}>
-            All Programs
-          </Text>
+          <Icon name="arrow-back" size={24} color="#FFF" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, selectedTab === 'mine' && styles.activeTab]}
-          onPress={() => setSelectedTab('mine')}
-        >
-          <Text style={[styles.tabText, selectedTab === 'mine' && styles.activeTabText]}>
-            My Programs
-          </Text>
+        <Text style={styles.title}>Programs</Text>
+        <TouchableOpacity style={styles.filterButton}>
+          <Icon name="options-outline" size={24} color="#FFF" />
         </TouchableOpacity>
-      </View>
+      </LiquidGlassView>
 
-      {/* Programs List */}
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#667eea" />
-        </View>
-      ) : (
-        <ScrollView style={styles.programsList} showsVerticalScrollIndicator={false}>
-          {filteredPrograms.map((program) => (
-            <TouchableOpacity
-              key={program.id}
-              onPress={() => navigation.navigate('ProgramDetail', { programId: program.id })}
-            >
-              <BlurView intensity={20} tint="light" style={styles.programCard}>
-                <View style={styles.programHeader}>
-                  <Text style={styles.programName}>{program.name}</Text>
-                  {program.is_mine && (
-                    <View style={styles.myBadge}>
-                      <Text style={styles.myBadgeText}>MINE</Text>
-                    </View>
-                  )}
-                </View>
-                
-                <Text style={styles.programDescription} numberOfLines={2}>
-                  {program.description}
-                </Text>
-                
-                <View style={styles.programMeta}>
-                  <View style={styles.metaItem}>
-                    <Icon name="calendar" size={16} color="rgba(255,255,255,0.7)" />
-                    <Text style={styles.metaText}>{program.duration_weeks} weeks</Text>
-                  </View>
-                  <View style={styles.metaItem}>
-                    <Icon name="barbell" size={16} color="rgba(255,255,255,0.7)" />
-                    <Text style={styles.metaText}>{program.workouts_per_week}x/week</Text>
-                  </View>
-                  <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor(program.difficulty_level) + '30' }]}>
-                    <Text style={[styles.difficultyText, { color: getDifficultyColor(program.difficulty_level) }]}>
-                      {program.difficulty_level}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.programActions}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => subscribeToProgram(program.id)}
-                  >
-                    <LinearGradient
-                      colors={['#667eea', '#764ba2']}
-                      style={styles.actionButtonGradient}
-                    >
-                      <Icon name="play" size={16} color="white" />
-                      <Text style={styles.actionButtonText}>Start</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                  
-                  {!program.is_mine && (
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => duplicateProgram(program.id)}
-                    >
-                      <View style={styles.secondaryActionButton}>
-                        <Icon name="copy" size={16} color="#667eea" />
-                        <Text style={styles.secondaryActionText}>Copy</Text>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </BlurView>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
-
-      {/* Create Program Modal */}
-      <Modal
-        visible={showCreateModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowCreateModal(false)}
+      {/* Category Filter */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.categoryContainer}
+        contentContainerStyle={styles.categoryContent}
       >
-        <View style={styles.modalOverlay}>
-          <Animated.View
+        {categories.map(category => (
+          <TouchableOpacity
+            key={category}
+            onPress={() => setSelectedCategory(category)}
             style={[
-              styles.modalContainer,
-              {
-                transform: [{ scale: scaleAnim }],
-              },
+              styles.categoryButton,
+              selectedCategory === category && styles.categoryButtonActive
             ]}
           >
-            <BlurView intensity={100} tint="dark" style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Create New Program</Text>
-              
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Program Name"
-                  placeholderTextColor="rgba(255,255,255,0.5)"
-                  value={formData.name}
-                  onChangeText={(text) => setFormData({ ...formData, name: text })}
-                />
-                
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  placeholder="Description"
-                  placeholderTextColor="rgba(255,255,255,0.5)"
-                  value={formData.description}
-                  onChangeText={(text) => setFormData({ ...formData, description: text })}
-                  multiline
-                  numberOfLines={3}
-                />
-                
-                <View style={styles.row}>
-                  <TextInput
-                    style={[styles.input, styles.halfInput]}
-                    placeholder="Duration (weeks)"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
-                    value={formData.duration_weeks}
-                    onChangeText={(text) => setFormData({ ...formData, duration_weeks: text })}
-                    keyboardType="numeric"
-                  />
-                  
-                  <TextInput
-                    style={[styles.input, styles.halfInput]}
-                    placeholder="Workouts/week"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
-                    value={formData.workouts_per_week}
-                    onChangeText={(text) => setFormData({ ...formData, workouts_per_week: text })}
-                    keyboardType="numeric"
-                  />
-                </View>
-                
-                <View style={styles.difficultySelector}>
-                  <Text style={styles.inputLabel}>Difficulty Level</Text>
-                  <View style={styles.difficultyOptions}>
-                    {['beginner', 'intermediate', 'advanced'].map((level) => (
-                      <TouchableOpacity
-                        key={level}
-                        style={[
-                          styles.difficultyOption,
-                          formData.difficulty_level === level && styles.selectedDifficulty,
-                        ]}
-                        onPress={() => setFormData({ ...formData, difficulty_level: level })}
-                      >
-                        <Text style={[
-                          styles.difficultyOptionText,
-                          formData.difficulty_level === level && styles.selectedDifficultyText,
-                        ]}>
-                          {level.charAt(0).toUpperCase() + level.slice(1)}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-                
-                <TextInput
-                  style={styles.input}
-                  placeholder="Target Goals (comma separated)"
-                  placeholderTextColor="rgba(255,255,255,0.5)"
-                  value={formData.target_goals}
-                  onChangeText={(text) => setFormData({ ...formData, target_goals: text })}
-                />
-                
-                <TextInput
-                  style={styles.input}
-                  placeholder="Equipment Needed (comma separated)"
-                  placeholderTextColor="rgba(255,255,255,0.5)"
-                  value={formData.equipment_needed}
-                  onChangeText={(text) => setFormData({ ...formData, equipment_needed: text })}
-                />
-                
-                <TouchableOpacity
-                  style={styles.publicToggle}
-                  onPress={() => setFormData({ ...formData, is_public: !formData.is_public })}
-                >
-                  <Text style={styles.publicToggleText}>Make Public</Text>
-                  <Icon
-                    name={formData.is_public ? 'checkbox' : 'square-outline'}
-                    size={24}
-                    color="#667eea"
-                  />
-                </TouchableOpacity>
-              </ScrollView>
-              
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => {
-                    setShowCreateModal(false);
-                    resetForm();
-                  }}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={styles.createProgramButton}
-                  onPress={createProgram}
-                  disabled={!formData.name || !formData.description}
-                >
-                  <LinearGradient
-                    colors={['#667eea', '#764ba2']}
-                    style={styles.createProgramGradient}
-                  >
-                    <Text style={styles.createProgramText}>Create Program</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            </BlurView>
-          </Animated.View>
-        </View>
-      </Modal>
-    </LinearGradient>
+            <LiquidGlassView 
+              style={styles.categoryGlass}
+              intensity={selectedCategory === category ? 90 : 70}
+            >
+              <Text style={[
+                styles.categoryText,
+                selectedCategory === category && styles.categoryTextActive
+              ]}>
+                {category}
+              </Text>
+            </LiquidGlassView>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Programs List */}
+      {filteredPrograms.length === 0 ? (
+        <LiquidEmptyState
+          icon="barbell-outline"
+          title="No Programs Found"
+          message="Try selecting a different category"
+        />
+      ) : (
+        <FlatList
+          data={filteredPrograms}
+          renderItem={renderProgram}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#FFF"
+            />
+          }
+        />
+      )}
+
+      {/* Create Custom Program Button */}
+      <TouchableOpacity style={styles.fab}>
+        <LiquidGlassView style={styles.fabGlass} intensity={95}>
+          <Icon name="add" size={28} color="#FFF" />
+        </LiquidGlassView>
+      </TouchableOpacity>
+    </LiquidGlassView>
   );
 };
 
@@ -491,282 +309,175 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    justifyContent: 'space-between',
+    padding: 16,
+    paddingTop: 60,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 8,
   },
-  headerTitle: {
+  title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
+    fontWeight: '700',
+    color: '#FFF',
   },
-  createButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  filterButton: {
+    padding: 8,
+  },
+  categoryContainer: {
+    maxHeight: 50,
+    marginTop: 8,
+  },
+  categoryContent: {
+    paddingHorizontal: 16,
+  },
+  categoryButton: {
+    marginRight: 12,
+  },
+  categoryButtonActive: {
+    transform: [{ scale: 1.05 }],
+  },
+  categoryGlass: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     borderRadius: 20,
   },
-  tabContainer: {
-    flexDirection: 'row',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 25,
-    padding: 4,
+  categoryText: {
+    fontSize: 14,
+    color: '#AAA',
+    fontWeight: '500',
   },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 22,
-  },
-  activeTab: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  tabText: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.6)',
+  categoryTextActive: {
+    color: '#FFF',
     fontWeight: '600',
   },
-  activeTabText: {
-    color: 'white',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  programsList: {
-    flex: 1,
-    paddingHorizontal: 20,
+  listContent: {
+    padding: 16,
+    paddingBottom: 100,
   },
   programCard: {
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 16,
+    marginBottom: 20,
+    padding: 0,
     overflow: 'hidden',
   },
-  programHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+  imageContainer: {
+    position: 'relative',
+    height: 180,
+    width: '100%',
   },
-  programName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
-    flex: 1,
+  programImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
-  myBadge: {
-    backgroundColor: 'rgba(76, 175, 80, 0.3)',
+  activeBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: 12,
   },
-  myBadgeText: {
+  activeBadgeText: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  programDescription: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 16,
-  },
-  programMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  metaText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.7)',
-    marginLeft: 4,
+    fontWeight: '700',
+    color: '#4CD964',
   },
   difficultyBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: 12,
-    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  difficultyDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
   },
   difficultyText: {
     fontSize: 12,
     fontWeight: '600',
-    textTransform: 'capitalize',
+    color: '#FFF',
   },
-  programActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
-  },
-  actionButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 8,
-  },
-  actionButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  secondaryActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1,
-    borderColor: '#667eea',
-    gap: 8,
-  },
-  secondaryActionText: {
-    color: '#667eea',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    width: '90%',
-    maxHeight: '80%',
-    borderRadius: 24,
-    overflow: 'hidden',
-  },
-  modalContent: {
-    padding: 24,
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  input: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
+  programInfo: {
     padding: 16,
-    fontSize: 16,
-    color: 'white',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
   },
-  textArea: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  halfInput: {
-    flex: 1,
-  },
-  inputLabel: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
+  programName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFF',
     marginBottom: 8,
   },
-  difficultySelector: {
+  programDescription: {
+    fontSize: 14,
+    color: '#AAA',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  programStats: {
+    flexDirection: 'row',
     marginBottom: 16,
   },
-  difficultyOptions: {
+  stat: {
     flexDirection: 'row',
-    gap: 8,
-  },
-  difficultyOption: {
-    flex: 1,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    marginRight: 20,
   },
-  selectedDifficulty: {
-    backgroundColor: 'rgba(102, 126, 234, 0.3)',
-    borderColor: '#667eea',
+  statText: {
+    fontSize: 14,
+    color: '#8E8E93',
+    marginLeft: 6,
   },
-  difficultyOptionText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontWeight: '600',
+  progressContainer: {
+    marginBottom: 16,
   },
-  selectedDifficultyText: {
-    color: 'white',
-  },
-  publicToggle: {
+  progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    marginBottom: 8,
   },
-  publicToggleText: {
-    fontSize: 16,
-    color: 'white',
+  progressText: {
+    fontSize: 14,
+    color: '#AAA',
   },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 16,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    fontSize: 16,
+  progressValue: {
+    fontSize: 14,
+    color: '#FFF',
     fontWeight: '600',
-    color: 'white',
   },
-  createProgramButton: {
-    flex: 1,
-    borderRadius: 12,
+  actionButton: {
+    width: '100%',
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 2,
     overflow: 'hidden',
+    marginTop: 8,
   },
-  createProgramGradient: {
-    paddingVertical: 16,
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#007AFF',
+    borderRadius: 2,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+  },
+  fabGlass: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
-  },
-  createProgramText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
+    justifyContent: 'center',
   },
 });
 
-export default ProgramsScreen;
+export default LiquidProgramsScreen;

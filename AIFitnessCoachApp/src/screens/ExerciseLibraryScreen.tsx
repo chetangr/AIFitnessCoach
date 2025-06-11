@@ -1,219 +1,428 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
-  ActivityIndicator,
+  StyleSheet,
+  Dimensions,
   FlatList,
+  ActivityIndicator,
+  Animated,
+  Image,
+  TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { exerciseService } from '../services/exerciseService';
-// Logger temporarily removed - was causing import errors
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { LiquidGlassView, LiquidCard, LiquidEmptyState } from '../components/glass';
+import { useThemeStore } from '../store/themeStore';
+
+const { width } = Dimensions.get('window');
 
 interface Exercise {
   id: string;
   name: string;
   category: string;
   muscles: string[];
-  equipment: string;
-  difficulty: string;
+  muscles_secondary: string[];
+  equipment: string[];
+  images: string[];
   description?: string;
-  images?: string[];
 }
 
-const ExerciseLibraryScreen = ({ navigation }: any) => {
-  const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMuscle, setSelectedMuscle] = useState('');
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+interface FilterChipProps {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}
 
-  const muscleGroups = [
-    { id: '', name: 'All', icon: 'body-outline' },
-    { id: 'Chest', name: 'Chest', icon: 'shield-outline' },
-    { id: 'Back', name: 'Back', icon: 'expand-outline' },
-    { id: 'Shoulders', name: 'Shoulders', icon: 'resize-outline' },
-    { id: 'Arms', name: 'Arms', icon: 'fitness-outline' },
-    { id: 'Legs', name: 'Legs', icon: 'walk-outline' },
-    { id: 'Core', name: 'Core', icon: 'disc-outline' },
-    { id: 'Glutes', name: 'Glutes', icon: 'ellipse-outline' },
-  ];
+const FilterChip: React.FC<FilterChipProps> = ({ label, selected, onPress }) => {
+  const { theme } = useThemeStore();
+  const { colors } = theme;
+  const scaleAnimation = useRef(new Animated.Value(1)).current;
+  
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnimation, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnimation, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    onPress();
+  };
+  
+  return (
+    <TouchableOpacity onPress={handlePress}>
+      <Animated.View style={{ transform: [{ scale: scaleAnimation }] }}>
+        <LiquidGlassView
+          intensity={selected ? 85 : 65}
+          style={styles.filterChip as any}
+          
+        >
+          <Text
+            style={[
+              styles.filterChipText,
+              { color: selected ? colors.primary : colors.text } as any,
+            ]}
+          >
+            {label}
+          </Text>
+        </LiquidGlassView>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
+
+interface ExerciseCardProps {
+  exercise: Exercise;
+  onPress: () => void;
+  index: number;
+}
+
+const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onPress }) => {
+  const { theme } = useThemeStore();
+  const { colors } = theme;
+  const rotateAnimation = useRef(new Animated.Value(0)).current;
+  const [isPressed, setIsPressed] = useState(false);
+  
+  const handlePressIn = () => {
+    setIsPressed(true);
+    Animated.timing(rotateAnimation, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  };
+  
+  const handlePressOut = () => {
+    setIsPressed(false);
+    Animated.timing(rotateAnimation, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  };
+  
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={1}
+    >
+      <Animated.View
+        style={[
+          styles.exerciseCardContainer,
+          {
+            transform: [
+              {
+                rotateY: rotateAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0deg', '3deg'],
+                }),
+              },
+              {
+                perspective: 1000,
+              },
+            ],
+          },
+        ]}
+      >
+        <LiquidCard
+          style={[styles.exerciseCard, isPressed && styles.exerciseCardPressed] as any}
+        >
+          <View style={styles.exerciseContent}>
+            {/* Exercise Image */}
+            {exercise.images && exercise.images.length > 0 ? (
+              <View style={styles.exerciseImageContainer}>
+                <Image
+                  source={{ uri: exercise.images[0] }}
+                  style={styles.exerciseImage}
+                  resizeMode="cover"
+                />
+              </View>
+            ) : (
+              <View style={[styles.exerciseImagePlaceholder, { backgroundColor: colors.primary + '20' }]}>
+                <Ionicons name="fitness" size={32} color={typeof colors.primary === 'string' ? colors.primary : colors.primary.main} />
+              </View>
+            )}
+            
+            {/* Exercise Info */}
+            <View style={styles.exerciseInfo}>
+              <Text style={[styles.exerciseName, { color: colors.text }]} numberOfLines={2}>
+                {exercise.name}
+              </Text>
+              
+              {/* Category Badge */}
+              <LiquidGlassView intensity={60} style={styles.categoryBadge}>
+                <Text style={[styles.categoryText, { color: colors.secondary }]}>
+                  {exercise.category}
+                </Text>
+              </LiquidGlassView>
+              
+              {/* Muscles */}
+              <View style={styles.musclesContainer}>
+                <Ionicons name="body" size={14} color={colors.text + '60'} />
+                <Text style={[styles.musclesText, { color: colors.text + '80' }]} numberOfLines={1}>
+                  {exercise.muscles.join(', ')}
+                </Text>
+              </View>
+              
+              {/* Equipment */}
+              {exercise.equipment && exercise.equipment.length > 0 && (
+                <View style={styles.equipmentContainer}>
+                  <Ionicons name="barbell" size={14} color={colors.text + '60'} />
+                  <Text style={[styles.equipmentText, { color: colors.text + '80' }]} numberOfLines={1}>
+                    {exercise.equipment.join(', ')}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </LiquidCard>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
+
+export default function LiquidExerciseLibraryScreen() {
+  const navigation = useNavigation();
+  const { theme } = useThemeStore();
+  const { colors } = theme;
+  
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [filteredExercises, setFilteredExercises] = useState<Exercise[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null);
+  const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const categories = ['Strength', 'Cardio', 'Flexibility', 'Balance', 'Plyometrics'];
+  const muscles = ['Chest', 'Back', 'Shoulders', 'Arms', 'Core', 'Legs'];
+  const equipment = ['Barbell', 'Dumbbell', 'Bodyweight', 'Cable', 'Machine', 'Bands'];
+  
+  const fadeAnimation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadExercises();
-  }, [selectedMuscle, searchQuery]);
+    
+    Animated.timing(fadeAnimation, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
-  const loadExercises = async (isLoadMore = false) => {
+  useEffect(() => {
+    filterExercises();
+  }, [searchQuery, selectedCategory, selectedMuscle, selectedEquipment, exercises]);
+
+  const loadExercises = async () => {
     try {
-      setLoading(!isLoadMore);
-      const currentPage = isLoadMore ? page + 1 : 1;
-      
-      const result = await exerciseService.getExercises({
-        muscle: selectedMuscle,
-        search: searchQuery,
-        page: currentPage,
-        limit: 20,
-      });
-
-      if (isLoadMore) {
-        setExercises([...exercises, ...result]);
-      } else {
-        setExercises(result);
-      }
-
-      setPage(currentPage);
-      setHasMore(result.length === 20);
-      console.log('Exercises Loaded', { count: result.length });
+      const wgerData = await import('../data/wgerExerciseDatabase');
+      const allExercises = wgerData.wgerExercises.map(ex => ({
+        id: ex.id,
+        name: ex.name,
+        category: ex.category,
+        muscles: ex.primaryMuscles,
+        muscles_secondary: ex.secondaryMuscles,
+        equipment: ex.equipment,
+        images: ex.images,
+        description: ex.description
+      }));
+      setExercises(allExercises);
+      setFilteredExercises(allExercises);
     } catch (error) {
-      console.error('Failed to load exercises', error);
+      console.error('Error loading exercises:', error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const loadMore = () => {
-    if (!loading && hasMore) {
-      loadExercises(true);
+  const filterExercises = () => {
+    let filtered = exercises;
+    
+    // Search filter
+    if (searchQuery) {
+      filtered = filtered.filter(ex => 
+        ex.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
     }
+    
+    // Category filter
+    if (selectedCategory) {
+      filtered = filtered.filter(ex => 
+        ex.category.toLowerCase() === selectedCategory.toLowerCase()
+      );
+    }
+    
+    // Muscle filter
+    if (selectedMuscle) {
+      filtered = filtered.filter(ex => 
+        ex.muscles.some(m => m.toLowerCase().includes(selectedMuscle.toLowerCase()))
+      );
+    }
+    
+    // Equipment filter
+    if (selectedEquipment) {
+      filtered = filtered.filter(ex => 
+        ex.equipment?.some(e => e.toLowerCase().includes(selectedEquipment.toLowerCase()))
+      );
+    }
+    
+    setFilteredExercises(filtered);
   };
 
-  const renderExercise = ({ item }: { item: Exercise }) => (
-    <TouchableOpacity
-      onPress={() => navigation.navigate('ExerciseDetail', { exercise: item })}
-    >
-      <BlurView intensity={25} tint="light" style={styles.exerciseCard}>
-        <View style={styles.exerciseHeader}>
-          <View style={styles.exerciseInfo}>
-            <Text style={styles.exerciseName}>{item.name}</Text>
-            <View style={styles.exerciseTags}>
-              <View style={styles.tag}>
-                <Icon name="body-outline" size={12} color="white" />
-                <Text style={styles.tagText} numberOfLines={1} ellipsizeMode="tail">{item.muscles[0]}</Text>
-              </View>
-              <View style={styles.tag}>
-                <Icon name="barbell-outline" size={12} color="white" />
-                <Text style={styles.tagText} numberOfLines={1} ellipsizeMode="tail">{item.equipment}</Text>
-              </View>
-            </View>
-          </View>
-          <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor(item.difficulty) }]}>
-            <Text style={styles.difficultyText}>{item.difficulty}</Text>
-          </View>
-        </View>
-        {item.description && (
-          <Text style={styles.exerciseDescription} numberOfLines={2}>
-            {item.description}
-          </Text>
-        )}
-      </BlurView>
-    </TouchableOpacity>
+  const clearFilters = () => {
+    setSelectedCategory(null);
+    setSelectedMuscle(null);
+    setSelectedEquipment(null);
+    setSearchQuery('');
+  };
+
+  const renderExercise = ({ item, index }: { item: Exercise; index: number }) => (
+    <ExerciseCard
+      exercise={item}
+      onPress={() => (navigation as any).navigate('ExerciseDetail', { exercise: item })}
+      index={index}
+    />
   );
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'Beginner': return '#4CAF50';
-      case 'Intermediate': return '#FF9800';
-      case 'Advanced': return '#F44336';
-      default: return '#667eea';
-    }
-  };
-
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={28} color="white" />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <LinearGradient
+        colors={[colors.primary + '20', colors.secondary + '20', colors.background]}
+        style={StyleSheet.absoluteFillObject}
+      />
+      
+      {/* Header */}
+      <LiquidGlassView intensity={75} style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Exercise Library</Text>
-        <TouchableOpacity 
-          onPress={() => {
-            console.log('Add new exercise');
-            // Could navigate to add exercise screen or show modal
-            // navigation.navigate('AddExercise');
-          }}
-        >
-          <Icon name="add-circle" size={28} color="white" />
-        </TouchableOpacity>
-      </View>
-
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Exercise Library</Text>
+        <View style={{ width: 40 }} />
+      </LiquidGlassView>
+      
       {/* Search Bar */}
-      <BlurView intensity={20} tint="light" style={styles.searchContainer}>
-        <Icon name="search" size={20} color="rgba(255,255,255,0.8)" />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search 10,000+ exercises..."
-          placeholderTextColor="rgba(255,255,255,0.5)"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </BlurView>
-
-      {/* Muscle Groups */}
+      <View style={styles.searchContainer}>
+        <LiquidGlassView intensity={60} style={styles.searchBar}>
+          <Ionicons name="search" size={20} color={colors.text + '60'} />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search exercises..."
+            placeholderTextColor={colors.text + '40'}
+            style={[styles.searchInput, { color: colors.text }]}
+          />
+          {searchQuery !== '' && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={20} color={colors.text + '60'} />
+            </TouchableOpacity>
+          )}
+        </LiquidGlassView>
+      </View>
+      
+      {/* Filters */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.muscleGroupsContainer}
+        style={styles.filtersContainer}
+        contentContainerStyle={styles.filtersContent}
       >
-        {muscleGroups.map((muscle) => (
-          <TouchableOpacity
-            key={muscle.id}
-            onPress={() => setSelectedMuscle(muscle.id)}
-          >
-            <BlurView
-              intensity={selectedMuscle === muscle.id ? 40 : 20}
-              tint="light"
-              style={[
-                styles.muscleGroupChip,
-                selectedMuscle === muscle.id && styles.selectedMuscleGroup,
-              ]}
-            >
-              <Icon
-                name={muscle.icon}
-                size={20}
-                color={selectedMuscle === muscle.id ? 'white' : 'rgba(255,255,255,0.8)'}
-              />
-              <Text style={styles.muscleGroupText} numberOfLines={1} ellipsizeMode="tail">{muscle.name}</Text>
-            </BlurView>
+        {/* Clear Filters */}
+        {(selectedCategory || selectedMuscle || selectedEquipment) && (
+          <TouchableOpacity onPress={clearFilters}>
+            <LiquidGlassView intensity={75} style={styles.clearFiltersChip}>
+              <Ionicons name="close" size={16} color={colors.text} />
+              <Text style={[styles.clearFiltersText, { color: colors.text }]}>Clear</Text>
+            </LiquidGlassView>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Exercise List */}
-      {loading && exercises.length === 0 ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="white" />
-          <Text style={styles.loadingText}>Loading exercises...</Text>
+        )}
+        
+        {/* Category Filters */}
+        <View style={styles.filterSection}>
+          <Text style={[styles.filterSectionTitle, { color: colors.text + '60' }]}>Category</Text>
+          <View style={styles.filterChips}>
+            {categories.map(category => (
+              <FilterChip
+                key={category}
+                label={category}
+                selected={selectedCategory === category}
+                onPress={() => setSelectedCategory(selectedCategory === category ? null : category)}
+              />
+            ))}
+          </View>
         </View>
-      ) : (
-        <FlatList
-          data={exercises}
-          renderItem={renderExercise}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.exerciseList}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={
-            loading ? (
-              <ActivityIndicator style={styles.loadMoreIndicator} color="white" />
-            ) : null
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Icon name="barbell-outline" size={60} color="rgba(255,255,255,0.5)" />
-              <Text style={styles.emptyText}>No exercises found</Text>
-            </View>
-          }
-        />
-      )}
-    </LinearGradient>
+        
+        {/* Muscle Filters */}
+        <View style={styles.filterSection}>
+          <Text style={[styles.filterSectionTitle, { color: colors.text + '60' }]}>Muscle</Text>
+          <View style={styles.filterChips}>
+            {muscles.map(muscle => (
+              <FilterChip
+                key={muscle}
+                label={muscle}
+                selected={selectedMuscle === muscle}
+                onPress={() => setSelectedMuscle(selectedMuscle === muscle ? null : muscle)}
+              />
+            ))}
+          </View>
+        </View>
+        
+        {/* Equipment Filters */}
+        <View style={styles.filterSection}>
+          <Text style={[styles.filterSectionTitle, { color: colors.text + '60' }]}>Equipment</Text>
+          <View style={styles.filterChips}>
+            {equipment.map(equip => (
+              <FilterChip
+                key={equip}
+                label={equip}
+                selected={selectedEquipment === equip}
+                onPress={() => setSelectedEquipment(selectedEquipment === equip ? null : equip)}
+              />
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+      
+      {/* Results Count */}
+      <View style={styles.resultsContainer}>
+        <Text style={[styles.resultsText, { color: colors.text + '80' }]}>
+          {filteredExercises.length} exercises found
+        </Text>
+      </View>
+      
+      {/* Exercise List */}
+      <Animated.View style={[styles.listContainer, { opacity: fadeAnimation }]}>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={typeof colors.primary === 'string' ? colors.primary : colors.primary.main} />
+          </View>
+        ) : (
+          <FlatList
+            data={filteredExercises}
+            renderItem={renderExercise}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={10}
+          />
+        )}
+      </Animated.View>
+    </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -223,141 +432,164 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
     paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  backButton: {
+    padding: 8,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
+    fontSize: 20,
+    fontWeight: '600',
   },
   searchContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 20,
-    marginBottom: 20,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
-    overflow: 'hidden',
+    height: 48,
+    borderRadius: 24,
   },
   searchInput: {
     flex: 1,
     marginLeft: 12,
     fontSize: 16,
-    color: 'white',
   },
-  muscleGroupsContainer: {
+  filtersContainer: {
+    maxHeight: 120,
+    marginBottom: 8,
+  },
+  filtersContent: {
     paddingHorizontal: 20,
-    marginBottom: 20,
   },
-  muscleGroupChip: {
+  filterSection: {
+    marginRight: 24,
+  },
+  filterSectionTitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  filterChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  filterChipText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  clearFiltersChip: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderRadius: 20,
-    marginRight: 10,
-    overflow: 'hidden',
+    marginRight: 16,
   },
-  selectedMuscleGroup: {
-    borderWidth: 2,
-    borderColor: 'white',
-  },
-  muscleGroupText: {
-    color: 'white',
+  clearFiltersText: {
     fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 8,
-    textAlign: 'center',
-    numberOfLines: 1,
-    ellipsizeMode: 'tail',
-  },
-  exerciseList: {
-    paddingHorizontal: 20,
-    paddingBottom: 100,
-  },
-  exerciseCard: {
-    marginBottom: 12,
-    padding: 16,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  exerciseHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  exerciseInfo: {
-    flex: 1,
-  },
-  exerciseName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 8,
-  },
-  exerciseTags: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  tag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    maxWidth: 120,
-  },
-  tagText: {
-    color: 'white',
-    fontSize: 12,
     fontWeight: '500',
     marginLeft: 4,
-    numberOfLines: 1,
-    ellipsizeMode: 'tail',
   },
-  difficultyBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+  resultsContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 8,
   },
-  difficultyText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  exerciseDescription: {
-    color: 'rgba(255,255,255,0.8)',
+  resultsText: {
     fontSize: 14,
-    marginTop: 8,
-    lineHeight: 20,
+  },
+  listContainer: {
+    flex: 1,
+  },
+  listContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    color: 'white',
-    fontSize: 16,
-    marginTop: 12,
+  exerciseCardContainer: {
+    marginBottom: 16,
   },
-  emptyContainer: {
-    flex: 1,
+  exerciseCard: {
+    padding: 16,
+  },
+  exerciseCardPressed: {
+    transform: [{ scale: 0.98 }],
+  },
+  exerciseContent: {
+    flexDirection: 'row',
+  },
+  exerciseImageContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginRight: 16,
+  },
+  exerciseImage: {
+    width: '100%',
+    height: '100%',
+  },
+  exerciseImagePlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 100,
+    marginRight: 16,
   },
-  emptyText: {
-    color: 'rgba(255,255,255,0.8)',
+  exerciseInfo: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  exerciseName: {
     fontSize: 16,
-    marginTop: 12,
+    fontWeight: '600',
+    marginBottom: 4,
   },
-  loadMoreIndicator: {
-    marginVertical: 20,
+  categoryBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  categoryText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  musclesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  musclesText: {
+    fontSize: 12,
+    marginLeft: 6,
+    flex: 1,
+  },
+  equipmentContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  equipmentText: {
+    fontSize: 12,
+    marginLeft: 6,
+    flex: 1,
   },
 });
-
-export default ExerciseLibraryScreen;

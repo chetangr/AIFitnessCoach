@@ -24,6 +24,9 @@ class ActionType(Enum):
     VIEW_PROGRESS = "view_progress"
     INCREASE_DIFFICULTY = "increase_difficulty"
     DECREASE_DIFFICULTY = "decrease_difficulty"
+    GET_SUGGESTIONS = "get_suggestions"
+    APPLY_SUGGESTION = "apply_suggestion"
+    SWAP_WORKOUT = "swap_workout"
 
 class AIActionExtractor:
     """
@@ -121,6 +124,41 @@ class AIActionExtractor:
                         r"step.*up",
                         r"advance.*workout",
                         r"progress.*to.*harder"
+                    ],
+                    "confidence": 0.85
+                }
+            ],
+            ActionType.GET_SUGGESTIONS: [
+                {
+                    "patterns": [
+                        r"suggest.*workout",
+                        r"recommend.*workout",
+                        r"what.*should.*do",
+                        r"need.*suggestions",
+                        r"give.*me.*ideas",
+                        r"workout.*recommendations"
+                    ],
+                    "confidence": 0.9
+                }
+            ],
+            ActionType.APPLY_SUGGESTION: [
+                {
+                    "patterns": [
+                        r"use.*suggestion",
+                        r"apply.*recommendation",
+                        r"add.*suggested",
+                        r"schedule.*recommended"
+                    ],
+                    "confidence": 0.85
+                }
+            ],
+            ActionType.SWAP_WORKOUT: [
+                {
+                    "patterns": [
+                        r"swap.*workout",
+                        r"replace.*with.*suggested",
+                        r"change.*to.*recommendation",
+                        r"switch.*workout"
                     ],
                     "confidence": 0.85
                 }
@@ -278,6 +316,24 @@ class AIActionExtractor:
                 "label": "Increase Difficulty",
                 "icon": "trending-up",
                 "color": "#9C27B0",
+                "priority": 2
+            },
+            ActionType.GET_SUGGESTIONS: {
+                "label": "Get AI Suggestions",
+                "icon": "bulb",
+                "color": "#00BCD4",
+                "priority": 1
+            },
+            ActionType.APPLY_SUGGESTION: {
+                "label": "Apply Suggestion",
+                "icon": "checkmark-circle",
+                "color": "#4CAF50",
+                "priority": 1
+            },
+            ActionType.SWAP_WORKOUT: {
+                "label": "Swap Workout",
+                "icon": "swap-horizontal",
+                "color": "#FF9800",
                 "priority": 2
             }
         }

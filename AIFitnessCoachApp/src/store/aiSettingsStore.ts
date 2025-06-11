@@ -20,10 +20,10 @@ interface AISettingsState {
 }
 
 export const useAISettingsStore = create<AISettingsState>((set, get) => ({
-  // Default to hybrid mode (faster)
-  actionMode: 'hybrid',
-  isQuantumMode: false,  // Pure AI mode
-  isTurboMode: true,     // Hybrid mode (default)
+  // Default to pure AI mode (better quality responses)
+  actionMode: 'pure_ai',
+  isQuantumMode: true,   // Pure AI mode (default)
+  isTurboMode: false,    // Hybrid mode (disabled by default)
   isLoading: false,
   
   setActionMode: async (mode) => {

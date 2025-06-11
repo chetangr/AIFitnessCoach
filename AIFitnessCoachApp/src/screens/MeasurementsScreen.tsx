@@ -1,271 +1,437 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Platform,
   TextInput,
-  Modal,
+  Dimensions,
+  RefreshControl,
   Alert,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+// import { useAuthStore } from '../store/authStore';
+// import measurementsService from '../services/measurementsService';
+import { 
+  LiquidGlassView, 
+  LiquidButton, 
+  LiquidCard,
+  LiquidEmptyState,
+  LiquidLoading,
+} from '../components/glass';
+import { LineChart } from 'react-native-chart-kit';
 
-const MeasurementsScreen = ({ navigation }: any) => {
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newMeasurement, setNewMeasurement] = useState({
-    type: '',
-    value: '',
-    unit: 'inches',
-  });
+const { width } = Dimensions.get('window');
 
-  const [measurements] = useState([
+interface LiquidMeasurementsScreenProps {
+  navigation: NativeStackNavigationProp<any>;
+}
+
+interface Measurement {
+  id: string;
+  value: number;
+  unit: string;
+  date: string;
+}
+
+interface MeasurementType {
+  id: string;
+  name: string;
+  icon: string;
+  unit: string;
+  color: string;
+  currentValue?: number;
+  previousValue?: number;
+  measurements: Measurement[];
+}
+
+const LiquidMeasurementsScreen: React.FC<LiquidMeasurementsScreenProps> = ({ navigation }) => {
+  // const { user } = useAuthStore();
+  const [measurementTypes, setMeasurementTypes] = useState<MeasurementType[]>([
     {
-      id: 1,
-      type: 'Weight',
-      current: 175,
-      previous: 180,
-      unit: 'lbs',
-      change: -5,
-      date: '2024-05-30',
+      id: 'weight',
+      name: 'Weight',
+      icon: 'scale-outline',
+      unit: 'kg',
+      color: '#007AFF',
+      measurements: [],
     },
     {
-      id: 2,
-      type: 'Body Fat',
-      current: 15.2,
-      previous: 16.8,
+      id: 'body-fat',
+      name: 'Body Fat',
+      icon: 'body-outline',
       unit: '%',
-      change: -1.6,
-      date: '2024-05-30',
+      color: '#FF9500',
+      measurements: [],
     },
     {
-      id: 3,
-      type: 'Chest',
-      current: 42,
-      previous: 40.5,
-      unit: 'inches',
-      change: 1.5,
-      date: '2024-05-30',
+      id: 'muscle-mass',
+      name: 'Muscle Mass',
+      icon: 'fitness-outline',
+      unit: 'kg',
+      color: '#4CD964',
+      measurements: [],
     },
     {
-      id: 4,
-      type: 'Waist',
-      current: 32,
-      previous: 34,
-      unit: 'inches',
-      change: -2,
-      date: '2024-05-30',
+      id: 'chest',
+      name: 'Chest',
+      icon: 'man-outline',
+      unit: 'cm',
+      color: '#FF3B30',
+      measurements: [],
     },
     {
-      id: 5,
-      type: 'Arms',
-      current: 15.5,
-      previous: 14.8,
-      unit: 'inches',
-      change: 0.7,
-      date: '2024-05-30',
+      id: 'waist',
+      name: 'Waist',
+      icon: 'resize-outline',
+      unit: 'cm',
+      color: '#5856D6',
+      measurements: [],
     },
     {
-      id: 6,
-      type: 'Thighs',
-      current: 24,
-      previous: 23.2,
-      unit: 'inches',
-      change: 0.8,
-      date: '2024-05-30',
+      id: 'arms',
+      name: 'Arms',
+      icon: 'hand-left-outline',
+      unit: 'cm',
+      color: '#FF2D55',
+      measurements: [],
     },
   ]);
 
-  const measurementTypes = [
-    'Weight', 'Body Fat', 'Chest', 'Waist', 'Arms', 'Thighs', 'Hips', 'Neck'
-  ];
+  const [selectedType, setSelectedType] = useState<MeasurementType>(measurementTypes[0]);
+  const [isAddingMeasurement, setIsAddingMeasurement] = useState(false);
+  const [newValue, setNewValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const handleAddMeasurement = () => {
-    if (!newMeasurement.type || !newMeasurement.value) {
-      Alert.alert('Error', 'Please fill in all fields');
+  useEffect(() => {
+    loadMeasurements();
+  }, []);
+
+  const loadMeasurements = async () => {
+    setIsLoading(true);
+    try {
+      // const data = await measurementsService.getMeasurements(user?.id || '');
+      // Update measurement types with loaded data
+      // This would be properly integrated with the backend
+    } catch (error) {
+      console.error('Error loading measurements:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadMeasurements();
+    setRefreshing(false);
+  };
+
+  const addMeasurement = async () => {
+    if (!newValue || isNaN(parseFloat(newValue))) {
+      Alert.alert(
+        'Invalid Value',
+        'Please enter a valid number'
+      );
       return;
     }
+
+    try {
+      const measurement: Measurement = {
+        id: Date.now().toString(),
+        value: parseFloat(newValue),
+        unit: selectedType.unit,
+        date: new Date().toISOString(),
+      };
+
+      // Update local state
+      const updatedTypes = measurementTypes.map(type => {
+        if (type.id === selectedType.id) {
+          return {
+            ...type,
+            currentValue: measurement.value,
+            previousValue: type.currentValue,
+            measurements: [measurement, ...type.measurements],
+          };
+        }
+        return type;
+      });
+
+      setMeasurementTypes(updatedTypes);
+      setSelectedType(updatedTypes.find(t => t.id === selectedType.id)!);
+      setNewValue('');
+      setIsAddingMeasurement(false);
+
+      // Save to backend
+      // TODO: Save to backend
+      // await measurementsService.addMeasurement(user?.id || '', {
+      //   type: selectedType.id,
+      //   value: measurement.value,
+      //   unit: measurement.unit,
+      // });
+
+      Alert.alert(
+        'Success',
+        'Measurement added successfully'
+      );
+    } catch (error) {
+      console.error('Error adding measurement:', error);
+      Alert.alert(
+        'Error',
+        'Failed to add measurement'
+      );
+    }
+  };
+
+  const getChartData = () => {
+    const measurements = selectedType.measurements.slice(0, 7).reverse();
     
-    Alert.alert('Success', 'Measurement added successfully!');
-    setShowAddModal(false);
-    setNewMeasurement({ type: '', value: '', unit: 'inches' });
+    if (measurements.length < 2) {
+      return null;
+    }
+
+    return {
+      labels: measurements.map((m, index) => {
+        if (index === 0) return 'Start';
+        if (index === measurements.length - 1) return 'Now';
+        return '';
+      }),
+      datasets: [{
+        data: measurements.map(m => m.value),
+        color: (opacity = 1) => selectedType.color,
+        strokeWidth: 3,
+      }],
+    };
   };
 
-  const getChangeColor = (change: number) => {
-    if (change > 0) return '#4CAF50'; // Green for positive
-    if (change < 0) return '#f5576c'; // Red for negative
-    return 'rgba(255,255,255,0.6)'; // Gray for no change
+  const getChangePercentage = (current?: number, previous?: number) => {
+    if (!current || !previous || previous === 0) return null;
+    const change = ((current - previous) / previous) * 100;
+    return change;
   };
 
-  const getChangeIcon = (change: number) => {
-    if (change > 0) return 'trending-up';
-    if (change < 0) return 'trending-down';
-    return 'remove';
-  };
+  const renderMeasurementType = (type: MeasurementType) => {
+    const isSelected = selectedType.id === type.id;
+    const change = getChangePercentage(type.currentValue, type.previousValue);
 
-  return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-back" size={24} color="white" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Measurements</Text>
-        <TouchableOpacity onPress={() => setShowAddModal(true)} style={styles.addButton}>
-          <Icon name="add" size={24} color="white" />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <BlurView intensity={20} style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Progress Summary</Text>
-          <View style={styles.summaryStats}>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>-5 lbs</Text>
-              <Text style={styles.summaryLabel}>Weight Change</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>-1.6%</Text>
-              <Text style={styles.summaryLabel}>Body Fat</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>+2.3"</Text>
-              <Text style={styles.summaryLabel}>Muscle Gain</Text>
-            </View>
+    return (
+      <TouchableOpacity
+        key={type.id}
+        onPress={() => setSelectedType(type)}
+        activeOpacity={0.8}
+      >
+        <LiquidCard 
+          style={[
+            styles.typeCard,
+            ...(isSelected ? [styles.typeCardSelected] : [])
+          ] as any}
+        >
+          <View style={[styles.typeIcon, { backgroundColor: type.color + '20' }]}>
+            <Icon name={type.icon} size={24} color={type.color} />
           </View>
-        </BlurView>
-
-        <Text style={styles.sectionTitle}>Current Measurements</Text>
-        
-        {measurements.map((measurement) => (
-          <BlurView key={measurement.id} intensity={20} style={styles.measurementCard}>
-            <View style={styles.measurementHeader}>
-              <View style={styles.measurementInfo}>
-                <Text style={styles.measurementType}>{measurement.type}</Text>
-                <Text style={styles.measurementDate}>
-                  {new Date(measurement.date).toLocaleDateString()}
-                </Text>
-              </View>
-              <View style={styles.measurementValues}>
-                <Text style={styles.currentValue}>
-                  {measurement.current} {measurement.unit}
-                </Text>
+          
+          <Text style={styles.typeName}>{type.name}</Text>
+          
+          {type.currentValue && (
+            <>
+              <Text style={styles.typeValue}>
+                {type.currentValue} {type.unit}
+              </Text>
+              {change !== null && (
                 <View style={styles.changeContainer}>
                   <Icon 
-                    name={getChangeIcon(measurement.change)} 
+                    name={change >= 0 ? 'trending-up' : 'trending-down'} 
                     size={16} 
-                    color={getChangeColor(measurement.change)} 
+                    color={change >= 0 ? '#4CD964' : '#FF3B30'} 
                   />
-                  <Text style={[styles.changeText, { color: getChangeColor(measurement.change) }]}>
-                    {measurement.change > 0 ? '+' : ''}{measurement.change} {measurement.unit}
+                  <Text style={[
+                    styles.changeText,
+                    { color: change >= 0 ? '#4CD964' : '#FF3B30' }
+                  ]}>
+                    {Math.abs(change).toFixed(1)}%
                   </Text>
                 </View>
-              </View>
+              )}
+            </>
+          )}
+        </LiquidCard>
+      </TouchableOpacity>
+    );
+  };
+
+  if (isLoading) {
+    return <LiquidLoading message="Loading measurements..." />;
+  }
+
+  const chartData = getChartData();
+
+  return (
+    <LiquidGlassView style={styles.container} intensity={95}>
+      {/* Header */}
+      <LiquidGlassView style={styles.header} intensity={90}>
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Icon name="arrow-back" size={24} color="#FFF" />
+        </TouchableOpacity>
+        <Text style={styles.title}>Measurements</Text>
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('ProgressPhotos')}
+          style={styles.photosButton}
+        >
+          <Icon name="camera-outline" size={24} color="#FFF" />
+        </TouchableOpacity>
+      </LiquidGlassView>
+
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#FFF"
+          />
+        }
+      >
+        {/* Measurement Types Grid */}
+        <View style={styles.typesGrid}>
+          {measurementTypes.map(renderMeasurementType)}
+        </View>
+
+        {/* Selected Measurement Details */}
+        <LiquidCard style={styles.detailsCard}>
+          <View style={styles.detailsHeader}>
+            <View>
+              <Text style={styles.detailsTitle}>{selectedType.name}</Text>
+              <Text style={styles.detailsSubtitle}>
+                Track your {selectedType.name.toLowerCase()} over time
+              </Text>
             </View>
-            
-            <View style={styles.progressBar}>
-              <Text style={styles.progressLabel}>vs. previous: {measurement.previous} {measurement.unit}</Text>
-              <View style={styles.progressTrack}>
-                <View 
-                  style={[
-                    styles.progressFill, 
-                    { 
-                      width: `${Math.abs(measurement.change) * 10}%`,
-                      backgroundColor: getChangeColor(measurement.change)
-                    }
-                  ]} 
+            <TouchableOpacity
+              onPress={() => setIsAddingMeasurement(true)}
+              style={styles.addButton}
+            >
+              <Icon name="add-circle" size={32} color="#007AFF" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Add Measurement Form */}
+          {isAddingMeasurement && (
+            <View style={styles.addForm}>
+              <LiquidGlassView style={styles.inputContainer} intensity={70}>
+                <TextInput
+                  value={newValue}
+                  onChangeText={setNewValue}
+                  placeholder={`Enter ${selectedType.name.toLowerCase()} (${selectedType.unit})`}
+                  keyboardType="numeric"
+                  autoFocus
+                  style={{ color: '#FFF', fontSize: 16 }}
+                  placeholderTextColor="#AAA"
+                />
+              </LiquidGlassView>
+              <View style={styles.addActions}>
+                <LiquidButton
+                  label="Cancel"
+                  onPress={() => {
+                    setIsAddingMeasurement(false);
+                    setNewValue('');
+                  }}
+                  variant="secondary"
+                  style={styles.addActionButton}
+                />
+                <LiquidButton
+                  label="Save"
+                  onPress={addMeasurement}
+                  style={styles.addActionButton}
                 />
               </View>
             </View>
-          </BlurView>
-        ))}
-      </ScrollView>
+          )}
 
-      {/* Add Measurement Modal */}
-      <Modal visible={showAddModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <BlurView intensity={80} style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Add New Measurement</Text>
-              
-              <Text style={styles.inputLabel}>Measurement Type</Text>
-              <View style={styles.typeSelector}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {measurementTypes.map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      style={[
-                        styles.typeButton,
-                        newMeasurement.type === type && styles.typeButtonSelected
-                      ]}
-                      onPress={() => setNewMeasurement(prev => ({ ...prev, type }))}
-                    >
-                      <Text style={[
-                        styles.typeButtonText,
-                        newMeasurement.type === type && styles.typeButtonTextSelected
-                      ]}>
-                        {type}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-              
-              <Text style={styles.inputLabel}>Value</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter measurement"
-                placeholderTextColor="rgba(255,255,255,0.5)"
-                value={newMeasurement.value}
-                onChangeText={(value) => setNewMeasurement(prev => ({ ...prev, value }))}
-                keyboardType="numeric"
+          {/* Chart */}
+          {chartData && (
+            <View style={styles.chartContainer}>
+              <LineChart
+                data={chartData}
+                width={width - 64}
+                height={200}
+                chartConfig={{
+                  backgroundColor: 'transparent',
+                  backgroundGradientFrom: 'transparent',
+                  backgroundGradientTo: 'transparent',
+                  decimalPlaces: 1,
+                  color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity * 0.5})`,
+                  style: {
+                    borderRadius: 16,
+                  },
+                  propsForDots: {
+                    r: '4',
+                    strokeWidth: '2',
+                    stroke: selectedType.color,
+                  },
+                }}
+                bezier
+                style={styles.chart}
               />
-              
-              <Text style={styles.inputLabel}>Unit</Text>
-              <View style={styles.unitSelector}>
-                {['inches', 'cm', 'lbs', 'kg', '%'].map((unit) => (
-                  <TouchableOpacity
-                    key={unit}
-                    style={[
-                      styles.unitButton,
-                      newMeasurement.unit === unit && styles.unitButtonSelected
-                    ]}
-                    onPress={() => setNewMeasurement(prev => ({ ...prev, unit }))}
-                  >
-                    <Text style={[
-                      styles.unitButtonText,
-                      newMeasurement.unit === unit && styles.unitButtonTextSelected
-                    ]}>
-                      {unit}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              
-              <View style={styles.modalButtons}>
-                <TouchableOpacity 
-                  style={[styles.modalButton, styles.cancelButton]} 
-                  onPress={() => setShowAddModal(false)}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.modalButton, styles.saveButton]} 
-                  onPress={handleAddMeasurement}
-                >
-                  <LinearGradient colors={['#f093fb', '#f5576c']} style={styles.saveGradient}>
-                    <Text style={styles.saveButtonText}>Add Measurement</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
             </View>
-          </BlurView>
-        </View>
-      </Modal>
-    </LinearGradient>
+          )}
+
+          {/* Recent Measurements */}
+          {selectedType.measurements.length > 0 ? (
+            <View style={styles.recentSection}>
+              <Text style={styles.recentTitle}>Recent Measurements</Text>
+              {selectedType.measurements.slice(0, 5).map((measurement, index) => (
+                <View key={measurement.id} style={styles.measurementRow}>
+                  <Text style={styles.measurementDate}>
+                    {new Date(measurement.date).toLocaleDateString()}
+                  </Text>
+                  <Text style={styles.measurementValue}>
+                    {measurement.value} {measurement.unit}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <LiquidEmptyState
+              icon="analytics-outline"
+              title="No Measurements Yet"
+              message={`Start tracking your ${selectedType.name.toLowerCase()} to see progress`}
+            />
+          )}
+        </LiquidCard>
+
+        {/* Quick Stats */}
+        <LiquidCard style={styles.statsCard}>
+          <Text style={styles.statsTitle}>Body Composition</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.stat}>
+              <Text style={styles.statLabel}>BMI</Text>
+              <Text style={styles.statValue}>
+                {measurementTypes[0].currentValue && measurementTypes[0].currentValue > 0
+                  ? (measurementTypes[0].currentValue / (170 / 100) ** 2).toFixed(1)
+                  : '—'}
+              </Text>
+            </View>
+            <View style={styles.stat}>
+              <Text style={styles.statLabel}>Total Change</Text>
+              <Text style={styles.statValue}>
+                {measurementTypes[0].currentValue && measurementTypes[0].measurements.length > 0
+                  ? `${(measurementTypes[0].currentValue - measurementTypes[0].measurements[measurementTypes[0].measurements.length - 1].value).toFixed(1)} kg`
+                  : '—'}
+              </Text>
+            </View>
+            <View style={styles.stat}>
+              <Text style={styles.statLabel}>Goal</Text>
+              <Text style={styles.statValue}>{'—'} kg</Text>
+            </View>
+          </View>
+        </LiquidCard>
+      </ScrollView>
+    </LiquidGlassView>
   );
 };
 
@@ -277,95 +443,53 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    padding: 16,
+    paddingTop: 60,
   },
   backButton: {
     padding: 8,
   },
-  headerTitle: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold',
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFF',
   },
-  addButton: {
+  photosButton: {
     padding: 8,
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 100,
-  },
-  summaryCard: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-  },
-  summaryTitle: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  summaryStats: {
+  typesGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    padding: 16,
+    paddingBottom: 0,
   },
-  summaryItem: {
+  typeCard: {
+    width: (width - 48) / 2,
+    padding: 16,
+    margin: 4,
     alignItems: 'center',
   },
-  summaryValue: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold',
+  typeCardSelected: {
+    transform: [{ scale: 1.02 }],
+  },
+  typeIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  typeName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFF',
     marginBottom: 4,
   },
-  summaryLabel: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
-  },
-  sectionTitle: {
-    color: 'white',
+  typeValue: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  measurementCard: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-  },
-  measurementHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  measurementInfo: {
-    flex: 1,
-  },
-  measurementType: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  measurementDate: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 12,
-  },
-  measurementValues: {
-    alignItems: 'flex-end',
-  },
-  currentValue: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: '#FFF',
     marginBottom: 4,
   },
   changeContainer: {
@@ -377,134 +501,106 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 4,
   },
-  progressBar: {
-    marginTop: 8,
+  detailsCard: {
+    margin: 16,
+    padding: 20,
   },
-  progressLabel: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 11,
-    marginBottom: 4,
-  },
-  progressTrack: {
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
+  detailsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContainer: {
-    width: '90%',
-    maxHeight: '80%',
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  modalContent: {
-    padding: 24,
-  },
-  modalTitle: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  inputLabel: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  typeSelector: {
     marginBottom: 20,
   },
-  typeButton: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
+  detailsTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFF',
   },
-  typeButtonSelected: {
-    backgroundColor: 'rgba(240, 147, 251, 0.3)',
-  },
-  typeButtonText: {
-    color: 'rgba(255,255,255,0.8)',
+  detailsSubtitle: {
     fontSize: 14,
+    color: '#AAA',
+    marginTop: 4,
   },
-  typeButtonTextSelected: {
-    color: 'white',
-    fontWeight: '600',
+  addButton: {
+    padding: 4,
+  },
+  addForm: {
+    marginBottom: 20,
   },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    color: 'white',
-    fontSize: 16,
+    marginBottom: 12,
   },
-  unitSelector: {
-    flexDirection: 'row',
-    marginBottom: 24,
+  inputContainer: {
+    marginBottom: 12,
+    padding: 12,
   },
-  unitButton: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    marginRight: 8,
-  },
-  unitButtonSelected: {
-    backgroundColor: 'rgba(240, 147, 251, 0.3)',
-  },
-  unitButtonText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-  },
-  unitButtonTextSelected: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  modalButtons: {
+  addActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  modalButton: {
-    flex: 1,
-    marginHorizontal: 6,
+  addActionButton: {
+    flex: 0.48,
   },
-  cancelButton: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    paddingVertical: 16,
+  chartContainer: {
+    marginVertical: 20,
+    alignItems: 'center',
   },
-  cancelButtonText: {
-    color: 'white',
-    fontSize: 16,
-    textAlign: 'center',
+  chart: {
+    borderRadius: 16,
   },
-  saveButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
+  recentSection: {
+    marginTop: 20,
   },
-  saveGradient: {
-    paddingVertical: 16,
-  },
-  saveButtonText: {
-    color: 'white',
+  recentTitle: {
     fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
+    color: '#FFF',
+    marginBottom: 12,
+  },
+  measurementRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  measurementDate: {
+    fontSize: 14,
+    color: '#AAA',
+  },
+  measurementValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  statsCard: {
+    margin: 16,
+    marginTop: 0,
+    padding: 20,
+  },
+  statsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFF',
+    marginBottom: 16,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  stat: {
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#AAA',
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFF',
   },
 });
 
-export default MeasurementsScreen;
+export default LiquidMeasurementsScreen;

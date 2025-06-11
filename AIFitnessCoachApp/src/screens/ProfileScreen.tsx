@@ -1,353 +1,599 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Switch,
+  Modal,
+  TextInput,
+  Alert,
   Platform,
+  Animated,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuthStore } from '../store/authStore';
+import { workoutTrackingService } from '../services/workoutTrackingService';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import { useThemeStore } from '../store/themeStore';
-import { getThemeGradient } from '../utils/themeConsistency';
-// Logger temporarily removed - was causing import errors
+import { LiquidGlassView, LiquidButton, LiquidCard, LiquidInput } from '../components/glass';
 
-const ProfileScreen = ({ navigation }: any) => {
+const LiquidProfileScreen = ({ navigation }: any) => {
+  const { theme } = useThemeStore();
   const { user, logout } = useAuthStore();
-  const { isDarkMode, toggleDarkMode } = useThemeStore();
-  const [notifications, setNotifications] = React.useState(true);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showGoalsModal, setShowGoalsModal] = useState(false);
+  
+  // Edit profile state
+  const [editName, setEditName] = useState(user?.email?.split('@')[0] || '');
+  const [editEmail, setEditEmail] = useState(user?.email || '');
+  
+  // Goals state
+  const [selectedGoals, setSelectedGoals] = useState([
+    'Weight Loss', 'Muscle Gain'
+  ]);
 
-  const stats = [
-    { label: 'Total Workouts', value: '156' },
-    { label: 'Hours Trained', value: '234' },
-    { label: 'Calories Burned', value: '45.2K' },
-    { label: 'Current Streak', value: '12 days' },
+  // Animation values
+  const scrollAnimation = useRef(new Animated.Value(0)).current;
+  const statsAnimation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Animate stats on mount
+    Animated.stagger(100, [
+      Animated.spring(statsAnimation, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 7,
+      }),
+    ]).start();
+  }, []);
+
+  const profileStats = [
+    { label: 'Workouts Completed', value: '24', icon: 'fitness', color: theme.colors.success },
+    { label: 'Total Minutes', value: '1,240', icon: 'time', color: theme.colors.primary.main },
+    { label: 'Calories Burned', value: '12,500', icon: 'flame', color: theme.colors.error },
+    { label: 'Current Streak', value: '7 days', icon: 'trending-up', color: theme.colors.warning },
   ];
 
   const menuItems = [
-    { icon: 'person-outline', label: 'Edit Profile', action: 'editProfile' },
-    { icon: 'fitness-outline', label: 'Fitness Goals', action: 'goals' },
-    { icon: 'analytics-outline', label: 'Progress Reports', action: 'reports' },
-    { icon: 'calendar-outline', label: 'Workout History', action: 'history' },
-    { icon: 'trophy-outline', label: 'Achievements', action: 'achievements' },
-    { icon: 'help-circle-outline', label: 'Help & Support', action: 'help' },
+    { label: 'Edit Profile', icon: 'person-outline', action: () => {
+      console.log('Edit Profile clicked');
+      setShowEditModal(true);
+    }},
+    { label: 'Fitness Goals', icon: 'flag-outline', action: () => setShowGoalsModal(true) },
+    { label: 'Change AI Coach', icon: 'chatbubble-ellipses-outline', action: () => navigation.navigate('TrainerSelection') },
+    { label: 'Workout History', icon: 'time-outline', action: () => navigation.navigate('WorkoutHistory') },
+    { label: 'Progress Photos', icon: 'camera-outline', action: () => navigation.navigate('ProgressPhotos') },
+    { label: 'Measurements', icon: 'resize-outline', action: () => navigation.navigate('EnhancedMeasurements') },
+    { label: 'Download Workouts', icon: 'cloud-download-outline', action: () => navigation.navigate('WorkoutDownloads') },
+    { label: 'Export Data', icon: 'download-outline', action: () => handleExportData() },
   ];
 
-  const handleMenuAction = (action: string) => {
-    console.log('Profile Menu Action', { action });
-    
-    switch (action) {
-      case 'editProfile':
-        // TODO: Create EditProfile screen
-        navigation.navigate('Settings');
-        break;
-      case 'goals':
-        navigation.navigate('Settings');
-        break;
-      case 'reports':
-        navigation.navigate('Stats');
-        break;
-      case 'history':
-        navigation.navigate('WorkoutHistory');
-        break;
-      case 'achievements':
-        // TODO: Create Achievements screen
-        navigation.navigate('Stats');
-        break;
-      case 'help':
-        navigation.navigate('Settings');
-        break;
-      default:
-        break;
+  const fitnessGoals = [
+    'Weight Loss', 'Muscle Gain', 'Endurance', 'Strength', 
+    'Flexibility', 'General Fitness', 'Rehabilitation', 'Sport Specific'
+  ];
+
+  const handleSaveProfile = async () => {
+    try {
+      // Update the user in the auth store
+      const updatedUser = {
+        ...user!,
+        name: editName,
+        email: editEmail
+      };
+      
+      // Update in AsyncStorage and auth store
+      await useAuthStore.getState().login(updatedUser);
+      
+      Alert.alert('Success', 'Profile updated successfully!');
+      setShowEditModal(false);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update profile');
     }
   };
 
-  const handleLogout = async () => {
-    console.log('Logout');
-    await logout();
+  const handleSaveGoals = () => {
+    // TODO: Implement actual goals update
+    Alert.alert('Success', 'Fitness goals updated successfully!');
+    setShowGoalsModal(false);
   };
 
-  const gradientColors = getThemeGradient(isDarkMode);
+  const handleExportData = () => {
+    Alert.alert(
+      'Export Data',
+      'Choose export format:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Hevy Format', onPress: () => exportToHevy() },
+        { text: 'JSON Format', onPress: () => exportToJSON() },
+      ]
+    );
+  };
+
+  const exportToHevy = async () => {
+    try {
+      const csvData = await workoutTrackingService.exportToHevyFormat();
+      const fileName = `fitness_data_hevy_${new Date().toISOString().split('T')[0]}.csv`;
+      const fileUri = FileSystem.documentDirectory + fileName;
+      
+      await FileSystem.writeAsStringAsync(fileUri, csvData);
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+      } else {
+        Alert.alert('Success', 'Data exported to device storage');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to export data');
+    }
+  };
+
+  const exportToJSON = async () => {
+    try {
+      const data = await workoutTrackingService.exportWorkoutData();
+      const fileName = `fitness_data_${new Date().toISOString().split('T')[0]}.json`;
+      const fileUri = FileSystem.documentDirectory + fileName;
+      
+      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(data, null, 2));
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri);
+      } else {
+        Alert.alert('Success', 'Data exported to device storage');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to export data');
+    }
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Logout', 
+          style: 'destructive', 
+          onPress: async () => {
+            await logout();
+            // Navigation should be handled by AppNavigator auth state change
+          }
+        }
+      ]
+    );
+  };
+
+  const toggleGoal = (goal: string) => {
+    setSelectedGoals(prev => 
+      prev.includes(goal) 
+        ? prev.filter(g => g !== goal)
+        : [...prev, goal]
+    );
+  };
 
   return (
-    <LinearGradient colors={gradientColors} style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
+    <View style={styles.container}>
+      {/* Animated Header */}
+      <Animated.View
+        style={[
+          styles.header,
+          {
+            transform: [{
+              translateY: scrollAnimation.interpolate({
+                inputRange: [0, 100],
+                outputRange: [0, -20],
+                extrapolate: 'clamp',
+              })
+            }],
+            opacity: scrollAnimation.interpolate({
+              inputRange: [0, 100],
+              outputRange: [1, 0.9],
+              extrapolate: 'clamp',
+            })
+          }
+        ]}
+      >
+        <LiquidGlassView intensity={90} style={styles.headerContent}>
           <Text style={styles.headerTitle}>Profile</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-            <Icon name="settings-outline" size={28} color="white" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Profile Info */}
-        <BlurView intensity={30} tint="light" style={styles.profileCard}>
-          <View style={styles.avatarContainer}>
-            <LinearGradient
-              colors={['#4facfe', '#00f2fe']}
-              style={styles.avatar}
-            >
-              <Text style={styles.avatarText}>
-                {user?.name?.charAt(0).toUpperCase() || 'U'}
-              </Text>
-            </LinearGradient>
-            <TouchableOpacity style={styles.editAvatarButton}>
-              <Icon name="camera" size={20} color="white" />
+          <View style={styles.headerButtons}>
+            <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.headerButton}>
+              <Icon name="settings-outline" size={24} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleLogout} style={styles.headerButton}>
+              <Icon name="log-out-outline" size={24} color="white" />
             </TouchableOpacity>
           </View>
-          
-          <Text style={styles.userName}>{user?.name || 'Fitness Warrior'}</Text>
-          <Text style={styles.userEmail}>{user?.email || 'user@fitness.com'}</Text>
-          
-          <View style={styles.membershipBadge}>
-            <Icon name="star" size={16} color="#FFD700" />
-            <Text style={styles.membershipText}>Premium Member</Text>
-          </View>
-        </BlurView>
+        </LiquidGlassView>
+      </Animated.View>
 
-        {/* Stats */}
+      <Animated.ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollAnimation } } }],
+          { useNativeDriver: true }
+        )}
+        scrollEventThrottle={16}
+      >
+        {/* Profile Info */}
+        <LiquidCard style={styles.profileCard}>
+          <View style={styles.profileHeader}>
+            <View style={styles.avatar}>
+              <Icon name="person" size={40} color="white" />
+            </View>
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>{user?.email?.split('@')[0] || 'Fitness Enthusiast'}</Text>
+              <Text style={styles.profileEmail}>{user?.email}</Text>
+              <Text style={styles.memberSince}>Member since {new Date().getFullYear()}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowEditModal(true)} style={styles.editButton}>
+              <Icon name="pencil" size={18} color="white" />
+            </TouchableOpacity>
+          </View>
+        </LiquidCard>
+
+        {/* Stats Grid */}
         <View style={styles.statsContainer}>
-          {stats.map((stat, index) => (
-            <BlurView key={index} intensity={30} tint="light" style={styles.statCard}>
-              <Text style={styles.statValue}>{stat.value}</Text>
-              <Text style={styles.statLabel}>{stat.label}</Text>
-            </BlurView>
-          ))}
+          <Text style={styles.sectionTitle}>Your Stats</Text>
+          <View style={styles.statsGrid}>
+            {profileStats.map((stat, index) => (
+              <Animated.View
+                key={index}
+                style={[
+                  {
+                    opacity: statsAnimation,
+                    transform: [{
+                      translateY: statsAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [50, 0],
+                      })
+                    }, {
+                      scale: statsAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.8, 1],
+                      })
+                    }]
+                  }
+                ]}
+              >
+                <LiquidCard style={styles.statCard}>
+                  <Icon name={stat.icon} size={24} color={stat.color} style={styles.statIcon} />
+                  <Text style={styles.statValue}>{stat.value}</Text>
+                  <Text style={styles.statLabel}>{stat.label}</Text>
+                </LiquidCard>
+              </Animated.View>
+            ))}
+          </View>
         </View>
-
-        {/* Settings */}
-        <BlurView intensity={30} tint="light" style={styles.settingsCard}>
-          <Text style={styles.sectionTitle}>Quick Settings</Text>
-          
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <Icon name="moon-outline" size={24} color="white" />
-              <Text style={styles.settingLabel}>Dark Mode</Text>
-            </View>
-            <Switch
-              value={isDarkMode}
-              onValueChange={toggleDarkMode}
-              trackColor={{ false: 'rgba(255,255,255,0.3)', true: '#667eea' }}
-              thumbColor="white"
-            />
-          </View>
-          
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <Icon name="notifications-outline" size={24} color="white" />
-              <Text style={styles.settingLabel}>Notifications</Text>
-            </View>
-            <Switch
-              value={notifications}
-              onValueChange={setNotifications}
-              trackColor={{ false: 'rgba(255,255,255,0.3)', true: '#667eea' }}
-              thumbColor="white"
-            />
-          </View>
-        </BlurView>
 
         {/* Menu Items */}
         <View style={styles.menuContainer}>
+          <Text style={styles.sectionTitle}>Profile & Settings</Text>
           {menuItems.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              onPress={() => handleMenuAction(item.action)}
+            <TouchableOpacity 
+              key={index} 
+              onPress={item.action}
+              activeOpacity={0.7}
+              style={styles.menuTouchable}
             >
-              <BlurView intensity={30} tint="light" style={styles.menuItem}>
-                <View style={styles.menuLeft}>
-                  <Icon name={item.icon} size={24} color="white" />
-                  <Text style={styles.menuLabel}>{item.label}</Text>
+              <LiquidCard style={styles.menuItem} >
+                <View style={styles.menuItemContent}>
+                  <Icon name={item.icon} size={20} color="white" />
+                  <Text style={styles.menuItemText}>{item.label}</Text>
+                  <Icon name="chevron-forward" size={16} color="rgba(255,255,255,0.6)" />
                 </View>
-                <Icon name="chevron-forward" size={20} color="rgba(255,255,255,0.6)" />
-              </BlurView>
+              </LiquidCard>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Logout Button */}
-        <TouchableOpacity onPress={handleLogout}>
-          <BlurView intensity={30} tint="light" style={styles.logoutButton}>
-            <Icon name="log-out-outline" size={24} color="white" />
-            <Text style={styles.logoutText}>Logout</Text>
-          </BlurView>
-        </TouchableOpacity>
+      </Animated.ScrollView>
 
-        {/* Bottom spacing for floating tab bar */}
-        <View style={{ height: Platform.OS === 'ios' ? 90 : 80 }} />
-      </ScrollView>
-    </LinearGradient>
+      {/* Edit Profile Modal */}
+      <Modal visible={showEditModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <LiquidCard style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Edit Profile</Text>
+              
+              <LiquidInput
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Display Name"
+                style={styles.modalInput}
+              />
+              
+              <LiquidInput
+                value={editEmail}
+                onChangeText={setEditEmail}
+                placeholder="Email"
+                style={styles.modalInput}
+              />
+              
+              <View style={styles.modalButtons}>
+                <LiquidButton
+                  label="Cancel"
+                  variant="secondary"
+                  size="medium"
+                  onPress={() => setShowEditModal(false)}
+                  style={styles.modalButton}
+                />
+                
+                <LiquidButton
+                  label="Save"
+                  variant="primary"
+                  size="medium"
+                  onPress={handleSaveProfile}
+                  style={styles.modalButton}
+                />
+              </View>
+            </View>
+          </LiquidCard>
+        </View>
+      </Modal>
+
+      {/* Goals Modal */}
+      <Modal visible={showGoalsModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <LiquidCard style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Fitness Goals</Text>
+              <Text style={styles.modalSubtitle}>Select your fitness goals</Text>
+              
+              <View style={styles.goalsGrid}>
+                {fitnessGoals.map((goal) => (
+                  <TouchableOpacity
+                    key={goal}
+                    style={[
+                      styles.goalItem,
+                      selectedGoals.includes(goal) && styles.goalItemSelected
+                    ]}
+                    onPress={() => toggleGoal(goal)}
+                  >
+                    <Text style={[
+                      styles.goalText,
+                      selectedGoals.includes(goal) && styles.goalTextSelected
+                    ]}>
+                      {goal}
+                    </Text>
+                    {selectedGoals.includes(goal) && (
+                      <Icon name="checkmark" size={16} color="white" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+              
+              <View style={styles.modalButtons}>
+                <LiquidButton
+                  label="Cancel"
+                  variant="secondary"
+                  size="medium"
+                  onPress={() => setShowGoalsModal(false)}
+                  style={styles.modalButton}
+                />
+                
+                <LiquidButton
+                  label="Save Goals"
+                  variant="primary"
+                  size="medium"
+                  onPress={handleSaveGoals}
+                  style={styles.modalButton}
+                />
+              </View>
+            </View>
+          </LiquidCard>
+        </View>
+      </Modal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0a0a0f',
   },
   header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
   },
   headerTitle: {
+    color: 'white',
     fontSize: 28,
     fontWeight: 'bold',
-    color: 'white',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerButton: {
+    padding: 8,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: Platform.OS === 'ios' ? 120 : 100,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 90 : 80,
   },
   profileCard: {
-    marginHorizontal: 20,
-    padding: 24,
-    borderRadius: 20,
-    alignItems: 'center',
-    overflow: 'hidden',
+    marginBottom: 30,
+    padding: 20,
   },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: 16,
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 16,
   },
-  avatarText: {
-    fontSize: 40,
-    fontWeight: 'bold',
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
     color: 'white',
-  },
-  editAvatarButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  userName: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
     marginBottom: 4,
   },
-  userEmail: {
-    fontSize: 16,
+  profileEmail: {
     color: 'rgba(255,255,255,0.8)',
-    marginBottom: 12,
-  },
-  membershipBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,215,0,0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  membershipText: {
-    color: '#FFD700',
     fontSize: 14,
-    fontWeight: 'bold',
-    marginLeft: 4,
+    marginBottom: 2,
+  },
+  memberSince: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+  },
+  editButton: {
+    padding: 8,
   },
   statsContainer: {
+    marginBottom: 30,
+  },
+  sectionTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 15,
-    marginTop: 20,
+    justifyContent: 'space-between',
   },
   statCard: {
     width: '48%',
-    padding: 20,
-    margin: '1%',
-    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
     alignItems: 'center',
-    overflow: 'hidden',
+  },
+  statIcon: {
+    marginBottom: 8,
   },
   statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
     color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
     marginBottom: 4,
   },
   statLabel: {
+    color: 'rgba(255,255,255,0.7)',
     fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
   },
-  settingsCard: {
-    marginHorizontal: 20,
-    marginTop: 20,
-    padding: 20,
-    borderRadius: 20,
-    overflow: 'hidden',
+  menuContainer: {
+    marginBottom: 30,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 16,
+  menuItem: {
+    marginBottom: 8,
   },
-  settingItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
+  menuTouchable: {
+    marginBottom: 4,
   },
-  settingLeft: {
+  menuItemContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 16,
   },
-  settingLabel: {
+  menuItemText: {
     color: 'white',
     fontSize: 16,
     marginLeft: 12,
+    flex: 1,
   },
-  menuContainer: {
-    marginTop: 20,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginHorizontal: 20,
-    marginBottom: 12,
-    padding: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  menuLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  menuLabel: {
-    color: 'white',
-    fontSize: 16,
-    marginLeft: 16,
-  },
-  logoutButton: {
-    flexDirection: 'row',
+  modalOverlay: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 20,
-    marginTop: 20,
-    padding: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 20,
   },
-  logoutText: {
+  modalContainer: {
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '85%',
+  },
+  modalContent: {
+    padding: 24,
+  },
+  modalTitle: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginLeft: 8,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  modalInput: {
+    marginBottom: 16,
+  },
+  goalsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  goalItem: {
+    width: '48%',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  goalItemSelected: {
+    backgroundColor: 'rgba(102, 126, 234, 0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(102, 126, 234, 0.5)',
+  },
+  goalText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+  },
+  goalTextSelected: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
   },
 });
 
-export default ProfileScreen;
+export default LiquidProfileScreen;

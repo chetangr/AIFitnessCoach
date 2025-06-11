@@ -189,7 +189,8 @@ class FitnessMetricsService {
       // Simulate distance for cardio exercises
       if (['running', 'cycling', 'walking'].includes(exerciseType.toLowerCase())) {
         const speedKmh = exerciseType === 'running' ? 10 : exerciseType === 'cycling' ? 20 : 5;
-        this.currentMetrics.distance += (speedKmh / 3600) * elapsedSinceLastUpdate;
+        const distanceIncrement = (speedKmh / 3600) * elapsedSinceLastUpdate;
+        this.currentMetrics.distance = Math.round((this.currentMetrics.distance + distanceIncrement) * 100) / 100;
       }
       
       // Simulate steps

@@ -1,101 +1,196 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
-  TouchableOpacity,
   ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Dimensions,
+  Modal,
+  TextInput,
+  Alert,
+  Animated,
+  Pressable,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, useRoute } from  '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import Icon from 'react-native-vector-icons/Ionicons';
-import FitnessMetricsOverlay from '../components/FitnessMetricsOverlay';
-import { fitnessMetricsService } from '../services/fitnessMetricsService';
-// Logger temporarily removed - was causing import errors
+import { LiquidGlassView, LiquidButton, LiquidCard, LiquidInput } from '../components/glass';
+import { workoutTrackingService } from '../services/workoutTrackingService';
+import { useThemeStore } from '../store/themeStore';
 
-const ActiveWorkoutScreen = ({ route, navigation }: any) => {
-  const { workout } = route.params || {};
-  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
-  const [isResting, setIsResting] = useState(false);
-  const [restTimer, setRestTimer] = useState(60);
-  const [workoutTimer, setWorkoutTimer] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-  const [volumeEnabled, setVolumeEnabled] = useState(true);
-  const [musicEnabled, setMusicEnabled] = useState(true);
-  const [currentSet, setCurrentSet] = useState(1);
-  const [totalSets, setTotalSets] = useState(0);
+const { width: screenWidth } = Dimensions.get('window');
+
+interface Exercise {
+  id: string;
+  name: string;
+  sets: number;
+  reps: string;
+  weight?: string;
+  duration?: string;
+  restTime: number;
+  equipment?: string;
+  muscle?: string;
+  instructions?: string[];
+}
+
+interface Set {
+  id: string;
+  reps: number;
+  weight: number;
+  completed: boolean;
+}
+
+export default function LiquidActiveWorkoutScreen() {
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { theme } = useThemeStore();
+  const { colors } = theme;
+  const { workout } = route.params as { workout: { id: string; name: string; exercises: Exercise[] } };
   
-  // Fitness metrics state
-  const [fitnessMetrics, setFitnessMetrics] = useState({
-    heartRate: 70,
-    calories: 0,
-    activeMinutes: 0,
-    distance: 0,
-    steps: 0,
-    avgHeartRate: 70,
-  });
-
-  const exercises = [
-    { name: 'Push-ups', sets: 3, reps: 12, rest: 60 },
-    { name: 'Pull-ups', sets: 3, reps: 8, rest: 90 },
-    { name: 'Dumbbell Press', sets: 3, reps: 10, rest: 60 },
-    { name: 'Bent-Over Rows', sets: 3, reps: 10, rest: 60 },
-    { name: 'Shoulder Press', sets: 3, reps: 10, rest: 60 },
-    { name: 'Plank', sets: 3, reps: '30s', rest: 45 },
-  ];
-
-  const currentExercise = exercises[currentExerciseIndex];
-  const progress = ((currentExerciseIndex + 1) / exercises.length) * 100;
+  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
+  const [sets, setSets] = useState<Set[]>([]);
+  const [isResting, setIsResting] = useState(false);
+  const [restTimeLeft, setRestTimeLeft] = useState(0);
+  const [workoutStartTime] = useState(new Date());
+  const [showExerciseModal, setShowExerciseModal] = useState(false);
+  const [editingSet, setEditingSet] = useState<Set | null>(null);
+  const [tempReps, setTempReps] = useState('');
+  const [tempWeight, setTempWeight] = useState('');
+  
+  const timerAnimation = useRef(new Animated.Value(0)).current;
+  const pulseAnimation = useRef(new Animated.Value(1)).current;
+  const shimmerAnimation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (!isPaused) {
-      const timer = setInterval(() => {
-        setWorkoutTimer((prev) => prev + 1);
-      }, 1000);
-
-      return () => clearInterval(timer);
+    // Initialize sets for first exercise
+    if (workout.exercises.length > 0) {
+      initializeSets(workout.exercises[0]);
     }
-  }, [isPaused]);
-
-  useEffect(() => {
-    if (isResting && restTimer > 0) {
-      const timer = setTimeout(() => {
-        setRestTimer((prev) => prev - 1);
-      }, 1000);
-
-      return () => clearTimeout(timer);
-    } else if (isResting && restTimer === 0) {
-      setIsResting(false);
-      setRestTimer(currentExercise.rest);
-    }
-  }, [isResting, restTimer]);
-
-  // Initialize total sets
-  useEffect(() => {
-    const total = exercises.reduce((sum, ex) => sum + ex.sets, 0);
-    setTotalSets(total);
+    
+    // Start shimmer animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmerAnimation, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmerAnimation, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
   }, []);
 
-  // Subscribe to fitness metrics
   useEffect(() => {
-    const unsubscribe = fitnessMetricsService.subscribe((metrics) => {
-      setFitnessMetrics(metrics);
-    });
-
-    // Start tracking when workout begins
-    if (!isPaused && !isResting) {
-      const intensity = currentExercise.name.includes('Plank') ? 'low' : 'medium';
-      fitnessMetricsService.startTracking(currentExercise.name, intensity);
-    } else if (isPaused) {
-      fitnessMetricsService.pauseTracking();
-    } else if (isResting) {
-      fitnessMetricsService.changeExercise('rest', 'low');
+    let interval: NodeJS.Timeout;
+    
+    if (isResting && restTimeLeft > 0) {
+      // Start pulse animation for rest timer
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnimation, {
+            toValue: 1.2,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnimation, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+      
+      interval = setInterval(() => {
+        setRestTimeLeft((prev) => {
+          if (prev <= 1) {
+            setIsResting(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     }
-
+    
     return () => {
-      unsubscribe();
+      if (interval) clearInterval(interval);
     };
-  }, [isPaused, isResting, currentExercise]);
+  }, [isResting, restTimeLeft]);
+
+  const initializeSets = (exercise: Exercise) => {
+    const newSets: Set[] = [];
+    for (let i = 0; i < exercise.sets; i++) {
+      newSets.push({
+        id: `set-${i}`,
+        reps: parseInt(exercise.reps) || 0,
+        weight: parseFloat(exercise.weight || '0') || 0,
+        completed: false,
+      });
+    }
+    setSets(newSets);
+  };
+
+  const currentExercise = workout.exercises[currentExerciseIndex];
+  const completedSets = sets.filter(s => s.completed).length;
+  const progress = (currentExerciseIndex / workout.exercises.length) * 100;
+
+  const completeSet = (setId: string) => {
+    setSets(prev => prev.map(s => 
+      s.id === setId ? { ...s, completed: true } : s
+    ));
+    
+    const updatedSets = sets.map(s => 
+      s.id === setId ? { ...s, completed: true } : s
+    );
+    
+    if (updatedSets.every(s => s.completed)) {
+      // All sets completed, move to next exercise
+      if (currentExerciseIndex < workout.exercises.length - 1) {
+        setIsResting(true);
+        setRestTimeLeft(currentExercise.restTime || 60);
+        setTimeout(() => {
+          setCurrentExerciseIndex(currentExerciseIndex + 1);
+          initializeSets(workout.exercises[currentExerciseIndex + 1]);
+        }, (currentExercise.restTime || 60) * 1000);
+      } else {
+        // Workout completed
+        completeWorkout();
+      }
+    } else {
+      // Start rest timer
+      setIsResting(true);
+      setRestTimeLeft(currentExercise.restTime || 60);
+    }
+  };
+
+  const completeWorkout = () => {
+    Alert.alert(
+      'Workout Complete! 🎉',
+      `Great job! You've completed ${workout.name}.`,
+      [
+        {
+          text: 'Save & Exit',
+          onPress: () => {
+            // Save workout data
+            workoutTrackingService.finishWorkout({
+              workoutId: workout.id,
+              duration: Math.floor((new Date().getTime() - workoutStartTime.getTime()) / 1000),
+              exercises: workout.exercises.map((ex, idx) => ({
+                ...ex,
+                sets: sets,
+              })),
+            });
+            navigation.goBack();
+          },
+        },
+      ]
+    );
+  };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -103,222 +198,257 @@ const ActiveWorkoutScreen = ({ route, navigation }: any) => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleNextExercise = () => {
-    if (currentExerciseIndex < exercises.length - 1) {
-      setCurrentExerciseIndex(currentExerciseIndex + 1);
-      setIsResting(true);
-      console.log('Exercise Completed', { 
-        exercise: currentExercise.name,
-        index: currentExerciseIndex 
-      });
-    } else {
-      handleFinishWorkout();
-    }
-  };
-
-  const handleFinishWorkout = () => {
-    console.log('Workout Completed', { 
-      duration: workoutTimer,
-      exercisesCompleted: currentExerciseIndex + 1 
-    });
-    // Stop fitness tracking
-    fitnessMetricsService.stopTracking();
-    navigation.navigate('MainTabs');
-  };
-
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
-      {/* Fitness Metrics Overlay */}
-      <FitnessMetricsOverlay
-        heartRate={fitnessMetrics.heartRate}
-        calories={fitnessMetrics.calories}
-        elapsedTime={formatTime(workoutTimer)}
-        activeMinutes={fitnessMetrics.activeMinutes}
-        currentExercise={currentExercise.name}
-        setsCompleted={currentSet}
-        totalSets={totalSets}
-        style="compact"
-        position="top"
-        showRings={true}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <LinearGradient
+        colors={[colors.primary + '20', colors.secondary + '20', colors.background]}
+        style={StyleSheet.absoluteFillObject}
       />
       
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Icon name="close" size={32} color="white" />
+      <LiquidGlassView intensity={85} style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.workoutName}>{workout?.name || 'Upper Body Workout'}</Text>
-        <Text style={styles.timer}>{formatTime(workoutTimer)}</Text>
-      </View>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{workout.name}</Text>
+        <TouchableOpacity onPress={() => setShowExerciseModal(true)}>
+          <Ionicons name="list" size={24} color={colors.text} />
+        </TouchableOpacity>
+      </LiquidGlassView>
 
       {/* Progress Bar */}
-      <View style={styles.progressContainer}>
+      <LiquidGlassView intensity={70} style={styles.progressContainer}>
         <View style={styles.progressBar}>
-          <LinearGradient
-            colors={['#4CAF50', '#45B7D1']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[styles.progressFill, { width: `${progress}%` }]}
+          <Animated.View
+            style={[
+              styles.progressFill,
+              {
+                width: `${progress}%`,
+                backgroundColor: colors.primary.main,
+                opacity: shimmerAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.8, 1],
+                }),
+              },
+            ]}
           />
         </View>
-        <Text style={styles.progressText}>
-          {currentExerciseIndex + 1} of {exercises.length} exercises
+        <Text style={[styles.progressText, { color: colors.text }]}>
+          {currentExerciseIndex + 1} of {workout.exercises.length} exercises
         </Text>
-      </View>
+      </LiquidGlassView>
 
-      {/* Main Content */}
-      <ScrollView contentContainerStyle={styles.content}>
-        {!isResting ? (
-          <>
-            {/* Exercise Display */}
-            <BlurView intensity={30} tint="light" style={styles.exerciseCard}>
-              <Text style={styles.exerciseNumber}>Exercise {currentExerciseIndex + 1}</Text>
-              <Text style={styles.exerciseName}>{currentExercise.name}</Text>
-              
-              <View style={styles.exerciseDetails}>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Sets</Text>
-                  <Text style={styles.detailValue}>{currentExercise.sets}</Text>
-                </View>
-                <View style={styles.detailDivider} />
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Reps</Text>
-                  <Text style={styles.detailValue}>{currentExercise.reps}</Text>
-                </View>
-                <View style={styles.detailDivider} />
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Rest</Text>
-                  <Text style={styles.detailValue}>{currentExercise.rest}s</Text>
-                </View>
-              </View>
-            </BlurView>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Current Exercise Card */}
+        <LiquidCard style={styles.exerciseCard}>
+          <View style={styles.exerciseHeader}>
+            <Text style={[styles.exerciseName, { color: colors.text }]}>
+              {currentExercise.name}
+            </Text>
+            {currentExercise.equipment && (
+              <LiquidGlassView intensity={70} style={styles.equipmentBadge}>
+                <Text style={[styles.equipmentText, { color: colors.primary.main }]}>
+                  {currentExercise.equipment}
+                </Text>
+              </LiquidGlassView>
+            )}
+          </View>
+          
+          {currentExercise.muscle && (
+            <Text style={[styles.muscleText, { color: colors.text + '80' }]}>
+              Target: {currentExercise.muscle}
+            </Text>
+          )}
+          
+          <View style={styles.setsInfo}>
+            <Text style={[styles.setsText, { color: colors.text }]}>
+              {completedSets} / {currentExercise.sets} sets completed
+            </Text>
+          </View>
+        </LiquidCard>
 
-            {/* Exercise Animation Placeholder */}
-            <BlurView intensity={20} tint="light" style={styles.animationContainer}>
-              <Icon name="fitness" size={100} color="white" />
-              <Text style={styles.animationText}>Exercise Animation</Text>
-            </BlurView>
-
-            {/* Action Buttons */}
-            <View style={styles.actionButtons}>
-              <TouchableOpacity 
-                style={styles.completeButton}
-                onPress={handleNextExercise}
-              >
-                <Text style={styles.completeButtonText}>Complete Exercise</Text>
-                <Icon name="checkmark-circle" size={24} color="white" />
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.helpButton}
-                onPress={() => {
-                  // Show exercise instructions
-                  console.log('Show instructions for:', currentExercise.name);
-                  // Could implement a modal with exercise instructions
-                }}
-              >
-                <Icon name="help-circle" size={24} color="white" />
-                <Text style={styles.helpButtonText}>View Instructions</Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        ) : (
-          <>
-            {/* Rest Screen */}
-            <BlurView intensity={30} tint="light" style={styles.restCard}>
-              <Icon name="time" size={60} color="white" />
-              <Text style={styles.restTitle}>Rest Time</Text>
-              <Text style={styles.restTimer}>{restTimer}s</Text>
-              
-              <Text style={styles.nextExerciseLabel}>Next Exercise:</Text>
-              <Text style={styles.nextExerciseName}>
-                {currentExerciseIndex < exercises.length - 1 
-                  ? exercises[currentExerciseIndex + 1].name 
-                  : 'Workout Complete!'}
+        {/* Rest Timer */}
+        {isResting && (
+          <LiquidCard style={styles.restCard}>
+            <Animated.View
+              style={[
+                styles.restContent,
+                {
+                  transform: [{ scale: pulseAnimation }],
+                },
+              ]}
+            >
+              <Text style={[styles.restTitle, { color: colors.text }]}>Rest Time</Text>
+              <Text style={[styles.restTimer, { color: colors.primary.main }]}>
+                {formatTime(restTimeLeft)}
               </Text>
-
-              <TouchableOpacity 
-                style={styles.skipButton}
+              <TouchableOpacity
                 onPress={() => {
                   setIsResting(false);
-                  setRestTimer(currentExercise.rest);
+                  setRestTimeLeft(0);
                 }}
               >
-                <Text style={styles.skipButtonText}>Skip Rest</Text>
+                <Text style={[styles.skipText, { color: colors.secondary }]}>Skip Rest</Text>
               </TouchableOpacity>
-            </BlurView>
-          </>
+            </Animated.View>
+          </LiquidCard>
+        )}
+
+        {/* Sets */}
+        <View style={styles.setsContainer}>
+          {sets.map((set, index) => (
+            <LiquidCard
+              key={set.id}
+              style={[
+                styles.setCard,
+                set.completed && styles.completedSetCard,
+              ] as any}
+            >
+              <View style={styles.setHeader}>
+                <Text style={[styles.setNumber, { color: colors.text }]}>Set {index + 1}</Text>
+                {set.completed && (
+                  <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+                )}
+              </View>
+              
+              <View style={styles.setDetails}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setEditingSet(set);
+                    setTempWeight(set.weight.toString());
+                    setTempReps(set.reps.toString());
+                  }}
+                  style={styles.setInfo}
+                >
+                  <Text style={[styles.setInfoText, { color: colors.text }]}>
+                    {set.weight} kg × {set.reps} reps
+                  </Text>
+                  <Ionicons name="pencil" size={16} color={colors.text + '60'} />
+                </TouchableOpacity>
+                
+                {!set.completed && (
+                  <LiquidButton
+                    label="Complete"
+                    onPress={() => completeSet(set.id)}
+                    style={styles.completeButton}
+                  />
+                )}
+              </View>
+            </LiquidCard>
+          ))}
+        </View>
+
+        {/* Exercise Instructions */}
+        {currentExercise.instructions && (
+          <LiquidCard style={styles.instructionsCard}>
+            <Text style={[styles.instructionsTitle, { color: colors.text }]}>Instructions</Text>
+            {currentExercise.instructions.map((instruction, index) => (
+              <Text key={index} style={[styles.instructionText, { color: colors.text + '80' }]}>
+                {index + 1}. {instruction}
+              </Text>
+            ))}
+          </LiquidCard>
         )}
       </ScrollView>
 
-      {/* Bottom Controls */}
-      <BlurView intensity={80} tint="dark" style={styles.bottomControls}>
-        <TouchableOpacity 
-          style={styles.controlButton}
-          onPress={() => setVolumeEnabled(!volumeEnabled)}
-        >
-          <Icon 
-            name={volumeEnabled ? "volume-high" : "volume-mute"} 
-            size={28} 
-            color={volumeEnabled ? "white" : "rgba(255,255,255,0.5)"} 
-          />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.controlButton}
-          onPress={() => setMusicEnabled(!musicEnabled)}
-        >
-          <Icon 
-            name={musicEnabled ? "musical-notes" : "musical-notes-outline"} 
-            size={28} 
-            color={musicEnabled ? "white" : "rgba(255,255,255,0.5)"} 
-          />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.pauseButton}
-          onPress={() => {
-            setIsPaused(!isPaused);
-            console.log('Workout', isPaused ? 'Resumed' : 'Paused');
-          }}
-        >
-          <Icon name={isPaused ? "play" : "pause"} size={32} color="white" />
-        </TouchableOpacity>
-      </BlurView>
-    </LinearGradient>
+      {/* Edit Set Modal */}
+      <Modal
+        visible={editingSet !== null}
+        transparent
+        animationType="slide"
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setEditingSet(null)}>
+          <LiquidCard style={styles.modalContent}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Set</Text>
+            
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Weight (kg)</Text>
+              <LiquidGlassView intensity={70} style={styles.inputContainer}>
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  value={tempWeight}
+                  onChangeText={setTempWeight}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor={colors.text + '40'}
+                />
+              </LiquidGlassView>
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Reps</Text>
+              <LiquidGlassView intensity={70} style={styles.inputContainer}>
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  value={tempReps}
+                  onChangeText={setTempReps}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor={colors.text + '40'}
+                />
+              </LiquidGlassView>
+            </View>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setEditingSet(null)}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.text + '60' }]}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <LiquidButton
+                label="Save"
+                onPress={() => {
+                  if (editingSet) {
+                    setSets(prev => prev.map(s => 
+                      s.id === editingSet.id
+                        ? { ...s, weight: parseFloat(tempWeight) || 0, reps: parseInt(tempReps) || 0 }
+                        : s
+                    ));
+                  }
+                  setEditingSet(null);
+                }}
+                style={styles.saveButton}
+              />
+            </View>
+          </LiquidCard>
+        </Pressable>
+      </Modal>
+    </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
-  workoutName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
-    flex: 1,
-    textAlign: 'center',
+  backButton: {
+    padding: 8,
   },
-  timer: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
   },
   progressContainer: {
-    paddingHorizontal: 20,
+    marginHorizontal: 20,
     marginBottom: 20,
+    padding: 16,
+    borderRadius: 16,
   },
   progressBar: {
     height: 8,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 4,
+    marginBottom: 8,
     overflow: 'hidden',
   },
   progressFill: {
@@ -326,169 +456,170 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   progressText: {
-    color: 'rgba(255,255,255,0.8)',
     fontSize: 14,
-    marginTop: 8,
     textAlign: 'center',
+    opacity: 0.7,
   },
   content: {
     flex: 1,
     paddingHorizontal: 20,
   },
   exerciseCard: {
-    padding: 24,
-    borderRadius: 20,
-    alignItems: 'center',
+    padding: 20,
     marginBottom: 20,
-    overflow: 'hidden',
   },
-  exerciseNumber: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 16,
+  exerciseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 8,
   },
   exerciseName: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  exerciseDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  detailItem: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  detailLabel: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  detailValue: {
-    color: 'white',
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    flex: 1,
+    marginRight: 12,
   },
-  detailDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  animationContainer: {
-    height: 200,
+  equipmentBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    overflow: 'hidden',
   },
-  animationText: {
-    color: 'rgba(255,255,255,0.8)',
+  equipmentText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  muscleText: {
     fontSize: 16,
-    marginTop: 16,
+    marginBottom: 16,
   },
-  actionButtons: {
-    gap: 12,
+  setsInfo: {
+    marginTop: 8,
   },
-  completeButton: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 16,
-    padding: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  completeButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  helpButton: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16,
-    padding: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  helpButtonText: {
-    color: 'white',
+  setsText: {
     fontSize: 16,
+    fontWeight: '500',
   },
   restCard: {
-    flex: 1,
-    justifyContent: 'center',
+    padding: 24,
+    marginBottom: 20,
     alignItems: 'center',
-    padding: 40,
-    borderRadius: 20,
-    overflow: 'hidden',
+  },
+  restContent: {
+    alignItems: 'center',
   },
   restTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  restTimer: {
-    fontSize: 72,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 40,
-  },
-  nextExerciseLabel: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: '600',
     marginBottom: 8,
   },
-  nextExerciseName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
+  restTimer: {
+    fontSize: 48,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  skipText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  setsContainer: {
+    marginBottom: 20,
+  },
+  setCard: {
+    padding: 16,
+    marginBottom: 12,
+  },
+  completedSetCard: {
+    opacity: 0.7,
+  },
+  setHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  setNumber: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  setDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  setInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  setInfoText: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  completeButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  instructionsCard: {
+    padding: 20,
     marginBottom: 40,
   },
-  skipButton: {
-    paddingHorizontal: 40,
-    paddingVertical: 12,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)',
+  instructionsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
   },
-  skipButtonText: {
-    color: 'white',
+  instructionText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    margin: 20,
+    padding: 24,
+    borderRadius: 24,
+    marginBottom: 40,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  inputContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  input: {
+    padding: 16,
     fontSize: 16,
   },
-  bottomControls: {
+  modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 20,
-    paddingBottom: 40,
-    gap: 20,
+    justifyContent: 'space-between',
+    marginTop: 24,
   },
-  controlButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  modalButton: {
+    padding: 16,
   },
-  pauseButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  saveButton: {
+    paddingHorizontal: 32,
   },
 });
-
-export default ActiveWorkoutScreen;

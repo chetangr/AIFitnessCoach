@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,14 @@ import {
   Dimensions,
   FlatList,
   Modal,
+  Animated,
+  Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
+import Svg, { Circle } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '../store/themeStore';
+import { LiquidGlassView, LiquidButton, LiquidCard, LiquidInput } from '../components/glass';
 
 const { width } = Dimensions.get('window');
 
@@ -36,7 +38,7 @@ interface DailyNutrition {
   protein: number;
   carbs: number;
   fat: number;
-  water: number; // in ml
+  water: number;
   foods: FoodItem[];
 }
 
@@ -48,8 +50,8 @@ interface NutritionGoals {
   water: number;
 }
 
-const DietScreen = ({ navigation }: any) => {
-  const { theme, isDarkMode } = useThemeStore();
+const LiquidDietScreen = ({ navigation }: any) => {
+  const { theme } = useThemeStore();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [dailyNutrition, setDailyNutrition] = useState<DailyNutrition>({
     date: new Date().toISOString().split('T')[0],
@@ -73,6 +75,11 @@ const DietScreen = ({ navigation }: any) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMeal, setSelectedMeal] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('breakfast');
 
+  // Animation values
+  const scrollAnimation = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const waterAnimation = useRef(new Animated.Value(0)).current;
+
   const mealTypes = [
     { id: 'breakfast', name: 'Breakfast', icon: 'sunny', color: '#FFB74D' },
     { id: 'lunch', name: 'Lunch', icon: 'restaurant', color: '#4FC3F7' },
@@ -94,7 +101,23 @@ const DietScreen = ({ navigation }: any) => {
   useEffect(() => {
     loadDailyNutrition();
     loadNutritionGoals();
+    
+    // Entrance animation
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
   }, [selectedDate]);
+
+  useEffect(() => {
+    // Animate water progress
+    Animated.timing(waterAnimation, {
+      toValue: getProgress(dailyNutrition.water, nutritionGoals.water),
+      duration: 500,
+      useNativeDriver: false,
+    }).start();
+  }, [dailyNutrition.water]);
 
   const loadDailyNutrition = async () => {
     try {
@@ -173,26 +196,84 @@ const DietScreen = ({ navigation }: any) => {
     return Math.min((current / goal) * 100, 100);
   };
 
-  const gradientColors = isDarkMode 
-    ? [theme.colors.background, theme.colors.surface, '#24243e'] as const
-    : [theme.colors.primary, theme.colors.secondary] as const;
+  const renderProgressRing = (current: number, goal: number, color: string, size: number = 60) => {
+    const strokeWidth = 4;
+    const radius = (size - strokeWidth) / 2;
+    const circumference = radius * 2 * Math.PI;
+    const progress = getProgress(current, goal);
+    const strokeDashoffset = circumference - (progress / 100) * circumference;
+
+    return (
+      <Svg width={size} height={size}>
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="rgba(255,255,255,0.1)"
+          strokeWidth={strokeWidth}
+          fill="transparent"
+        />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={color}
+          strokeWidth={strokeWidth}
+          fill="transparent"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+    );
+  };
 
   return (
-    <LinearGradient colors={gradientColors} style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Nutrition</Text>
-          <Text style={[styles.headerDate, { color: theme.colors.textSecondary }]}>
+    <View style={styles.container}>
+      {/* Animated Header */}
+      <Animated.View
+        style={[
+          styles.header,
+          {
+            transform: [{
+              translateY: scrollAnimation.interpolate({
+                inputRange: [0, 100],
+                outputRange: [0, -20],
+                extrapolate: 'clamp',
+              })
+            }],
+            opacity: scrollAnimation.interpolate({
+              inputRange: [0, 100],
+              outputRange: [1, 0.9],
+              extrapolate: 'clamp',
+            })
+          }
+        ]}
+      >
+        <LiquidGlassView intensity={90} style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Nutrition</Text>
+          <Text style={styles.headerDate}>
             {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </Text>
-        </View>
+        </LiquidGlassView>
+      </Animated.View>
 
+      <Animated.ScrollView 
+        showsVerticalScrollIndicator={false}
+        style={{ opacity: fadeAnim }}
+        contentContainerStyle={styles.scrollContent}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollAnimation } } }],
+          { useNativeDriver: true }
+        )}
+        scrollEventThrottle={16}
+      >
         {/* Daily Summary */}
         <View style={styles.summaryContainer}>
-          <BlurView intensity={25} tint={isDarkMode ? "dark" : "light"} style={styles.summaryCard}>
+          <LiquidCard style={styles.summaryCard}>
             <View style={styles.summaryHeader}>
-              <Text style={[styles.summaryTitle, { color: theme.colors.text }]}>Daily Summary</Text>
+              <Text style={styles.summaryTitle}>Daily Summary</Text>
               <TouchableOpacity onPress={() => Alert.alert('Edit Goals', 'Goal editing coming soon!')}>
                 <Icon name="settings-outline" size={20} color={theme.colors.textSecondary} />
               </TouchableOpacity>
@@ -201,18 +282,18 @@ const DietScreen = ({ navigation }: any) => {
             {/* Calories Progress */}
             <View style={styles.macroItem}>
               <View style={styles.macroHeader}>
-                <Text style={[styles.macroLabel, { color: theme.colors.text }]}>Calories</Text>
-                <Text style={[styles.macroValue, { color: theme.colors.text }]}>
+                <Text style={styles.macroLabel}>Calories</Text>
+                <Text style={styles.macroValue}>
                   {dailyNutrition.calories} / {nutritionGoals.calories}
                 </Text>
               </View>
               <View style={styles.progressBar}>
-                <View 
+                <Animated.View 
                   style={[
                     styles.progressFill, 
                     { 
                       width: `${getProgress(dailyNutrition.calories, nutritionGoals.calories)}%`,
-                      backgroundColor: '#FF6B6B' 
+                      backgroundColor: theme.colors.error 
                     }
                   ]} 
                 />
@@ -223,103 +304,76 @@ const DietScreen = ({ navigation }: any) => {
             <View style={styles.macrosGrid}>
               {/* Protein */}
               <View style={styles.macroBox}>
-                <Icon name="fitness" size={20} color="#4ECDC4" />
-                <Text style={[styles.macroBoxLabel, { color: theme.colors.textSecondary }]}>Protein</Text>
-                <Text style={[styles.macroBoxValue, { color: theme.colors.text }]}>
-                  {dailyNutrition.protein}g
-                </Text>
-                <View style={styles.miniProgressBar}>
-                  <View 
-                    style={[
-                      styles.miniProgressFill, 
-                      { 
-                        width: `${getProgress(dailyNutrition.protein, nutritionGoals.protein)}%`,
-                        backgroundColor: '#4ECDC4' 
-                      }
-                    ]} 
-                  />
+                <View style={styles.macroRingContainer}>
+                  {renderProgressRing(dailyNutrition.protein, nutritionGoals.protein, '#4ECDC4')}
+                  <Icon name="fitness" size={20} color="#4ECDC4" style={styles.macroIcon} />
                 </View>
+                <Text style={styles.macroBoxLabel}>Protein</Text>
+                <Text style={styles.macroBoxValue}>{dailyNutrition.protein}g</Text>
               </View>
 
               {/* Carbs */}
               <View style={styles.macroBox}>
-                <Icon name="pizza" size={20} color="#FFB74D" />
-                <Text style={[styles.macroBoxLabel, { color: theme.colors.textSecondary }]}>Carbs</Text>
-                <Text style={[styles.macroBoxValue, { color: theme.colors.text }]}>
-                  {dailyNutrition.carbs}g
-                </Text>
-                <View style={styles.miniProgressBar}>
-                  <View 
-                    style={[
-                      styles.miniProgressFill, 
-                      { 
-                        width: `${getProgress(dailyNutrition.carbs, nutritionGoals.carbs)}%`,
-                        backgroundColor: '#FFB74D' 
-                      }
-                    ]} 
-                  />
+                <View style={styles.macroRingContainer}>
+                  {renderProgressRing(dailyNutrition.carbs, nutritionGoals.carbs, '#FFB74D')}
+                  <Icon name="pizza" size={20} color="#FFB74D" style={styles.macroIcon} />
                 </View>
+                <Text style={styles.macroBoxLabel}>Carbs</Text>
+                <Text style={styles.macroBoxValue}>{dailyNutrition.carbs}g</Text>
               </View>
 
               {/* Fat */}
               <View style={styles.macroBox}>
-                <Icon name="water" size={20} color="#7E57C2" />
-                <Text style={[styles.macroBoxLabel, { color: theme.colors.textSecondary }]}>Fat</Text>
-                <Text style={[styles.macroBoxValue, { color: theme.colors.text }]}>
-                  {dailyNutrition.fat}g
-                </Text>
-                <View style={styles.miniProgressBar}>
-                  <View 
-                    style={[
-                      styles.miniProgressFill, 
-                      { 
-                        width: `${getProgress(dailyNutrition.fat, nutritionGoals.fat)}%`,
-                        backgroundColor: '#7E57C2' 
-                      }
-                    ]} 
-                  />
+                <View style={styles.macroRingContainer}>
+                  {renderProgressRing(dailyNutrition.fat, nutritionGoals.fat, '#7E57C2')}
+                  <Icon name="water" size={20} color="#7E57C2" style={styles.macroIcon} />
                 </View>
+                <Text style={styles.macroBoxLabel}>Fat</Text>
+                <Text style={styles.macroBoxValue}>{dailyNutrition.fat}g</Text>
               </View>
             </View>
-          </BlurView>
+          </LiquidCard>
         </View>
 
         {/* Water Tracking */}
         <View style={styles.waterContainer}>
-          <BlurView intensity={25} tint={isDarkMode ? "dark" : "light"} style={styles.waterCard}>
+          <LiquidCard style={styles.waterCard}>
             <View style={styles.waterHeader}>
               <Icon name="water-outline" size={24} color="#4FC3F7" />
-              <Text style={[styles.waterTitle, { color: theme.colors.text }]}>Water Intake</Text>
+              <Text style={styles.waterTitle}>Water Intake</Text>
             </View>
-            <Text style={[styles.waterValue, { color: theme.colors.text }]}>
+            <Text style={styles.waterValue}>
               {(dailyNutrition.water / 1000).toFixed(1)}L / {(nutritionGoals.water / 1000).toFixed(1)}L
             </Text>
             <View style={styles.waterButtons}>
-              <TouchableOpacity 
-                style={styles.waterButton}
+              <LiquidButton
+                label="+250ml"
+                size="small"
+                variant="secondary"
                 onPress={() => addWater(250)}
-              >
-                <Text style={styles.waterButtonText}>+250ml</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
                 style={styles.waterButton}
+              />
+              <LiquidButton
+                label="+500ml"
+                size="small"
+                variant="secondary"
                 onPress={() => addWater(500)}
-              >
-                <Text style={styles.waterButtonText}>+500ml</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
                 style={styles.waterButton}
+              />
+              <LiquidButton
+                label="+1L"
+                size="small"
+                variant="secondary"
                 onPress={() => addWater(1000)}
-              >
-                <Text style={styles.waterButtonText}>+1L</Text>
-              </TouchableOpacity>
+                style={styles.waterButton}
+              />
             </View>
-          </BlurView>
+          </LiquidCard>
         </View>
 
         {/* Meals */}
         <View style={styles.mealsContainer}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Today's Meals</Text>
+          <Text style={styles.sectionTitle}>Today's Meals</Text>
           
           {mealTypes.map((meal) => {
             const mealFoods = dailyNutrition.foods.filter(f => f.meal === meal.id);
@@ -334,17 +388,17 @@ const DietScreen = ({ navigation }: any) => {
                   setShowAddFood(true);
                 }}
               >
-                <BlurView intensity={25} tint={isDarkMode ? "dark" : "light"} style={styles.mealContent}>
+                <LiquidCard style={styles.mealContent}>
                   <View style={styles.mealHeader}>
                     <View style={styles.mealLeft}>
                       <View style={[styles.mealIcon, { backgroundColor: meal.color + '20' }]}>
                         <Icon name={meal.icon} size={20} color={meal.color} />
                       </View>
-                      <Text style={[styles.mealName, { color: theme.colors.text }]}>{meal.name}</Text>
+                      <Text style={styles.mealName}>{meal.name}</Text>
                     </View>
                     <View style={styles.mealRight}>
-                      <Text style={[styles.mealCalories, { color: theme.colors.text }]}>{mealCalories} cal</Text>
-                      <Icon name="add-circle" size={24} color={theme.colors.primary} />
+                      <Text style={styles.mealCalories}>{mealCalories} cal</Text>
+                      <Icon name="add-circle" size={24} color={theme.colors.primary.main} />
                     </View>
                   </View>
                   
@@ -352,13 +406,13 @@ const DietScreen = ({ navigation }: any) => {
                     <View style={styles.mealFoods}>
                       {mealFoods.map((food) => (
                         <View key={food.id} style={styles.foodItem}>
-                          <Text style={[styles.foodName, { color: theme.colors.textSecondary }]}>{food.name}</Text>
-                          <Text style={[styles.foodCalories, { color: theme.colors.textSecondary }]}>{food.calories} cal</Text>
+                          <Text style={styles.foodName}>{food.name}</Text>
+                          <Text style={styles.foodCalories}>{food.calories} cal</Text>
                         </View>
                       ))}
                     </View>
                   )}
-                </BlurView>
+                </LiquidCard>
               </TouchableOpacity>
             );
           })}
@@ -366,7 +420,7 @@ const DietScreen = ({ navigation }: any) => {
 
         {/* Quick Add Section */}
         <View style={styles.quickAddContainer}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Quick Add</Text>
+          <Text style={styles.sectionTitle}>Quick Add</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {quickAddFoods.map((food, index) => (
               <TouchableOpacity
@@ -380,26 +434,28 @@ const DietScreen = ({ navigation }: any) => {
                       { text: 'Cancel', style: 'cancel' },
                       { 
                         text: 'Add', 
-                        onPress: () => addFood(food)
+                        onPress: () => addFood({ ...food, meal: selectedMeal })
                       },
                     ]
                   );
                 }}
               >
-                <BlurView intensity={20} tint={isDarkMode ? "dark" : "light"} style={styles.quickAddContent}>
-                  <Text style={[styles.quickAddName, { color: theme.colors.text }]}>{food.name}</Text>
-                  <Text style={[styles.quickAddCalories, { color: theme.colors.textSecondary }]}>{food.calories} cal</Text>
+                <LiquidCard style={styles.quickAddContent}>
+                  <Text style={styles.quickAddName}>{food.name}</Text>
+                  <Text style={styles.quickAddCalories}>{food.calories} cal</Text>
                   <View style={styles.quickAddMacros}>
                     <Text style={[styles.quickAddMacro, { color: '#4ECDC4' }]}>P: {food.protein}g</Text>
                     <Text style={[styles.quickAddMacro, { color: '#FFB74D' }]}>C: {food.carbs}g</Text>
                     <Text style={[styles.quickAddMacro, { color: '#7E57C2' }]}>F: {food.fat}g</Text>
                   </View>
-                </BlurView>
+                </LiquidCard>
               </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
-      </ScrollView>
+
+        <View style={{ height: Platform.OS === 'ios' ? 120 : 100 }} />
+      </Animated.ScrollView>
 
       {/* Add Food Modal */}
       <Modal
@@ -409,34 +465,35 @@ const DietScreen = ({ navigation }: any) => {
         onRequestClose={() => setShowAddFood(false)}
       >
         <View style={styles.modalOverlay}>
-          <BlurView intensity={80} tint={isDarkMode ? "dark" : "light"} style={styles.modalContainer}>
+          <LiquidCard style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Add Food</Text>
+              <Text style={styles.modalTitle}>Add Food to {selectedMeal}</Text>
               <TouchableOpacity onPress={() => setShowAddFood(false)}>
                 <Icon name="close" size={24} color={theme.colors.text} />
               </TouchableOpacity>
             </View>
             
-            <TextInput
-              style={[styles.searchInput, { color: theme.colors.text, backgroundColor: theme.colors.surface }]}
-              placeholder="Search food..."
-              placeholderTextColor={theme.colors.textSecondary}
+            <LiquidInput
               value={searchQuery}
               onChangeText={setSearchQuery}
+              placeholder="Search food..."
+              style={styles.searchInput}
             />
             
             <FlatList
-              data={quickAddFoods}
+              data={quickAddFoods.filter(food => 
+                food.name.toLowerCase().includes(searchQuery.toLowerCase())
+              )}
               keyExtractor={(item, index) => index.toString()}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={[styles.foodSearchItem, { borderBottomColor: theme.colors.border }]}
-                  onPress={() => addFood(item)}
+                  style={styles.foodSearchItem}
+                  onPress={() => addFood({ ...item, meal: selectedMeal })}
                 >
                   <View>
-                    <Text style={[styles.foodSearchName, { color: theme.colors.text }]}>{item.name}</Text>
+                    <Text style={styles.foodSearchName}>{item.name}</Text>
                     <View style={styles.foodSearchMacros}>
-                      <Text style={[styles.foodSearchMacro, { color: theme.colors.textSecondary }]}>
+                      <Text style={styles.foodSearchMacro}>
                         {item.calories} cal
                       </Text>
                       <Text style={[styles.foodSearchMacro, { color: '#4ECDC4' }]}>
@@ -450,42 +507,54 @@ const DietScreen = ({ navigation }: any) => {
                       </Text>
                     </View>
                   </View>
-                  <Icon name="add-circle" size={24} color={theme.colors.primary} />
+                  <Icon name="add-circle" size={24} color={theme.colors.primary.main} />
                 </TouchableOpacity>
               )}
             />
-          </BlurView>
+          </LiquidCard>
         </View>
       </Modal>
-    </LinearGradient>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0a0a0f',
   },
   header: {
-    paddingTop: 60,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+  },
+  headerContent: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingVertical: 20,
   },
   headerTitle: {
     fontSize: 32,
     fontWeight: 'bold',
+    color: 'white',
   },
   headerDate: {
     fontSize: 16,
     marginTop: 4,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  scrollContent: {
+    paddingTop: Platform.OS === 'ios' ? 140 : 120,
+    paddingBottom: 20,
   },
   summaryContainer: {
     paddingHorizontal: 20,
     marginBottom: 20,
   },
   summaryCard: {
-    borderRadius: 20,
     padding: 20,
-    overflow: 'hidden',
   },
   summaryHeader: {
     flexDirection: 'row',
@@ -496,6 +565,7 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: 18,
     fontWeight: '600',
+    color: 'white',
   },
   macroItem: {
     marginBottom: 20,
@@ -508,10 +578,12 @@ const styles = StyleSheet.create({
   macroLabel: {
     fontSize: 16,
     fontWeight: '500',
+    color: 'white',
   },
   macroValue: {
     fontSize: 16,
     fontWeight: '600',
+    color: 'white',
   },
   progressBar: {
     height: 8,
@@ -532,34 +604,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 5,
   },
+  macroRingContainer: {
+    position: 'relative',
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  macroIcon: {
+    position: 'absolute',
+  },
   macroBoxLabel: {
     fontSize: 12,
-    marginTop: 4,
+    marginTop: 8,
+    color: 'rgba(255,255,255,0.7)',
   },
   macroBoxValue: {
     fontSize: 16,
     fontWeight: '600',
-    marginVertical: 4,
-  },
-  miniProgressBar: {
-    width: '100%',
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  miniProgressFill: {
-    height: '100%',
-    borderRadius: 2,
+    marginTop: 4,
+    color: 'white',
   },
   waterContainer: {
     paddingHorizontal: 20,
     marginBottom: 20,
   },
   waterCard: {
-    borderRadius: 16,
     padding: 16,
-    overflow: 'hidden',
   },
   waterHeader: {
     flexDirection: 'row',
@@ -570,11 +641,13 @@ const styles = StyleSheet.create({
   waterTitle: {
     fontSize: 16,
     fontWeight: '600',
+    color: 'white',
   },
   waterValue: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 12,
+    color: 'white',
   },
   waterButtons: {
     flexDirection: 'row',
@@ -582,14 +655,6 @@ const styles = StyleSheet.create({
   },
   waterButton: {
     flex: 1,
-    backgroundColor: 'rgba(79, 195, 247, 0.2)',
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  waterButtonText: {
-    color: '#4FC3F7',
-    fontWeight: '600',
   },
   mealsContainer: {
     paddingHorizontal: 20,
@@ -599,14 +664,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 16,
+    color: 'white',
   },
   mealCard: {
     marginBottom: 12,
   },
   mealContent: {
-    borderRadius: 16,
     padding: 16,
-    overflow: 'hidden',
   },
   mealHeader: {
     flexDirection: 'row',
@@ -628,6 +692,7 @@ const styles = StyleSheet.create({
   mealName: {
     fontSize: 16,
     fontWeight: '600',
+    color: 'white',
   },
   mealRight: {
     flexDirection: 'row',
@@ -637,6 +702,7 @@ const styles = StyleSheet.create({
   mealCalories: {
     fontSize: 16,
     fontWeight: '500',
+    color: 'white',
   },
   mealFoods: {
     marginTop: 12,
@@ -649,31 +715,32 @@ const styles = StyleSheet.create({
   },
   foodName: {
     fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
   },
   foodCalories: {
     fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
   },
   quickAddContainer: {
     paddingLeft: 20,
-    paddingBottom: 100,
   },
   quickAddCard: {
     marginRight: 12,
     width: 120,
   },
   quickAddContent: {
-    borderRadius: 12,
     padding: 12,
-    overflow: 'hidden',
   },
   quickAddName: {
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 4,
+    color: 'white',
   },
   quickAddCalories: {
     fontSize: 12,
     marginBottom: 8,
+    color: 'rgba(255,255,255,0.7)',
   },
   quickAddMacros: {
     gap: 2,
@@ -684,7 +751,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'flex-end',
   },
   modalContainer: {
@@ -693,7 +760,6 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
     maxHeight: '80%',
-    overflow: 'hidden',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -704,12 +770,9 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+    color: 'white',
   },
   searchInput: {
-    fontSize: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
     marginBottom: 16,
   },
   foodSearchItem: {
@@ -718,11 +781,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   foodSearchName: {
     fontSize: 16,
     fontWeight: '500',
     marginBottom: 4,
+    color: 'white',
   },
   foodSearchMacros: {
     flexDirection: 'row',
@@ -730,7 +795,8 @@ const styles = StyleSheet.create({
   },
   foodSearchMacro: {
     fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
   },
 });
 
-export default DietScreen;
+export default LiquidDietScreen;

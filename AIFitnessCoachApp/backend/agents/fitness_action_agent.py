@@ -10,6 +10,7 @@ from enum import Enum
 from agents.base_agent import BaseFitnessAgent
 from services.workout_service import WorkoutService
 from services.exercise_service import ExerciseService
+from services.workout_suggestion_service import workout_suggestion_service
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -324,6 +325,81 @@ class FitnessActionAgent(BaseFitnessAgent):
                         "required": ["exercise_name"]
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_workout_suggestions",
+                    "description": "Get AI-powered workout suggestions based on user stats and history",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "days_ahead": {
+                                "type": "integer",
+                                "description": "Number of days to look ahead",
+                                "default": 7
+                            },
+                            "focus_muscle": {
+                                "type": "string",
+                                "description": "Specific muscle group to focus on",
+                                "enum": ["chest", "back", "shoulders", "arms", "legs", "core", "cardio"]
+                            },
+                            "include_rationale": {
+                                "type": "boolean",
+                                "description": "Include explanation for suggestions",
+                                "default": True
+                            }
+                        },
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "apply_workout_suggestion",
+                    "description": "Apply a suggested workout to the schedule",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "suggestion_id": {
+                                "type": "string",
+                                "description": "ID of the workout suggestion to apply"
+                            },
+                            "date": {
+                                "type": "string",
+                                "description": "Date to schedule the workout (YYYY-MM-DD)"
+                            },
+                            "replace_existing": {
+                                "type": "boolean",
+                                "description": "Replace existing workout on that date",
+                                "default": False
+                            }
+                        },
+                        "required": ["suggestion_id", "date"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "swap_workout_suggestion",
+                    "description": "Swap current workout with a suggested alternative",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "current_date": {
+                                "type": "string",
+                                "description": "Date of current workout to swap (YYYY-MM-DD)"
+                            },
+                            "suggestion_id": {
+                                "type": "string",
+                                "description": "ID of the suggested workout to use"
+                            }
+                        },
+                        "required": ["current_date", "suggestion_id"]
+                    }
+                }
             }
         ]
     
@@ -342,7 +418,10 @@ class FitnessActionAgent(BaseFitnessAgent):
             "adjust_workout_intensity": self._adjust_workout_intensity,
             "create_custom_workout": self._create_custom_workout,
             "confirm_action": self._confirm_action,
-            "add_exercise_to_today": self._add_exercise_to_today
+            "add_exercise_to_today": self._add_exercise_to_today,
+            "get_workout_suggestions": self._get_workout_suggestions,
+            "apply_workout_suggestion": self._apply_workout_suggestion,
+            "swap_workout_suggestion": self._swap_workout_suggestion
         }
         
         handler = tool_handlers.get(function_name)
@@ -765,6 +844,10 @@ class FitnessActionAgent(BaseFitnessAgent):
             result = await self._execute_intensity_adjustment(action)
         elif action["action_type"] == ActionType.CREATE_WORKOUT:
             result = await self._execute_create_workout(action)
+        elif action["action_type"] == "APPLY_SUGGESTION":
+            result = await self._execute_apply_suggestion(action)
+        elif action["action_type"] == "SWAP_SUGGESTION":
+            result = await self._execute_swap_suggestion(action)
         
         # Clean up pending action
         del self.pending_actions[action_id]
@@ -1064,4 +1147,305 @@ class FitnessActionAgent(BaseFitnessAgent):
                 "total_exercises": len(workout.get("exercises", [])) + 1
             },
             "action_completed": True
+        }
+    
+    async def _get_workout_suggestions(
+        self,
+        days_ahead: int = 7,
+        focus_muscle: Optional[str] = None,
+        include_rationale: bool = True
+    ) -> Dict[str, Any]:
+        """Get intelligent workout suggestions based on user stats"""
+        try:
+            # Get suggestions from the service
+            suggestions_data = workout_suggestion_service.get_suggestions_for_user(
+                self.user_id,
+                days_ahead,
+                include_rationale
+            )
+            
+            # Store suggestions for later application
+            self._cached_suggestions = {
+                s.id: s for s in suggestions_data.get("suggestions", [])
+            }
+            
+            # Format response
+            formatted_suggestions = []
+            for suggestion in suggestions_data.get("suggestions", []):
+                formatted = {
+                    "id": suggestion.id,
+                    "title": suggestion.title,
+                    "description": suggestion.description,
+                    "duration": f"{suggestion.duration_minutes} minutes",
+                    "difficulty": suggestion.difficulty,
+                    "muscle_groups": suggestion.muscle_groups,
+                    "rationale": suggestion.rationale,
+                    "priority": suggestion.priority,
+                    "suggested_date": suggestion.suggested_date.isoformat() if suggestion.suggested_date else None,
+                    "can_replace": suggestion.can_replace_date.isoformat() if suggestion.can_replace_date else None,
+                    "preview_exercises": suggestion.exercises[:3]  # Show first 3 exercises
+                }
+                
+                # Filter by focus muscle if specified
+                if not focus_muscle or focus_muscle in suggestion.muscle_groups:
+                    formatted_suggestions.append(formatted)
+            
+            # Add analysis summary
+            analysis = suggestions_data.get("analysis", {})
+            summary = f"Based on your training history: averaging {analysis.get('avg_workouts_per_week', 0)} workouts/week"
+            
+            if analysis.get("needs_rest"):
+                summary += " ⚠️ You may need a rest day soon."
+            
+            if analysis.get("undertrained_muscles"):
+                summary += f" 💪 Focus areas: {', '.join(analysis['undertrained_muscles'][:2])}"
+            
+            return {
+                "status": "success",
+                "summary": summary,
+                "suggestions": formatted_suggestions[:5],  # Top 5 suggestions
+                "analysis": {
+                    "current_week_load": analysis.get("current_week_load", "moderate"),
+                    "training_phase": analysis.get("training_phase", "maintenance"),
+                    "consecutive_days": analysis.get("consecutive_workout_days", 0)
+                },
+                "message": f"Generated {len(formatted_suggestions)} personalized workout suggestions"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting workout suggestions: {e}")
+            return {
+                "status": "error",
+                "message": "Unable to generate workout suggestions",
+                "error": str(e)
+            }
+    
+    async def _apply_workout_suggestion(
+        self,
+        suggestion_id: str,
+        date: str,
+        replace_existing: bool = False
+    ) -> Dict[str, Any]:
+        """Apply a workout suggestion to the schedule"""
+        try:
+            # Get cached suggestion
+            if not hasattr(self, '_cached_suggestions') or suggestion_id not in self._cached_suggestions:
+                return {
+                    "status": "error",
+                    "message": "Suggestion not found. Please get suggestions first."
+                }
+            
+            suggestion = self._cached_suggestions[suggestion_id]
+            target_date = datetime.strptime(date, "%Y-%m-%d").date()
+            
+            # Check if date has existing workout
+            existing = await self.workout_service.get_workout_for_date(self.user_id, target_date)
+            
+            if existing and not replace_existing:
+                # Create pending action for confirmation
+                action_id = f"apply_suggestion_{suggestion_id}_{datetime.now().timestamp()}"
+                
+                self.pending_actions[action_id] = {
+                    "action_type": "APPLY_SUGGESTION",
+                    "suggestion": suggestion,
+                    "target_date": target_date,
+                    "existing_workout": existing,
+                    "replace": True
+                }
+                
+                return {
+                    "status": "confirmation_required",
+                    "action_id": action_id,
+                    "message": f"Replace {existing.get('title', 'existing workout')} with {suggestion.title}?",
+                    "details": {
+                        "current": existing.get('title'),
+                        "new": suggestion.title,
+                        "date": target_date.strftime('%A, %B %d'),
+                        "duration_change": f"{existing.get('duration', 60)}min → {suggestion.duration_minutes}min"
+                    }
+                }
+            
+            # Apply the suggestion
+            workout_data = {
+                "title": suggestion.title,
+                "type": suggestion.workout_type,
+                "duration": suggestion.duration_minutes,
+                "difficulty": suggestion.difficulty,
+                "exercises": suggestion.exercises,
+                "muscle_groups": suggestion.muscle_groups,
+                "source": "ai_suggestion"
+            }
+            
+            success = await self.workout_service.add_workout(
+                self.user_id,
+                target_date,
+                workout_data,
+                replace_existing=replace_existing
+            )
+            
+            if success:
+                return {
+                    "status": "success",
+                    "message": f"✅ Added {suggestion.title} to {target_date.strftime('%A, %B %d')}",
+                    "workout_details": {
+                        "title": suggestion.title,
+                        "date": target_date.isoformat(),
+                        "exercises": len(suggestion.exercises),
+                        "duration": suggestion.duration_minutes
+                    }
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": "Failed to add workout to schedule"
+                }
+                
+        except Exception as e:
+            logger.error(f"Error applying workout suggestion: {e}")
+            return {
+                "status": "error",
+                "message": f"Error: {str(e)}"
+            }
+    
+    async def _swap_workout_suggestion(
+        self,
+        current_date: str,
+        suggestion_id: str
+    ) -> Dict[str, Any]:
+        """Swap current workout with a suggested one"""
+        try:
+            # Get cached suggestion
+            if not hasattr(self, '_cached_suggestions') or suggestion_id not in self._cached_suggestions:
+                return {
+                    "status": "error",
+                    "message": "Suggestion not found. Please get suggestions first."
+                }
+            
+            suggestion = self._cached_suggestions[suggestion_id]
+            swap_date = datetime.strptime(current_date, "%Y-%m-%d").date()
+            
+            # Get current workout
+            current = await self.workout_service.get_workout_for_date(self.user_id, swap_date)
+            
+            if not current:
+                return {
+                    "status": "error",
+                    "message": f"No workout found on {swap_date.strftime('%A, %B %d')}"
+                }
+            
+            # Create pending action
+            action_id = f"swap_suggestion_{suggestion_id}_{datetime.now().timestamp()}"
+            
+            self.pending_actions[action_id] = {
+                "action_type": "SWAP_SUGGESTION",
+                "suggestion": suggestion,
+                "swap_date": swap_date,
+                "current_workout": current
+            }
+            
+            return {
+                "status": "confirmation_required",
+                "action_id": action_id,
+                "message": f"Swap {current.get('title')} with {suggestion.title}?",
+                "comparison": {
+                    "current": {
+                        "title": current.get('title'),
+                        "duration": current.get('duration', 60),
+                        "type": current.get('type'),
+                        "exercises": len(current.get('exercises', []))
+                    },
+                    "suggested": {
+                        "title": suggestion.title,
+                        "duration": suggestion.duration_minutes,
+                        "type": suggestion.workout_type,
+                        "exercises": len(suggestion.exercises),
+                        "rationale": suggestion.rationale
+                    }
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error swapping workout suggestion: {e}")
+            return {
+                "status": "error",
+                "message": f"Error: {str(e)}"
+            }
+    
+    async def _execute_apply_suggestion(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute applying a workout suggestion"""
+        suggestion = action["suggestion"]
+        target_date = action["target_date"]
+        
+        # Apply the suggestion
+        workout_data = {
+            "title": suggestion.title,
+            "type": suggestion.workout_type,
+            "duration": suggestion.duration_minutes,
+            "difficulty": suggestion.difficulty,
+            "exercises": suggestion.exercises,
+            "muscle_groups": suggestion.muscle_groups,
+            "source": "ai_suggestion"
+        }
+        
+        success = await self.workout_service.add_workout(
+            self.user_id,
+            target_date,
+            workout_data,
+            replace_existing=True
+        )
+        
+        if success:
+            return {
+                "status": "success",
+                "message": f"✅ Applied {suggestion.title} to {target_date.strftime('%A, %B %d')}",
+                "changes_made": {
+                    "action": "suggestion_applied",
+                    "date": target_date.isoformat(),
+                    "workout": suggestion.title
+                }
+            }
+        
+        return {
+            "status": "error",
+            "message": "Failed to apply workout suggestion"
+        }
+    
+    async def _execute_swap_suggestion(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute swapping workout with suggestion"""
+        suggestion = action["suggestion"]
+        swap_date = action["swap_date"]
+        
+        # Apply the suggestion (replacing existing)
+        workout_data = {
+            "title": suggestion.title,
+            "type": suggestion.workout_type,
+            "duration": suggestion.duration_minutes,
+            "difficulty": suggestion.difficulty,
+            "exercises": suggestion.exercises,
+            "muscle_groups": suggestion.muscle_groups,
+            "source": "ai_suggestion"
+        }
+        
+        success = await self.workout_service.add_workout(
+            self.user_id,
+            swap_date,
+            workout_data,
+            replace_existing=True
+        )
+        
+        if success:
+            return {
+                "status": "success",
+                "message": f"✅ Swapped workout with {suggestion.title}",
+                "changes_made": {
+                    "action": "workout_swapped",
+                    "date": swap_date.isoformat(),
+                    "old_workout": action["current_workout"].get("title"),
+                    "new_workout": suggestion.title
+                }
+            }
+        
+        return {
+            "status": "error",
+            "message": "Failed to swap workout"
         }

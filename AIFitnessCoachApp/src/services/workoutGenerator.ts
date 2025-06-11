@@ -1,4 +1,21 @@
-import { exerciseDatabase, Exercise } from './exerciseDatabase';
+// import { exerciseDatabase, Exercise } from './exerciseDatabase';
+import { wgerExercises, WgerExercise } from '../data/wgerExerciseDatabase';
+
+interface Exercise {
+  id: string;
+  name: string;
+  sets: number;
+  reps: string;
+  weight: string;
+  muscleGroups: string[];
+  category: string;
+  difficulty: string;
+  equipment: string[];
+  instructions: string[];
+  caloriesPerMinute: number;
+  tags?: string[];
+  duration?: number;
+}
 import { WorkoutEvent } from './workoutScheduleService';
 
 interface WorkoutRequirements {
@@ -408,15 +425,26 @@ class WorkoutGenerator {
     }
     
     // Search for exercises matching template requirements
-    const exercisePool = await exerciseDatabase.searchExercises('', {
-      muscleGroups: template.targetMuscleGroups,
-      equipment: availableEquipment.length > 0 ? availableEquipment : undefined,
-      difficulty: [template.difficulty],
-      excludeInjury: limitations
+    const exercisePool = wgerExercises.filter((ex: WgerExercise) => {
+      // Filter by muscle groups
+      const muscleMatch = !template.targetMuscleGroups || template.targetMuscleGroups.length === 0 ||
+        template.targetMuscleGroups.some(muscle => 
+          ex.primaryMuscles.some(m => m.toLowerCase().includes(muscle.toLowerCase()))
+        );
+      
+      // Filter by equipment
+      const equipmentMatch = availableEquipment.length === 0 ||
+        ex.equipment.some(eq => availableEquipment.includes(eq));
+      
+      // Filter by difficulty
+      const difficultyMatch = !template.difficulty ||
+        ex.difficulty.toLowerCase() === template.difficulty.toLowerCase();
+      
+      return muscleMatch && equipmentMatch && difficultyMatch;
     });
     
     // Filter out excluded exercises
-    const filteredPool = exercisePool.filter(exercise => 
+    const filteredPool = exercisePool.filter((exercise: any) => 
       !excludedExercises?.includes(exercise.id) &&
       !excludedExercises?.some(excluded => exercise.name.toLowerCase().includes(excluded.toLowerCase()))
     );
@@ -433,7 +461,23 @@ class WorkoutGenerator {
       return bPreferred - aPreferred;
     });
     
-    return prioritizedPool;
+    // Convert WgerExercise to Exercise format
+    const exercises: Exercise[] = prioritizedPool.map((wgerEx: WgerExercise) => ({
+      id: wgerEx.id,
+      name: wgerEx.name,
+      sets: 3, // Default sets
+      reps: '10-12', // Default reps
+      weight: 'bodyweight', // Default weight
+      muscleGroups: wgerEx.primaryMuscles,
+      category: wgerEx.category,
+      difficulty: wgerEx.difficulty,
+      equipment: wgerEx.equipment,
+      instructions: [wgerEx.instructions],
+      caloriesPerMinute: 5, // Default calories
+      tags: [],
+    }));
+    
+    return exercises;
   }
 
   // Assemble final workout from template and exercises
@@ -442,6 +486,7 @@ class WorkoutGenerator {
     template: WorkoutTemplate, 
     exercisePool: Exercise[]
   ): GeneratedWorkout {
+    const { limitations } = requirements;
     const selectedExercises: Exercise[] = [];
     const workoutSections: WorkoutSection[] = [];
     
@@ -539,9 +584,9 @@ class WorkoutGenerator {
   // Helper methods for exercise selection
   private selectWarmupExercises(exercisePool: Exercise[], duration: number): Exercise[] {
     const warmupExercises = exercisePool.filter(exercise => 
-      exercise.tags.includes('warm-up') || 
+      exercise.tags?.includes('warm-up') || 
       exercise.category === 'flexibility' ||
-      exercise.tags.includes('mobility') ||
+      exercise.tags?.includes('mobility') ||
       exercise.caloriesPerMinute <= 5
     );
     
@@ -552,8 +597,8 @@ class WorkoutGenerator {
   private selectCooldownExercises(exercisePool: Exercise[], duration: number): Exercise[] {
     const cooldownExercises = exercisePool.filter(exercise => 
       exercise.category === 'flexibility' ||
-      exercise.tags.includes('stretch') ||
-      exercise.tags.includes('relaxation') ||
+      exercise.tags?.includes('stretch') ||
+      exercise.tags?.includes('relaxation') ||
       exercise.caloriesPerMinute <= 3
     );
     
@@ -568,12 +613,12 @@ class WorkoutGenerator {
   ): Exercise[] {
     // Prioritize compound exercises
     const compoundExercises = exercisePool.filter(exercise => 
-      exercise.tags.includes('compound') && 
+      exercise.tags?.includes('compound') && 
       exercise.muscleGroups.some(group => targetMuscleGroups.includes(group))
     );
     
     const isolationExercises = exercisePool.filter(exercise => 
-      exercise.tags.includes('isolation') && 
+      exercise.tags?.includes('isolation') && 
       exercise.muscleGroups.some(group => targetMuscleGroups.includes(group))
     );
     
@@ -638,7 +683,7 @@ class WorkoutGenerator {
       sets,
       reps,
       weight: exercise.weight,
-      duration: exercise.duration,
+      duration: exercise.duration?.toString(),
       restBetweenSets,
       notes: exercise.difficulty === 'advanced' ? 'Focus on form' : undefined
     };
@@ -738,10 +783,7 @@ class WorkoutGenerator {
       difficulty: 'beginner'
     };
     
-    const exercisePool = await exerciseDatabase.searchExercises('', {
-      category: ['flexibility'],
-      difficulty: ['beginner']
-    });
+    const exercisePool = await this.selectExercises(requirements, recoveryTemplate);
     
     return this.assembleWorkout(requirements, recoveryTemplate, exercisePool);
   }

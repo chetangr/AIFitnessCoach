@@ -1,5 +1,27 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { WorkoutSet, WorkoutSession } from '../data/comprehensiveExerciseDatabase';
+
+interface WorkoutSet {
+  id: string;
+  exerciseId: string;
+  weight: number;
+  reps: number;
+  completed: boolean;
+  duration?: number;
+}
+
+interface WorkoutSession {
+  id: string;
+  name: string;
+  date: Date;
+  duration: number;
+  exercises: any[];
+  totalWeight: number;
+  totalSets: number;
+  totalReps: number;
+  caloriesBurned: number;
+  notes: string;
+  sets: WorkoutSet[];
+}
 
 interface ExerciseProgress {
   exerciseId: string;
@@ -473,6 +495,62 @@ class WorkoutTrackingService {
       console.error('Error clearing workout data:', error);
       throw new Error('Failed to clear workout data');
     }
+  }
+
+  // Finish/Complete a workout (alias for saveWorkoutSession)
+  async finishWorkout(workoutData: {
+    workoutId: string;
+    duration: number;
+    exercises: any[];
+  }): Promise<void> {
+    try {
+      const session: WorkoutSession = {
+        id: workoutData.workoutId,
+        name: 'Workout Session',
+        date: new Date(),
+        duration: workoutData.duration,
+        exercises: workoutData.exercises,
+        totalWeight: 0,
+        totalSets: 0,
+        totalReps: 0,
+        caloriesBurned: Math.round(workoutData.duration / 60 * 8),
+        notes: '',
+        sets: []
+      };
+      
+      await this.saveWorkoutSession(session);
+    } catch (error) {
+      console.error('Error finishing workout:', error);
+      throw error;
+    }
+  }
+
+  // Get exercises for a specific workout (mock implementation)
+  async getExercisesForWorkout(workoutId: string): Promise<any[]> {
+    // This is a placeholder - in a real app, this would fetch from the database
+    return [
+      {
+        id: 'ex1',
+        name: 'Bench Press',
+        sets: 3,
+        reps: 10,
+        weight: 135
+      },
+      {
+        id: 'ex2',
+        name: 'Squats',
+        sets: 3,
+        reps: 12,
+        weight: 185
+      },
+      {
+        id: 'ex3',
+        name: 'Deadlifts',
+        sets: 3,
+        reps: 8,
+        weight: 225
+      }
+    ];
   }
 }
 

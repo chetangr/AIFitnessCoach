@@ -1,381 +1,259 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Animated,
-  Dimensions,
   Platform,
+  ViewStyle,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { LinearGradient } from 'expo-linear-gradient';
-
-const { width } = Dimensions.get('window');
-
-interface MetricItem {
-  label: string;
-  value: string | number;
-  unit?: string;
-  icon: string;
-  color: string;
-  showPulse?: boolean;
-}
 
 interface FitnessMetricsOverlayProps {
-  heartRate?: number;
-  calories?: number;
-  elapsedTime?: string;
-  activeMinutes?: number;
-  distance?: number;
-  pace?: string;
-  position?: 'top' | 'bottom';
-  style?: 'minimal' | 'full' | 'compact';
-  theme?: 'dark' | 'light';
-  showRings?: boolean;
+  heartRate: number;
+  calories: number;
+  elapsedTime: string;
+  activeMinutes: number;
   currentExercise?: string;
   setsCompleted?: number;
   totalSets?: number;
+  style?: 'minimal' | 'full' | 'compact';
+  theme?: 'light' | 'dark';
+  showRings?: boolean;
+  position?: 'top' | 'bottom';
+  customStyle?: ViewStyle;
 }
 
 const FitnessMetricsOverlay: React.FC<FitnessMetricsOverlayProps> = ({
-  heartRate = 0,
-  calories = 0,
-  elapsedTime = '0:00',
-  activeMinutes = 0,
-  distance = 0,
-  pace = '--',
-  position = 'top',
-  style = 'full',
-  theme = 'dark',
-  showRings = true,
-  currentExercise,
+  heartRate,
+  calories,
+  elapsedTime,
+  activeMinutes,
+  currentExercise = '',
   setsCompleted = 0,
   totalSets = 0,
+  style = 'full',
+  theme = 'dark',
+  showRings = false,
+  position = 'top',
+  customStyle,
 }) => {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const slideAnim = useRef(new Animated.Value(-100)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const ringProgress = useRef(new Animated.Value(0)).current;
+  const isDark = theme === 'dark';
+  const textColor = isDark ? 'white' : 'black';
+  const secondaryTextColor = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)';
 
-  // Metrics configuration
-  const getMetrics = (): MetricItem[] => {
-    const baseMetrics: MetricItem[] = [
-      {
-        label: 'Heart Rate',
-        value: heartRate,
-        unit: 'BPM',
-        icon: 'heart',
-        color: '#FF3B30',
-        showPulse: true,
-      },
-      {
-        label: 'Calories',
-        value: Math.round(calories),
-        unit: 'CAL',
-        icon: 'flame',
-        color: '#FF9500',
-      },
-      {
-        label: 'Time',
-        value: elapsedTime,
-        icon: 'time',
-        color: '#5AC8FA',
-      },
-    ];
-
-    if (style === 'full') {
-      return [
-        ...baseMetrics,
-        {
-          label: 'Active',
-          value: activeMinutes,
-          unit: 'MIN',
-          icon: 'fitness',
-          color: '#4CD964',
-        },
-        {
-          label: 'Distance',
-          value: distance.toFixed(2),
-          unit: 'KM',
-          icon: 'navigate',
-          color: '#007AFF',
-        },
-        {
-          label: 'Pace',
-          value: pace,
-          unit: 'MIN/KM',
-          icon: 'speedometer',
-          color: '#5856D6',
-        },
-      ];
-    }
-
-    if (style === 'compact') {
-      return baseMetrics.slice(0, 2);
-    }
-
-    return baseMetrics;
+  // Format numbers properly
+  const formatNumber = (num: number, decimals: number = 0): string => {
+    if (isNaN(num) || !isFinite(num)) return '0';
+    return num.toFixed(decimals);
   };
 
-  // Animations
-  useEffect(() => {
-    // Slide in animation
-    Animated.spring(slideAnim, {
-      toValue: 0,
-      tension: 20,
-      friction: 7,
-      useNativeDriver: true,
-    }).start();
-
-    // Fade in animation
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-
-    // Heart rate pulse animation
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    pulse.start();
-
-    // Ring progress animation
-    if (showRings) {
-      Animated.timing(ringProgress, {
-        toValue: (setsCompleted / totalSets) || 0,
-        duration: 1000,
-        useNativeDriver: false,
-      }).start();
+  const formatMinutes = (minutes: number): string => {
+    if (isNaN(minutes) || !isFinite(minutes)) return '0:00';
+    const hrs = Math.floor(minutes / 60);
+    const mins = Math.floor(minutes % 60);
+    const secs = Math.floor((minutes * 60) % 60);
+    
+    if (hrs > 0) {
+      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
-    return () => pulse.stop();
-  }, [heartRate, setsCompleted, totalSets]);
-
-  const metrics = getMetrics();
-
-  const renderMinimalStyle = () => (
-    <Animated.View
-      style={[
-        styles.minimalContainer,
-        {
-          transform: [{ translateY: slideAnim }],
-          opacity: fadeAnim,
-        },
-        position === 'bottom' && styles.bottomPosition,
-      ]}
-    >
+  if (style === 'minimal') {
+    return (
       <BlurView
-        intensity={theme === 'dark' ? 80 : 60}
-        tint={theme}
-        style={styles.minimalBlur}
+        intensity={isDark ? 80 : 60}
+        tint={isDark ? 'dark' : 'light'}
+        style={[
+          styles.minimalContainer,
+          position === 'bottom' && styles.bottomPosition,
+          customStyle,
+        ]}
       >
         <View style={styles.minimalContent}>
-          {metrics.map((metric, index) => (
-            <View key={index} style={styles.minimalMetric}>
-              <Icon name={metric.icon} size={16} color={metric.color} />
-              <Text style={[styles.minimalValue, theme === 'light' && styles.lightText]}>
-                {metric.value}
-              </Text>
-              {metric.unit && (
-                <Text style={[styles.minimalUnit, theme === 'light' && styles.lightText]}>
-                  {metric.unit}
-                </Text>
-              )}
-            </View>
-          ))}
+          <View style={styles.minimalMetric}>
+            <Icon name="heart" size={16} color="#FF6B6B" />
+            <Text style={[styles.minimalValue, { color: textColor }]}>
+              {formatNumber(heartRate)}
+            </Text>
+          </View>
+          <View style={styles.minimalDivider} />
+          <View style={styles.minimalMetric}>
+            <Icon name="flame" size={16} color="#FF9800" />
+            <Text style={[styles.minimalValue, { color: textColor }]}>
+              {formatNumber(calories)}
+            </Text>
+          </View>
+          <View style={styles.minimalDivider} />
+          <View style={styles.minimalMetric}>
+            <Icon name="time" size={16} color="#4CAF50" />
+            <Text style={[styles.minimalValue, { color: textColor }]}>
+              {elapsedTime}
+            </Text>
+          </View>
         </View>
       </BlurView>
-    </Animated.View>
-  );
+    );
+  }
 
-  const renderCompactStyle = () => (
-    <Animated.View
-      style={[
-        styles.compactContainer,
-        {
-          transform: [{ translateY: slideAnim }],
-          opacity: fadeAnim,
-        },
-        position === 'bottom' && styles.bottomPosition,
-      ]}
-    >
+  if (style === 'compact') {
+    return (
       <BlurView
-        intensity={theme === 'dark' ? 80 : 60}
-        tint={theme}
-        style={styles.compactBlur}
+        intensity={isDark ? 80 : 60}
+        tint={isDark ? 'dark' : 'light'}
+        style={[
+          styles.compactContainer,
+          position === 'bottom' && styles.bottomPosition,
+          customStyle,
+        ]}
       >
-        <LinearGradient
-          colors={theme === 'dark' 
-            ? ['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.1)']
-            : ['rgba(255,255,255,0.3)', 'rgba(255,255,255,0.1)']
-          }
-          style={styles.compactGradient}
-        >
-          {currentExercise && (
-            <Text style={[styles.exerciseName, theme === 'light' && styles.lightText]}>
-              {currentExercise}
-            </Text>
-          )}
+        <View style={styles.compactContent}>
+          <Text style={[styles.compactExercise, { color: textColor }]}>
+            {currentExercise}
+          </Text>
           <View style={styles.compactMetrics}>
-            {metrics.map((metric, index) => (
-              <Animated.View
-                key={index}
-                style={[
-                  styles.compactMetricItem,
-                  metric.showPulse && {
-                    transform: [{ scale: pulseAnim }],
-                  },
-                ]}
-              >
-                <Icon name={metric.icon} size={20} color={metric.color} />
-                <Text style={[styles.compactValue, theme === 'light' && styles.lightText]}>
-                  {metric.value}
-                </Text>
-                {metric.unit && (
-                  <Text style={[styles.compactUnit, theme === 'light' && styles.lightText]}>
-                    {metric.unit}
-                  </Text>
-                )}
-              </Animated.View>
-            ))}
+            <View style={styles.compactMetric}>
+              <Icon name="heart" size={20} color="#FF6B6B" />
+              <Text style={[styles.compactValue, { color: textColor }]}>
+                {formatNumber(heartRate)}
+              </Text>
+              <Text style={[styles.compactLabel, { color: secondaryTextColor }]}>BPM</Text>
+            </View>
+            <View style={styles.compactMetric}>
+              <Icon name="flame" size={20} color="#FF9800" />
+              <Text style={[styles.compactValue, { color: textColor }]}>
+                {formatNumber(calories)}
+              </Text>
+              <Text style={[styles.compactLabel, { color: secondaryTextColor }]}>CAL</Text>
+            </View>
+            <View style={styles.compactMetric}>
+              <Icon name="time" size={20} color="#4CAF50" />
+              <Text style={[styles.compactValue, { color: textColor }]}>
+                {formatMinutes(activeMinutes)}
+              </Text>
+              <Text style={[styles.compactLabel, { color: secondaryTextColor }]}>MIN</Text>
+            </View>
           </View>
-        </LinearGradient>
+        </View>
       </BlurView>
-    </Animated.View>
-  );
+    );
+  }
 
-  const renderFullStyle = () => (
-    <Animated.View
+  // Full style
+  return (
+    <BlurView
+      intensity={isDark ? 80 : 60}
+      tint={isDark ? 'dark' : 'light'}
       style={[
         styles.fullContainer,
-        {
-          transform: [{ translateY: slideAnim }],
-          opacity: fadeAnim,
-        },
         position === 'bottom' && styles.bottomPosition,
+        customStyle,
       ]}
     >
-      <BlurView
-        intensity={theme === 'dark' ? 90 : 70}
-        tint={theme}
-        style={styles.fullBlur}
-      >
-        <LinearGradient
-          colors={theme === 'dark'
-            ? ['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.2)']
-            : ['rgba(255,255,255,0.4)', 'rgba(255,255,255,0.2)']
-          }
-          style={styles.fullGradient}
-        >
-          {/* Activity Rings */}
-          {showRings && (
-            <View style={styles.ringsContainer}>
-              <View style={styles.ring}>
-                <Animated.View
-                  style={[
-                    styles.ringProgress,
-                    {
-                      backgroundColor: '#FF3B30',
-                      width: ringProgress.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0%', '100%'],
-                      }),
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={[styles.ringStat, theme === 'light' && styles.lightText]}>
-                {setsCompleted}/{totalSets} Sets
-              </Text>
-            </View>
-          )}
+      <View style={styles.fullHeader}>
+        <Text style={[styles.nowPlaying, { color: secondaryTextColor }]}>
+          NOW PLAYING
+        </Text>
+        <Text style={[styles.setsProgress, { color: secondaryTextColor }]}>
+          {setsCompleted}/{totalSets} Sets
+        </Text>
+      </View>
 
-          {/* Current Exercise */}
-          {currentExercise && (
-            <View style={styles.exerciseContainer}>
-              <Text style={[styles.exerciseLabel, theme === 'light' && styles.lightText]}>
-                NOW PLAYING
-              </Text>
-              <Text style={[styles.exerciseNameFull, theme === 'light' && styles.lightText]}>
-                {currentExercise}
-              </Text>
-            </View>
-          )}
+      <Text style={[styles.exerciseName, { color: textColor }]}>
+        {currentExercise}
+      </Text>
 
-          {/* Metrics Grid */}
-          <View style={styles.metricsGrid}>
-            {metrics.map((metric, index) => (
-              <Animated.View
-                key={index}
-                style={[
-                  styles.metricCard,
-                  metric.showPulse && {
-                    transform: [{ scale: pulseAnim }],
-                  },
-                ]}
-              >
-                <View style={[styles.metricIcon, { backgroundColor: `${metric.color}20` }]}>
-                  <Icon name={metric.icon} size={24} color={metric.color} />
-                </View>
-                <Text style={[styles.metricLabel, theme === 'light' && styles.lightText]}>
-                  {metric.label}
-                </Text>
-                <View style={styles.metricValueContainer}>
-                  <Text style={[styles.metricValue, theme === 'light' && styles.lightText]}>
-                    {metric.value}
-                  </Text>
-                  {metric.unit && (
-                    <Text style={[styles.metricUnit, theme === 'light' && styles.lightText]}>
-                      {metric.unit}
-                    </Text>
-                  )}
-                </View>
-              </Animated.View>
-            ))}
+      <View style={styles.metricsGrid}>
+        <View style={styles.metricItem}>
+          <Icon name="heart" size={32} color="#FF6B6B" />
+          <Text style={[styles.metricTitle, { color: secondaryTextColor }]}>
+            Heart Rate
+          </Text>
+          <View style={styles.metricValueRow}>
+            <Text style={[styles.metricValue, { color: textColor }]}>
+              {formatNumber(heartRate)}
+            </Text>
+            <Text style={[styles.metricUnit, { color: secondaryTextColor }]}>
+              BPM
+            </Text>
           </View>
-        </LinearGradient>
-      </BlurView>
-    </Animated.View>
-  );
+        </View>
 
-  // Render based on style prop
-  if (style === 'minimal') return renderMinimalStyle();
-  if (style === 'compact') return renderCompactStyle();
-  return renderFullStyle();
+        <View style={styles.metricItem}>
+          <Icon name="flame" size={32} color="#FF9800" />
+          <Text style={[styles.metricTitle, { color: secondaryTextColor }]}>
+            Calories
+          </Text>
+          <View style={styles.metricValueRow}>
+            <Text style={[styles.metricValue, { color: textColor }]}>
+              {formatNumber(calories)}
+            </Text>
+            <Text style={[styles.metricUnit, { color: secondaryTextColor }]}>
+              CAL
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.metricItem}>
+          <Icon name="time" size={32} color="#4CAF50" />
+          <Text style={[styles.metricTitle, { color: secondaryTextColor }]}>
+            Time
+          </Text>
+          <Text style={[styles.metricValue, { color: textColor }]}>
+            {elapsedTime}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.secondaryMetrics}>
+        <View style={styles.secondaryItem}>
+          <Icon name="trending-up" size={20} color="#4CAF50" />
+          <Text style={[styles.secondaryValue, { color: textColor }]}>
+            {formatMinutes(activeMinutes)}
+          </Text>
+          <Text style={[styles.secondaryLabel, { color: secondaryTextColor }]}>
+            Active
+          </Text>
+        </View>
+
+        <View style={styles.secondaryItem}>
+          <Icon name="location" size={20} color="#2196F3" />
+          <Text style={[styles.secondaryValue, { color: textColor }]}>0.00</Text>
+          <Text style={[styles.secondaryLabel, { color: secondaryTextColor }]}>
+            Distance
+          </Text>
+        </View>
+
+        <View style={styles.secondaryItem}>
+          <Icon name="speedometer" size={20} color="#9C27B0" />
+          <Text style={[styles.secondaryValue, { color: textColor }]}>--</Text>
+          <Text style={[styles.secondaryLabel, { color: secondaryTextColor }]}>
+            Pace
+          </Text>
+        </View>
+      </View>
+    </BlurView>
+  );
 };
 
 const styles = StyleSheet.create({
   // Minimal Style
   minimalContainer: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 30,
+    top: 60,
     left: 20,
     right: 20,
-    zIndex: 100,
-  },
-  minimalBlur: {
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
   },
   minimalContent: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
   },
   minimalMetric: {
     flexDirection: 'row',
@@ -383,151 +261,130 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   minimalValue: {
-    color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
-  minimalUnit: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
+  minimalDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginHorizontal: 16,
   },
 
   // Compact Style
   compactContainer: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 30,
+    top: 60,
     left: 20,
     right: 20,
-    zIndex: 100,
-  },
-  compactBlur: {
     borderRadius: 20,
     overflow: 'hidden',
   },
-  compactGradient: {
+  compactContent: {
     padding: 16,
   },
-  exerciseName: {
-    color: 'white',
-    fontSize: 14,
+  compactExercise: {
+    fontSize: 18,
     fontWeight: '600',
-    textAlign: 'center',
     marginBottom: 12,
-    opacity: 0.9,
+    textAlign: 'center',
   },
   compactMetrics: {
     flexDirection: 'row',
     justifyContent: 'space-around',
   },
-  compactMetricItem: {
+  compactMetric: {
     alignItems: 'center',
   },
   compactValue: {
-    color: 'white',
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '700',
     marginTop: 4,
   },
-  compactUnit: {
-    color: 'rgba(255,255,255,0.7)',
+  compactLabel: {
     fontSize: 12,
+    marginTop: 2,
   },
 
   // Full Style
   fullContainer: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 30,
-    left: 0,
-    right: 0,
-    zIndex: 100,
-  },
-  fullBlur: {
+    top: 60,
+    left: 20,
+    right: 20,
+    borderRadius: 24,
     overflow: 'hidden',
+    padding: 20,
   },
-  fullGradient: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-  },
-  ringsContainer: {
+  fullHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  ring: {
-    width: width - 40,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 2,
-    overflow: 'hidden',
     marginBottom: 8,
   },
-  ringProgress: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  ringStat: {
-    color: 'rgba(255,255,255,0.8)',
+  nowPlaying: {
     fontSize: 12,
-  },
-  exerciseContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  exerciseLabel: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 12,
+    fontWeight: '600',
     letterSpacing: 1,
-    marginBottom: 4,
   },
-  exerciseNameFull: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+  setsProgress: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  exerciseName: {
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 20,
+    textAlign: 'center',
   },
   metricsGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
+    marginBottom: 20,
   },
-  metricCard: {
-    width: '30%',
+  metricItem: {
     alignItems: 'center',
-    marginBottom: 16,
   },
-  metricIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  metricLabel: {
-    color: 'rgba(255,255,255,0.7)',
+  metricTitle: {
     fontSize: 12,
+    marginTop: 8,
     marginBottom: 4,
   },
-  metricValueContainer: {
+  metricValueRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
+    gap: 4,
   },
   metricValue: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 32,
+    fontWeight: '700',
   },
   metricUnit: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 12,
-    marginLeft: 2,
+    fontSize: 14,
+    fontWeight: '500',
   },
-
-  // Common
+  secondaryMetrics: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  secondaryItem: {
+    alignItems: 'center',
+  },
+  secondaryValue: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  secondaryLabel: {
+    fontSize: 11,
+    marginTop: 2,
+  },
   bottomPosition: {
-    top: undefined,
-    bottom: Platform.OS === 'ios' ? 100 : 80,
-  },
-  lightText: {
-    color: '#000',
+    top: 'auto',
+    bottom: 100,
   },
 });
 

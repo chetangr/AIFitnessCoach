@@ -1,14 +1,4 @@
-import { 
-  searchExercises, 
-  comprehensiveExerciseDatabase,
-  getExercisesByCategory,
-  getRandomExercises
-} from '../data/comprehensiveExerciseDatabase';
-import { 
-  workoutPrograms, 
-  completeExercisesDatabase,
-  getExerciseById as getExerciseFromDatabase 
-} from '../data/exercisesDatabase';
+import { wgerExercises, WgerExercise } from '../data/wgerExerciseDatabase';
 
 interface ExerciseQuery {
   muscle?: string;
@@ -30,13 +20,23 @@ class ExerciseService {
     try {
       const { muscle, page = 1, limit = 20, search } = query;
       
-      // Use comprehensive database with search functionality
-      const filters: any = {};
-      if (muscle && muscle !== 'All') {
-        filters.muscleGroup = muscle;
+      // Filter exercises
+      let filteredExercises = wgerExercises;
+      
+      // Search filter
+      if (search) {
+        filteredExercises = filteredExercises.filter(ex =>
+          ex.name.toLowerCase().includes(search.toLowerCase()) ||
+          ex.description.toLowerCase().includes(search.toLowerCase())
+        );
       }
       
-      let filteredExercises = searchExercises(search || '', filters);
+      // Muscle filter
+      if (muscle && muscle !== 'All') {
+        filteredExercises = filteredExercises.filter(ex =>
+          ex.primaryMuscles.some(m => m.toLowerCase().includes(muscle.toLowerCase()))
+        );
+      }
       
       // Implement pagination
       const startIndex = (page - 1) * limit;
@@ -44,7 +44,7 @@ class ExerciseService {
       const paginatedExercises = filteredExercises.slice(startIndex, endIndex);
       
       // Transform to match expected interface
-      return paginatedExercises.map((exercise) => ({
+      return paginatedExercises.map((exercise: WgerExercise) => ({
         id: exercise.id,
         name: exercise.name,
         category: exercise.category,
@@ -53,9 +53,7 @@ class ExerciseService {
         difficulty: exercise.difficulty,
         description: exercise.description,
         instructions: exercise.instructions,
-        tips: exercise.tips,
-        videoUrl: exercise.videoUrl,
-        imageUrl: exercise.imageUrl,
+        imageUrl: exercise.images?.[0],
       }));
     } catch (error) {
       console.error('Exercise Service Error:', error);
@@ -63,138 +61,88 @@ class ExerciseService {
     }
   }
 
+  async searchExercises(searchTerm: string, filters: any = {}) {
+    const filteredExercises = wgerExercises.filter((ex: WgerExercise) =>
+      ex.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    return filteredExercises.map((ex: WgerExercise) => ({
+      id: ex.id,
+      name: ex.name,
+      muscleGroup: ex.primaryMuscles?.[0] || ex.category,
+      difficulty: ex.difficulty,
+    }));
+  }
+
   async getExerciseById(id: string) {
-    try {
-      // First try to find in completeExercisesDatabase (includes exercisesDatabase + variations)
-      let exercise = completeExercisesDatabase.find(ex => ex.id === id);
-      
-      // If not found, try comprehensive database as fallback
-      if (!exercise) {
-        exercise = comprehensiveExerciseDatabase.find(ex => ex.id === id);
-      }
-      
-      if (!exercise) {
-        // Try using the getExerciseById helper from exercisesDatabase
-        const dbExercise = getExerciseFromDatabase(id);
-        if (dbExercise) {
-          exercise = dbExercise;
-        }
-      }
-      
-      if (!exercise) {
-        throw new Error(`Exercise not found: ${id}`);
-      }
-      
-      return {
-        id: exercise.id,
-        name: exercise.name,
-        category: exercise.category,
-        muscles: exercise.primaryMuscles,
-        equipment: exercise.equipment,
-        difficulty: exercise.difficulty,
-        description: exercise.description,
-        instructions: exercise.instructions,
-        tips: exercise.tips,
-        videoUrl: exercise.videoUrl,
-        imageUrl: exercise.imageUrl,
-        primaryMuscles: exercise.primaryMuscles,
-        secondaryMuscles: exercise.secondaryMuscles,
-      };
-    } catch (error) {
-      console.error('Exercise Service Error:', error);
-      throw error;
-    }
+    const exercise = wgerExercises.find((ex: WgerExercise) => ex.id === id);
+    return exercise || null;
   }
 
   async getPrograms(query: ProgramQuery = {}) {
-    try {
-      const { level, category, page = 1, limit = 20, search } = query;
-      
-      // Filter programs based on query
-      let filteredPrograms = workoutPrograms.filter(program => {
-        let matches = true;
-        
-        if (search && search.trim() !== '') {
-          matches = matches && program.name.toLowerCase().includes(search.toLowerCase());
-        }
-        
-        if (level && level !== 'All') {
-          matches = matches && program.level === level;
-        }
-        
-        if (category && category !== 'All') {
-          matches = matches && program.category === category;
-        }
-        
-        return matches;
-      });
-      
-      // Implement pagination
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const paginatedPrograms = filteredPrograms.slice(startIndex, endIndex);
-      
-      return paginatedPrograms;
-    } catch (error) {
-      console.error('Program Service Error:', error);
-      throw error;
+    // Mock program data
+    const mockPrograms = [
+      {
+        id: '1',
+        name: 'Beginner Full Body',
+        description: 'Perfect for fitness newcomers',
+        level: 'beginner',
+        duration: '4 weeks',
+        workoutsPerWeek: 3,
+        category: 'strength',
+      },
+      {
+        id: '2',
+        name: 'Advanced Muscle Building',
+        description: 'Intensive muscle building program',
+        level: 'advanced',
+        duration: '8 weeks',
+        workoutsPerWeek: 5,
+        category: 'strength',
+      },
+    ];
+
+    const { level, category, page = 1, limit = 10, search } = query;
+    
+    let filteredPrograms = mockPrograms;
+    
+    if (level) {
+      filteredPrograms = filteredPrograms.filter(p => p.level === level);
     }
+    
+    if (category) {
+      filteredPrograms = filteredPrograms.filter(p => p.category === category);
+    }
+    
+    if (search) {
+      filteredPrograms = filteredPrograms.filter(p =>
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.description.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+    
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    
+    return filteredPrograms.slice(startIndex, endIndex);
   }
 
   async getProgramById(id: string) {
-    try {
-      const program = workoutPrograms.find(p => p.id === id);
-      
-      if (!program) {
-        throw new Error('Program not found');
-      }
-      
-      // Get exercises for this program
-      const programExercises = program.exercises.map(exerciseId => {
-        // First try completeExercisesDatabase
-        let exercise = completeExercisesDatabase.find(ex => ex.id === exerciseId);
-        
-        // If not found, try comprehensive database
-        if (!exercise) {
-          exercise = comprehensiveExerciseDatabase.find(ex => ex.id === exerciseId);
-        }
-        
-        // If still not found, try the helper function
-        if (!exercise) {
-          exercise = getExerciseFromDatabase(exerciseId);
-        }
-        
-        return exercise;
-      }).filter(Boolean);
-      
-      return {
-        ...program,
-        exerciseDetails: programExercises,
-      };
-    } catch (error) {
-      console.error('Program Service Error:', error);
-      throw error;
-    }
+    const programs = await this.getPrograms();
+    return programs.find(p => p.id === id) || null;
   }
 
-  // Get exercise categories for filtering
-  getCategories() {
-    return ['All', 'Chest', 'Back', 'Shoulders', 'Legs', 'Arms', 'Core', 'Cardio', 'Functional'];
+  async getExercisesByIds(exerciseIds: string[]) {
+    return exerciseIds
+      .map((id: string) => wgerExercises.find((ex: WgerExercise) => ex.id === id))
+      .filter(Boolean);
   }
 
-  // Get difficulty levels for filtering
-  getDifficultyLevels() {
-    return ['All', 'Beginner', 'Intermediate', 'Advanced'];
-  }
-
-  // Get exercise count for display
-  getExerciseCount() {
-    return comprehensiveExerciseDatabase.length;
-  }
-
-  // Get program count for display
-  getProgramCount() {
-    return workoutPrograms.length;
+  async getTotalCounts() {
+    return {
+      exercises: wgerExercises.length,
+      programs: 2, // Mock count
+    };
   }
 }
 

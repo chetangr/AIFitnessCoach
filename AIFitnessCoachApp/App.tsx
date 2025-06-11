@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StatusBar, View, Text, ActivityIndicator } from 'react-native';
+import { StatusBar, View, Text, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppNavigator } from './src/navigation/AppNavigator';
@@ -72,8 +72,10 @@ const App: React.FC = () => {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        <AppNavigator />
+        <StatusBar barStyle="light-content" backgroundColor="#000000" />
+        <View style={{ flex: 1, backgroundColor: '#000000' }}>
+          <AppNavigator />
+        </View>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

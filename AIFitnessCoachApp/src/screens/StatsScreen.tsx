@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,15 +7,16 @@ import {
   TouchableOpacity,
   Dimensions,
   Alert,
+  Animated,
+  Platform,
+  SafeAreaView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { ThemedGlassCard, ThemedGlassContainer } from '../components/glass/ThemedGlassComponents';
-import { theme } from '../config/theme';
+import { useThemeStore } from '../store/themeStore';
+import { LiquidGlassView, LiquidButton, LiquidCard } from '../components/glass';
 
 const { width } = Dimensions.get('window');
 
@@ -39,7 +40,8 @@ interface WorkoutStats {
   totalCaloriesBurned: number;
 }
 
-const StatsScreen = ({ navigation }: any) => {
+const LiquidStatsScreen = ({ navigation }: any) => {
+  const { theme } = useThemeStore();
   const [workoutSets, setWorkoutSets] = useState<WorkoutSet[]>([]);
   const [stats, setStats] = useState<WorkoutStats>({
     totalWorkouts: 24,
@@ -51,8 +53,30 @@ const StatsScreen = ({ navigation }: any) => {
     totalCaloriesBurned: 12500,
   });
 
+  const scrollAnimation = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const cardAnimations = useRef([...Array(6)].map(() => new Animated.Value(0))).current;
+
   useEffect(() => {
     loadWorkoutData();
+    
+    // Entrance animations
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+
+    // Animate cards in sequence
+    cardAnimations.forEach((anim, index) => {
+      Animated.spring(anim, {
+        toValue: 1,
+        delay: index * 100,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 7,
+      }).start();
+    });
   }, []);
 
   const loadWorkoutData = async () => {
@@ -102,392 +126,412 @@ const StatsScreen = ({ navigation }: any) => {
         return;
       }
 
-      // Create Hevy-compatible CSV format
-      const csvHeader = 'Date,Workout Name,Exercise Name,Set Order,Weight,Reps,RPE,Notes\n';
-      const csvData = workoutSets.map((set, index) => 
-        `${set.date},"Workout ${index + 1}","${set.exerciseName}",1,${set.weight},${set.reps},,`
-      ).join('\n');
-
-      const csvContent = csvHeader + csvData;
+      // Create CSV content in Hevy format
+      let csvContent = 'Date,Exercise Name,Set Order,Weight,Reps,Distance,Seconds,Notes,Workout Name,Workout Notes\n';
       
-      // Save to file
-      const fileUri = FileSystem.documentDirectory + 'hevy_export.csv';
-      await FileSystem.writeAsStringAsync(fileUri, csvContent);
-      
-      // Share the file
-      await Sharing.shareAsync(fileUri, {
-        mimeType: 'text/csv',
-        dialogTitle: 'Export to Hevy',
+      workoutSets.forEach((set, index) => {
+        const date = new Date(set.date).toISOString().split('T')[0];
+        csvContent += `${date},${set.exerciseName},${index + 1},${set.weight},${set.reps},0,0,"","Workout",""\n`;
       });
 
-      Alert.alert('Success', 'Workout data exported to Hevy format!');
+      // Save to file
+      const fileName = `hevy_export_${new Date().toISOString().split('T')[0]}.csv`;
+      const filePath = `${FileSystem.documentDirectory}${fileName}`;
+      
+      await FileSystem.writeAsStringAsync(filePath, csvContent);
+      
+      // Share the file
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(filePath);
+      } else {
+        Alert.alert('Success', 'File saved to device');
+      }
     } catch (error) {
-      console.error('Export error:', error);
       Alert.alert('Error', 'Failed to export data');
+      console.error(error);
     }
   };
 
   const exportToJSON = async () => {
     try {
-      if (workoutSets.length === 0) {
-        Alert.alert('No Data', 'No workout data to export');
-        return;
-      }
-
       const exportData = {
         stats,
-        workoutSets,
+        workouts: workoutSets,
         exportDate: new Date().toISOString(),
       };
 
-      const fileUri = FileSystem.documentDirectory + 'workout_data.json';
-      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(exportData, null, 2));
+      const fileName = `fitness_data_${new Date().toISOString().split('T')[0]}.json`;
+      const filePath = `${FileSystem.documentDirectory}${fileName}`;
       
-      await Sharing.shareAsync(fileUri, {
-        mimeType: 'application/json',
-        dialogTitle: 'Export Workout Data',
-      });
-
-      Alert.alert('Success', 'Workout data exported as JSON!');
+      await FileSystem.writeAsStringAsync(filePath, JSON.stringify(exportData, null, 2));
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(filePath);
+      } else {
+        Alert.alert('Success', 'File saved to device');
+      }
     } catch (error) {
-      console.error('Export error:', error);
       Alert.alert('Error', 'Failed to export data');
+      console.error(error);
     }
   };
 
-  const _addSampleWorkout = async () => {
-    const newSet: WorkoutSet = {
-      id: Date.now().toString(),
-      exerciseName: 'Bench Press',
-      sets: 3,
-      reps: 10,
-      weight: 135,
-      date: new Date().toISOString().split('T')[0],
-      duration: 45,
-    };
-
-    const updatedSets = [...workoutSets, newSet];
-    setWorkoutSets(updatedSets);
-    
-    await AsyncStorage.setItem('workoutSets', JSON.stringify(updatedSets));
-    calculateStats(updatedSets);
-    
-    Alert.alert('Added', 'Sample workout added!');
-  };
-
-  const StatCard = ({ title, value, icon, color }: any) => (
-    <BlurView intensity={20} tint="light" style={[styles.statCard, { borderLeftColor: color }]}>
-      <View style={styles.statIconContainer}>
-        <Icon name={icon} size={24} color={color} />
-      </View>
-      <View style={styles.statContent}>
-        <Text style={styles.statValue}>{value}</Text>
-        <Text style={styles.statTitle}>{title}</Text>
-      </View>
-    </BlurView>
-  );
+  const statCards = [
+    { 
+      title: 'Total Workouts', 
+      value: stats.totalWorkouts.toString(), 
+      icon: 'fitness', 
+      color: theme.colors.primary.main,
+      index: 0 
+    },
+    { 
+      title: 'Total Minutes', 
+      value: stats.totalMinutes.toString(), 
+      icon: 'time', 
+      color: '#4FC3F7',
+      index: 1 
+    },
+    { 
+      title: 'Current Streak', 
+      value: `${stats.currentStreak} days`, 
+      icon: 'flame', 
+      color: theme.colors.error,
+      index: 2 
+    },
+    { 
+      title: 'Calories Burned', 
+      value: stats.totalCaloriesBurned.toLocaleString(), 
+      icon: 'flash', 
+      color: theme.colors.warning,
+      index: 3 
+    },
+    { 
+      title: 'Average Duration', 
+      value: `${stats.averageWorkoutTime} min`, 
+      icon: 'stopwatch', 
+      color: '#7E57C2',
+      index: 4 
+    },
+    { 
+      title: 'Favorite Exercise', 
+      value: stats.favoriteExercise, 
+      icon: 'star', 
+      color: '#FFD700',
+      index: 5 
+    },
+  ];
 
   return (
-    <LinearGradient colors={theme.colors.primary.gradient as [string, string, string]} style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Icon name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Stats & Export</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Quick Stats */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your Progress</Text>
-          <View style={styles.statsGrid}>
-            <StatCard 
-              title="Total Workouts" 
-              value={stats.totalWorkouts} 
-              icon="fitness" 
-              color="#4CAF50" 
-            />
-            <StatCard 
-              title="Total Minutes" 
-              value={stats.totalMinutes.toLocaleString()} 
-              icon="time" 
-              color="#2196F3" 
-            />
-            <StatCard 
-              title="Total Sets" 
-              value={stats.totalSets} 
-              icon="barbell" 
-              color="#FF5722" 
-            />
-            <StatCard 
-              title="Current Streak" 
-              value={`${stats.currentStreak} days`} 
-              icon="flame" 
-              color="#FF9800" 
-            />
-            <StatCard 
-              title="Avg Workout" 
-              value={`${stats.averageWorkoutTime} min`} 
-              icon="speedometer" 
-              color="#9C27B0" 
-            />
-            <StatCard 
-              title="Calories Burned" 
-              value={stats.totalCaloriesBurned.toLocaleString()} 
-              icon="flash" 
-              color="#E91E63" 
-            />
-          </View>
-        </View>
-
-        {/* Favorite Exercise */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Favorite Exercise</Text>
-          <BlurView intensity={20} tint="light" style={styles.favoriteCard}>
-            <Icon name="trophy" size={32} color="#FFD700" />
-            <Text style={styles.favoriteExercise}>{stats.favoriteExercise}</Text>
-            <Text style={styles.favoriteSubtext}>Most performed exercise</Text>
-          </BlurView>
-        </View>
-
-        {/* Export Options */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Export Data</Text>
-          
-          <TouchableOpacity onPress={exportToHevy} style={styles.exportButton}>
-            <BlurView intensity={25} tint="light" style={styles.exportButtonContent}>
-              <View style={styles.exportIconContainer}>
-                <Icon name="download" size={24} color="#4CAF50" />
-              </View>
-              <View style={styles.exportTextContainer}>
-                <Text style={styles.exportTitle}>Export to Hevy</Text>
-                <Text style={styles.exportSubtitle}>CSV format for Hevy app</Text>
-              </View>
-              <Icon name="chevron-forward" size={20} color="rgba(255,255,255,0.6)" />
-            </BlurView>
+    <SafeAreaView style={styles.container}>
+      {/* Animated Header */}
+      <Animated.View
+        style={[
+          styles.header,
+          {
+            transform: [{
+              translateY: scrollAnimation.interpolate({
+                inputRange: [0, 100],
+                outputRange: [0, -20],
+                extrapolate: 'clamp',
+              })
+            }],
+            opacity: scrollAnimation.interpolate({
+              inputRange: [0, 100],
+              outputRange: [1, 0.9],
+              extrapolate: 'clamp',
+            })
+          }
+        ]}
+      >
+        <LiquidGlassView intensity={90} style={styles.headerContent}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Icon name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
-
-          <TouchableOpacity onPress={exportToJSON} style={styles.exportButton}>
-            <BlurView intensity={25} tint="light" style={styles.exportButtonContent}>
-              <View style={styles.exportIconContainer}>
-                <Icon name="document-text" size={24} color="#2196F3" />
-              </View>
-              <View style={styles.exportTextContainer}>
-                <Text style={styles.exportTitle}>Export as JSON</Text>
-                <Text style={styles.exportSubtitle}>Complete data backup</Text>
-              </View>
-              <Icon name="chevron-forward" size={20} color="rgba(255,255,255,0.6)" />
-            </BlurView>
-          </TouchableOpacity>
-
+          <Text style={styles.headerTitle}>Your Stats</Text>
           <TouchableOpacity 
-            onPress={() => navigation.navigate('WorkoutDownloads')} 
             style={styles.exportButton}
+            onPress={() => {
+              Alert.alert(
+                'Export Data',
+                'Choose export format',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Hevy Format', onPress: exportToHevy },
+                  { text: 'JSON Format', onPress: exportToJSON },
+                ]
+              );
+            }}
           >
-            <BlurView intensity={25} tint="light" style={styles.exportButtonContent}>
-              <View style={styles.exportIconContainer}>
-                <Icon name="cloud-download" size={24} color="#9C27B0" />
-              </View>
-              <View style={styles.exportTextContainer}>
-                <Text style={styles.exportTitle}>Download Workouts</Text>
-                <Text style={styles.exportSubtitle}>Save workouts offline</Text>
-              </View>
-              <Icon name="chevron-forward" size={20} color="rgba(255,255,255,0.6)" />
-            </BlurView>
+            <Icon name="download-outline" size={24} color="white" />
           </TouchableOpacity>
+        </LiquidGlassView>
+      </Animated.View>
+
+      <Animated.ScrollView
+        showsVerticalScrollIndicator={false}
+        style={{ opacity: fadeAnim }}
+        contentContainerStyle={styles.scrollContent}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollAnimation } } }],
+          { useNativeDriver: true }
+        )}
+        scrollEventThrottle={16}
+      >
+        {/* Hero Stats */}
+        <View style={styles.heroSection}>
+          <LiquidCard style={styles.heroCard}>
+            <Icon name="trophy" size={48} color={theme.colors.warning} />
+            <Text style={styles.heroTitle}>Great Progress!</Text>
+            <Text style={styles.heroSubtitle}>
+              You've completed {stats.totalWorkouts} workouts and burned {stats.totalCaloriesBurned.toLocaleString()} calories
+            </Text>
+          </LiquidCard>
         </View>
 
-        {/* Recent Sets */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Sets</Text>
-          {workoutSets.length > 0 ? (
-            workoutSets.slice(-5).reverse().map((set) => (
-              <BlurView key={set.id} intensity={15} tint="light" style={styles.setItem}>
-                <View style={styles.setInfo}>
-                  <Text style={styles.setExercise}>{set.exerciseName}</Text>
-                  <Text style={styles.setDetails}>
-                    {set.sets} sets × {set.reps} reps @ {set.weight}lbs
-                  </Text>
-                  <Text style={styles.setDate}>{set.date}</Text>
-                </View>
-              </BlurView>
-            ))
-          ) : (
-            <BlurView intensity={15} tint="light" style={styles.emptyState}>
-              <Icon name="barbell-outline" size={48} color="rgba(255,255,255,0.5)" />
-              <Text style={styles.emptyText}>No workout data yet</Text>
-              <Text style={styles.emptySubtext}>Start tracking your sets!</Text>
-            </BlurView>
-          )}
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          {statCards.map((card) => (
+            <Animated.View
+              key={card.title}
+              style={[
+                styles.statCardWrapper,
+                {
+                  opacity: cardAnimations[card.index],
+                  transform: [{
+                    translateY: cardAnimations[card.index].interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [50, 0],
+                    })
+                  }, {
+                    scale: cardAnimations[card.index].interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.8, 1],
+                    })
+                  }]
+                }
+              ]}
+            >
+              <LiquidCard style={styles.statCard}>
+                <Icon name={card.icon} size={32} color={card.color} style={styles.statIcon} />
+                <Text style={styles.statValue}>{card.value}</Text>
+                <Text style={styles.statTitle}>{card.title}</Text>
+              </LiquidCard>
+            </Animated.View>
+          ))}
         </View>
-      </ScrollView>
-    </LinearGradient>
+
+        {/* Weekly Progress */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Weekly Progress</Text>
+          <LiquidCard style={styles.progressCard}>
+            <View style={styles.weekDays}>
+              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => {
+                const isActive = index < 5; // Example: active on weekdays
+                return (
+                  <View key={index} style={styles.dayColumn}>
+                    <View
+                      style={[
+                        styles.dayBar,
+                        isActive && styles.dayBarActive,
+                        { height: isActive ? `${(index + 1) * 15}%` : '10%' }
+                      ]}
+                    />
+                    <Text style={[styles.dayText, isActive && styles.dayTextActive]}>
+                      {day}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </LiquidCard>
+        </View>
+
+        {/* Export Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Export Your Data</Text>
+          <LiquidCard style={styles.exportCard}>
+            <Icon name="document-text" size={48} color={theme.colors.primary.main} />
+            <Text style={styles.exportTitle}>Export to Hevy or JSON</Text>
+            <Text style={styles.exportDescription}>
+              Export your workout data to import into other fitness apps or for your records
+            </Text>
+            <View style={styles.exportButtons}>
+              <LiquidButton
+                label="Hevy Format"
+                icon="logo-google"
+                size="medium"
+                variant="primary"
+                onPress={exportToHevy}
+                style={styles.exportBtn}
+              />
+              <LiquidButton
+                label="JSON Format"
+                icon="code-slash"
+                size="medium"
+                variant="secondary"
+                onPress={exportToJSON}
+                style={styles.exportBtn}
+              />
+            </View>
+          </LiquidCard>
+        </View>
+
+        <View style={{ height: Platform.OS === 'ios' ? 120 : 100 }} />
+      </Animated.ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0a0a0f',
   },
   header: {
+    zIndex: 100,
+  },
+  headerContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
+    paddingVertical: 15,
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: 'white',
   },
-  content: {
-    flex: 1,
+  exportButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollContent: {
+    paddingTop: Platform.OS === 'ios' ? 120 : 100,
     paddingHorizontal: 20,
   },
-  section: {
-    marginBottom: 25,
+  heroSection: {
+    marginBottom: 30,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+  heroCard: {
+    padding: 30,
+    alignItems: 'center',
+  },
+  heroTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
     color: 'white',
-    marginBottom: 15,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  heroSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+    lineHeight: 22,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    marginBottom: 30,
+  },
+  statCardWrapper: {
+    width: '48%',
+    marginBottom: 16,
   },
   statCard: {
-    width: (width - 60) / 2,
-    marginBottom: 15,
-    padding: 16,
-    borderRadius: 16,
-    borderLeftWidth: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  statIconContainer: {
-    marginRight: 12,
-  },
-  statContent: {
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  statTitle: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 2,
-  },
-  favoriteCard: {
     padding: 20,
-    borderRadius: 16,
     alignItems: 'center',
-    overflow: 'hidden',
   },
-  favoriteExercise: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
-    marginTop: 8,
-  },
-  favoriteSubtext: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.7)',
-    marginTop: 4,
-  },
-  exportButton: {
+  statIcon: {
     marginBottom: 12,
   },
-  exportButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  exportIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  exportTextContainer: {
-    flex: 1,
-  },
-  exportTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
     color: 'white',
+    marginBottom: 4,
   },
-  exportSubtitle: {
+  statTitle: {
     fontSize: 14,
     color: 'rgba(255,255,255,0.7)',
-    marginTop: 2,
+    textAlign: 'center',
   },
-  setItem: {
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    overflow: 'hidden',
+  section: {
+    marginBottom: 30,
   },
-  setInfo: {
-    flex: 1,
-  },
-  setExercise: {
-    fontSize: 16,
-    fontWeight: '600',
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
     color: 'white',
+    marginBottom: 16,
   },
-  setDetails: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 4,
+  progressCard: {
+    padding: 20,
+    height: 200,
   },
-  setDate: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.6)',
-    marginTop: 4,
+  weekDays: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: '100%',
   },
-  emptyState: {
-    padding: 40,
-    borderRadius: 16,
+  dayColumn: {
+    flex: 1,
     alignItems: 'center',
-    overflow: 'hidden',
+    justifyContent: 'flex-end',
   },
-  emptyText: {
+  dayBar: {
+    width: '60%',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  dayBarActive: {
+    backgroundColor: 'rgba(102, 126, 234, 0.8)',
+  },
+  dayText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  dayTextActive: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  exportCard: {
+    padding: 30,
+    alignItems: 'center',
+  },
+  exportTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: 'white',
     marginTop: 16,
+    marginBottom: 8,
   },
-  emptySubtext: {
+  exportDescription: {
     fontSize: 14,
     color: 'rgba(255,255,255,0.7)',
-    marginTop: 4,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  exportButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  exportBtn: {
+    minWidth: 120,
   },
 });
 
-export default StatsScreen;
+export default LiquidStatsScreen;

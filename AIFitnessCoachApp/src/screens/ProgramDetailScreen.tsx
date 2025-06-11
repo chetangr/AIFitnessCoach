@@ -1,522 +1,457 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
+  ActivityIndicator,
+  Alert,
   Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { exerciseService } from '../services/exerciseService';
-import { WorkoutProgram, Exercise } from '../data/exercisesDatabase';
+// import { useAuthStore } from '../store/authStore';
+// import { useThemeStore } from '../store/themeStore';
+// import backendWorkoutService from '../services/backendWorkoutService';
 
-const { width } = Dimensions.get('window');
+// const { width } = Dimensions.get('window');
 
-interface ProgramDetailScreenProps {
-  navigation: any;
-  route: {
-    params: {
-      program: WorkoutProgram;
-    };
-  };
+type RootStackParamList = {
+  ProgramDetail: { programId: string };
+  WorkoutDetail: { workoutId: string };
+  ActiveWorkout: { workoutId: string };
+};
+
+type ProgramDetailRouteProp = RouteProp<RootStackParamList, 'ProgramDetail'>;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+interface WorkoutDay {
+  id: string;
+  day: string;
+  name: string;
+  exercises: number;
+  duration: string;
+  focus: string[];
+  completed?: boolean;
 }
 
-const ProgramDetailScreen: React.FC<ProgramDetailScreenProps> = ({ navigation, route }) => {
-  const { program } = route.params;
-  const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
+interface Program {
+  id: string;
+  name: string;
+  description: string;
+  duration: string;
+  level: string;
+  goal: string;
+  daysPerWeek: number;
+  equipment: string[];
+  currentWeek: number;
+  totalWeeks: number;
+  progress: number;
+  workouts: WorkoutDay[];
+}
 
-  // Animation values
-  const fadeAnim = new Animated.Value(0);
-  const slideAnim = new Animated.Value(50);
+const LiquidProgramDetailScreen: React.FC = () => {
+  const route = useRoute<ProgramDetailRouteProp>();
+  const navigation = useNavigation<NavigationProp>();
+  const { programId } = route.params;
+  // const { token } = useAuthStore();
+  // const { theme } = useThemeStore();
+  const [program, setProgram] = useState<Program | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedWeek, setSelectedWeek] = useState(1);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    loadProgramExercises();
-    
-    // Entrance animation
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
+    fetchProgramDetails();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 1000,
+      useNativeDriver: true,
+    }).start();
+  }, [programId]);
 
-  const createProgramExercises = (program: WorkoutProgram): Exercise[] => {
-    const programName = program.name.toLowerCase();
-    const level = program.level;
-    
-    // Define exercise templates based on program types
-    const exerciseTemplates: { [key: string]: Exercise[] } = {
-      transformation: [
-        {
-          id: 'push_ups',
-          name: 'Push-ups',
-          category: 'Chest',
-          muscles: ['Chest', 'Triceps'],
-          primaryMuscles: ['Chest', 'Triceps'],
-          secondaryMuscles: ['Shoulders', 'Core'],
-          equipment: 'Bodyweight',
-          difficulty: level,
-          description: 'Classic bodyweight chest exercise',
-          instructions: [
-            'Start in plank position with hands shoulder-width apart',
-            'Lower body until chest nearly touches floor',
-            'Push back up to starting position',
-            'Keep core tight throughout movement'
-          ],
-          tips: ['Keep body in straight line', 'Control the descent', 'Breathe steadily'],
-        },
-        {
-          id: 'squats',
-          name: 'Bodyweight Squats',
-          category: 'Legs',
-          muscles: ['Quadriceps', 'Glutes'],
-          primaryMuscles: ['Quadriceps', 'Glutes'],
-          secondaryMuscles: ['Hamstrings', 'Core'],
-          equipment: 'Bodyweight',
-          difficulty: level,
-          description: 'Fundamental lower body exercise',
-          instructions: [
-            'Stand with feet shoulder-width apart',
-            'Lower body by bending knees and hips',
-            'Keep chest up and core engaged',
-            'Return to standing position'
-          ],
-          tips: ['Keep knees tracking over toes', 'Go as low as comfortable', 'Drive through heels'],
-        },
-        {
-          id: 'plank',
-          name: 'Plank Hold',
-          category: 'Core',
-          muscles: ['Core', 'Shoulders'],
-          primaryMuscles: ['Core'],
-          secondaryMuscles: ['Shoulders', 'Glutes'],
-          equipment: 'Bodyweight',
-          difficulty: level,
-          description: 'Isometric core strengthening exercise',
-          instructions: [
-            'Start in push-up position',
-            'Hold body in straight line',
-            'Engage core muscles',
-            'Breathe steadily'
-          ],
-          tips: ['Don\'t let hips sag', 'Keep core tight', 'Start with shorter holds'],
-        },
-      ],
-      strength: [
-        {
-          id: 'deadlift',
-          name: 'Deadlift',
-          category: 'Back',
-          muscles: ['Back', 'Glutes'],
-          primaryMuscles: ['Erector Spinae', 'Glutes'],
-          secondaryMuscles: ['Hamstrings', 'Traps'],
-          equipment: 'Barbell',
-          difficulty: level,
-          description: 'Compound movement targeting posterior chain',
-          instructions: [
-            'Stand with feet hip-width apart',
-            'Grip bar with hands just outside legs',
-            'Keep back straight, lift by extending hips',
-            'Lower bar with control'
-          ],
-          tips: ['Keep bar close to body', 'Drive through heels', 'Maintain neutral spine'],
-        },
-        {
-          id: 'bench_press',
-          name: 'Bench Press',
-          category: 'Chest',
-          muscles: ['Chest', 'Triceps'],
-          primaryMuscles: ['Chest'],
-          secondaryMuscles: ['Triceps', 'Shoulders'],
-          equipment: 'Barbell',
-          difficulty: level,
-          description: 'Primary chest building exercise',
-          instructions: [
-            'Lie on bench with feet flat on floor',
-            'Grip bar slightly wider than shoulders',
-            'Lower bar to chest with control',
-            'Press back up to starting position'
-          ],
-          tips: ['Keep shoulder blades retracted', 'Touch chest lightly', 'Control the weight'],
-        },
-        {
-          id: 'squat',
-          name: 'Barbell Squat',
-          category: 'Legs',
-          muscles: ['Quadriceps', 'Glutes'],
-          primaryMuscles: ['Quadriceps', 'Glutes'],
-          secondaryMuscles: ['Hamstrings', 'Core'],
-          equipment: 'Barbell',
-          difficulty: level,
-          description: 'King of leg exercises',
-          instructions: [
-            'Position bar on upper back',
-            'Stand with feet shoulder-width apart',
-            'Lower by sitting back and down',
-            'Drive through heels to stand'
-          ],
-          tips: ['Keep chest up', 'Track knees over toes', 'Full range of motion'],
-        },
-      ],
-      hiit: [
-        {
-          id: 'burpees',
-          name: 'Burpees',
-          category: 'Cardio',
-          muscles: ['Full Body'],
-          primaryMuscles: ['Full Body'],
-          secondaryMuscles: [],
-          equipment: 'Bodyweight',
-          difficulty: level,
-          description: 'High-intensity full body exercise',
-          instructions: [
-            'Start standing',
-            'Drop into squat, hands on floor',
-            'Jump feet back to plank',
-            'Jump feet forward, then jump up'
-          ],
-          tips: ['Land softly', 'Keep core engaged', 'Modify as needed'],
-        },
-        {
-          id: 'mountain_climbers',
-          name: 'Mountain Climbers',
-          category: 'Cardio',
-          muscles: ['Core', 'Shoulders'],
-          primaryMuscles: ['Core'],
-          secondaryMuscles: ['Shoulders', 'Legs'],
-          equipment: 'Bodyweight',
-          difficulty: level,
-          description: 'Dynamic core and cardio exercise',
-          instructions: [
-            'Start in plank position',
-            'Bring one knee to chest',
-            'Quickly switch legs',
-            'Maintain plank position'
-          ],
-          tips: ['Keep hips level', 'Move quickly', 'Breathe steadily'],
-        },
-        {
-          id: 'jumping_jacks',
-          name: 'Jumping Jacks',
-          category: 'Cardio',
-          muscles: ['Full Body'],
-          primaryMuscles: ['Legs'],
-          secondaryMuscles: ['Shoulders', 'Core'],
-          equipment: 'Bodyweight',
-          difficulty: level,
-          description: 'Classic cardio warm-up exercise',
-          instructions: [
-            'Start with feet together, arms at sides',
-            'Jump feet apart while raising arms overhead',
-            'Jump back to starting position',
-            'Maintain steady rhythm'
-          ],
-          tips: ['Land on balls of feet', 'Keep core engaged', 'Stay light on feet'],
-        },
-      ]
-    };
-
-    // Determine which exercise set to use based on program name
-    let selectedExercises: Exercise[] = [];
-    
-    if (programName.includes('transformation') || programName.includes('12 week')) {
-      selectedExercises = exerciseTemplates.transformation;
-    } else if (programName.includes('strength') || programName.includes('builder')) {
-      selectedExercises = exerciseTemplates.strength;
-    } else if (programName.includes('hiit') || programName.includes('shred') || programName.includes('cardio')) {
-      selectedExercises = exerciseTemplates.hiit;
-    } else if (programName.includes('upper')) {
-      selectedExercises = [exerciseTemplates.strength[1], exerciseTemplates.transformation[0], exerciseTemplates.strength[0]]; // Bench, Push-ups, Deadlift
-    } else {
-      // Default mixed workout
-      selectedExercises = [
-        exerciseTemplates.transformation[0], // Push-ups
-        exerciseTemplates.transformation[1], // Squats
-        exerciseTemplates.transformation[2], // Plank
-      ];
-    }
-
-    return selectedExercises;
-  };
-
-  const loadProgramExercises = async () => {
+  const fetchProgramDetails = async () => {
     try {
       setLoading(true);
-      console.log('Loading exercises for program:', program);
-      
-      // Create realistic exercises based on program name and type
-      const programBasedExercises = createProgramExercises(program);
-      console.log('Created program-based exercises:', programBasedExercises);
-      setExercises(programBasedExercises);
+      // In a real app, this would fetch from the backend
+      // For now, using mock data
+      const mockProgram: Program = {
+        id: programId,
+        name: 'Strength & Hypertrophy',
+        description: 'A comprehensive 12-week program designed to build muscle mass and increase strength through progressive overload and strategic periodization.',
+        duration: '12 weeks',
+        level: 'Intermediate',
+        goal: 'Build Muscle',
+        daysPerWeek: 4,
+        equipment: ['Barbell', 'Dumbbell', 'Cable Machine', 'Pull-up Bar'],
+        currentWeek: 3,
+        totalWeeks: 12,
+        progress: 25,
+        workouts: [
+          {
+            id: '1',
+            day: 'Monday',
+            name: 'Upper Power',
+            exercises: 6,
+            duration: '60 min',
+            focus: ['Chest', 'Back', 'Shoulders'],
+            completed: true,
+          },
+          {
+            id: '2',
+            day: 'Tuesday',
+            name: 'Lower Power',
+            exercises: 5,
+            duration: '55 min',
+            focus: ['Quads', 'Hamstrings', 'Glutes'],
+            completed: true,
+          },
+          {
+            id: '3',
+            day: 'Thursday',
+            name: 'Upper Hypertrophy',
+            exercises: 8,
+            duration: '70 min',
+            focus: ['Chest', 'Back', 'Arms'],
+            completed: false,
+          },
+          {
+            id: '4',
+            day: 'Friday',
+            name: 'Lower Hypertrophy',
+            exercises: 7,
+            duration: '65 min',
+            focus: ['Legs', 'Calves', 'Core'],
+            completed: false,
+          },
+        ],
+      };
+      setProgram(mockProgram);
     } catch (error) {
-      console.error('Failed to load program exercises:', error);
-      // Load some default exercises as fallback
-      setExercises([
-        {
-          id: 'default_1',
-          name: 'Push-ups',
-          category: 'Chest',
-          muscles: ['Chest', 'Triceps'],
-          primaryMuscles: ['Chest', 'Triceps'],
-          secondaryMuscles: ['Shoulders', 'Core'],
-          equipment: 'Bodyweight',
-          difficulty: 'Beginner',
-          description: 'Classic bodyweight chest exercise',
-          instructions: [
-            'Start in plank position',
-            'Lower body until chest nearly touches floor',
-            'Push back up to starting position'
-          ],
-          tips: ['Keep core tight', 'Maintain straight body line'],
-        },
-        {
-          id: 'default_2',
-          name: 'Squats',
-          category: 'Legs',
-          muscles: ['Quadriceps', 'Glutes'],
-          primaryMuscles: ['Quadriceps', 'Glutes'],
-          secondaryMuscles: ['Hamstrings', 'Core'],
-          equipment: 'Bodyweight',
-          difficulty: 'Beginner',
-          description: 'Fundamental lower body exercise',
-          instructions: [
-            'Stand with feet shoulder-width apart',
-            'Lower body by bending knees and hips',
-            'Return to standing position'
-          ],
-          tips: ['Keep knees tracking over toes', 'Maintain upright torso'],
-        },
-      ]);
+      console.error('Error fetching program details:', error);
+      Alert.alert('Error', 'Failed to load program details');
     } finally {
       setLoading(false);
     }
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'Beginner': return '#4CAF50';
-      case 'Intermediate': return '#FF9800';
-      case 'Advanced': return '#F44336';
-      default: return '#667eea';
-    }
+  const handleStartWorkout = (workout: WorkoutDay) => {
+    navigation.navigate('ActiveWorkout', { workoutId: workout.id });
   };
 
-  const toggleExerciseExpansion = (exerciseId: string) => {
-    setExpandedExercise(expandedExercise === exerciseId ? null : exerciseId);
+  const handleViewWorkout = (workout: WorkoutDay) => {
+    navigation.navigate('WorkoutDetail', { workoutId: workout.id });
   };
 
-  const startWorkout = () => {
-    navigation.navigate('ActiveWorkout', { 
-      program,
-      exercises: exercises.map(ex => ex.id) 
-    });
-  };
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 200],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
 
-  const renderExercise = (exercise: Exercise, index: number) => {
-    const isExpanded = expandedExercise === exercise.id;
-    
-    return (
-      <Animated.View
-        key={exercise.id}
-        style={[
-          styles.exerciseCard,
-          {
-            opacity: fadeAnim,
-            transform: [{
-              translateY: slideAnim.interpolate({
-                inputRange: [0, 50],
-                outputRange: [0, 50],
-                extrapolate: 'clamp',
-              })
-            }]
-          }
-        ]}
-      >
-        <BlurView intensity={25} tint="light" style={styles.exerciseContainer}>
-          <TouchableOpacity
-            onPress={() => toggleExerciseExpansion(exercise.id)}
-            style={styles.exerciseHeader}
-          >
-            <View style={styles.exerciseNumber}>
-              <Text style={styles.exerciseNumberText}>{index + 1}</Text>
-            </View>
-            
-            <View style={styles.exerciseInfo}>
-              <Text style={styles.exerciseName}>{exercise.name}</Text>
-              <View style={styles.exerciseMeta}>
-                <View style={styles.exerciseTag}>
-                  <Icon name="body" size={12} color="white" />
-                  <Text style={styles.exerciseTagText}>
-                    {exercise.primaryMuscles.join(', ')}
-                  </Text>
-                </View>
-                <View style={styles.exerciseTag}>
-                  <Icon name="barbell" size={12} color="white" />
-                  <Text style={styles.exerciseTagText}>{exercise.equipment}</Text>
-                </View>
-              </View>
-            </View>
+  const headerScale = scrollY.interpolate({
+    inputRange: [0, 200],
+    outputRange: [0.95, 1],
+    extrapolate: 'clamp',
+  });
 
-            <View style={styles.exerciseRight}>
-              <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor(exercise.difficulty) }]}>
-                <Text style={styles.difficultyText}>{exercise.difficulty}</Text>
-              </View>
-              <Icon 
-                name={isExpanded ? "chevron-up" : "chevron-down"} 
-                size={20} 
-                color="white" 
-                style={styles.expandIcon}
-              />
-            </View>
-          </TouchableOpacity>
-
-          {isExpanded && (
-            <Animated.View style={styles.exerciseDetails}>
-              <Text style={styles.exerciseDescription}>{exercise.description}</Text>
-              
-              {exercise.instructions && exercise.instructions.length > 0 && (
-                <View style={styles.instructionsSection}>
-                  <Text style={styles.sectionTitle}>Instructions:</Text>
-                  {exercise.instructions.map((instruction, idx) => (
-                    <Text key={idx} style={styles.instructionText}>
-                      {idx + 1}. {instruction}
-                    </Text>
-                  ))}
-                </View>
-              )}
-
-              {exercise.tips && exercise.tips.length > 0 && (
-                <View style={styles.tipsSection}>
-                  <Text style={styles.sectionTitle}>Tips:</Text>
-                  {exercise.tips.map((tip, idx) => (
-                    <Text key={idx} style={styles.tipText}>
-                      • {tip}
-                    </Text>
-                  ))}
-                </View>
-              )}
-
-              {exercise.secondaryMuscles && exercise.secondaryMuscles.length > 0 && (
-                <View style={styles.musclesSection}>
-                  <Text style={styles.sectionTitle}>Secondary Muscles:</Text>
-                  <Text style={styles.musclesText}>
-                    {exercise.secondaryMuscles.join(', ')}
-                  </Text>
-                </View>
-              )}
-            </Animated.View>
-          )}
-        </BlurView>
-      </Animated.View>
-    );
-  };
-
-  return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={28} color="white" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Program Details</Text>
-        <View style={{ width: 28 }} />
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Program Overview */}
-        <Animated.View
+  const renderWeekSelector = () => (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.weekSelector}
+      contentContainerStyle={styles.weekSelectorContent}
+    >
+      {Array.from({ length: program?.totalWeeks || 12 }, (_, i) => i + 1).map((week) => (
+        <TouchableOpacity
+          key={week}
+          onPress={() => setSelectedWeek(week)}
           style={[
-            styles.programOverview,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }]
-            }
+            styles.weekTab,
+            selectedWeek === week && styles.weekTabActive,
+            week === program?.currentWeek && styles.weekTabCurrent,
           ]}
         >
-          <BlurView intensity={30} tint="light" style={styles.overviewContainer}>
-            <Text style={styles.programName}>{program.name}</Text>
-            <Text style={styles.programDescription}>{program.description}</Text>
-            
-            <View style={styles.programStats}>
-              <View style={styles.statItem}>
-                <Icon name="time" size={20} color="#4CAF50" />
-                <Text style={styles.statLabel}>Duration</Text>
-                <Text style={styles.statValue}>{program.duration}</Text>
-              </View>
-              
-              <View style={styles.statItem}>
-                <Icon name="fitness" size={20} color="#2196F3" />
-                <Text style={styles.statLabel}>Exercises</Text>
-                <Text style={styles.statValue}>{program.exercises.length}</Text>
-              </View>
-              
-              <View style={styles.statItem}>
-                <Icon name="flame" size={20} color="#FF6B6B" />
-                <Text style={styles.statLabel}>Calories</Text>
-                <Text style={styles.statValue}>{program.estimatedCalories}</Text>
-              </View>
-            </View>
-
-            <View style={styles.programMeta}>
-              <View style={[styles.levelBadge, { backgroundColor: getDifficultyColor(program.level) }]}>
-                <Text style={styles.levelText}>{program.level}</Text>
-              </View>
-              
-              <View style={styles.trainerInfo}>
-                <Icon name="person" size={16} color="white" />
-                <Text style={styles.trainerText}>{program.trainer}</Text>
-              </View>
-              
-              <View style={styles.ratingInfo}>
-                <Icon name="star" size={16} color="#FFD700" />
-                <Text style={styles.ratingText}>{program.rating}</Text>
-              </View>
-            </View>
+          <BlurView
+            intensity={selectedWeek === week ? 100 : 60}
+            tint={true ? 'dark' : 'light'}
+            style={styles.weekTabBlur}
+          >
+            <Text style={[
+              styles.weekTabText,
+              selectedWeek === week && styles.weekTabTextActive,
+            ]}>
+              Week {week}
+            </Text>
+            {week === program?.currentWeek && (
+              <View style={styles.currentWeekDot} />
+            )}
           </BlurView>
-        </Animated.View>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
 
-        {/* Exercise List */}
-        <View style={styles.exercisesSection}>
-          <Text style={styles.sectionHeader}>Exercises ({exercises.length})</Text>
-          
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <Icon name="fitness" size={60} color="rgba(255,255,255,0.5)" />
-              <Text style={styles.loadingText}>Loading exercises...</Text>
+  const renderWorkoutCard = (workout: WorkoutDay) => (
+    <TouchableOpacity
+      key={workout.id}
+      onPress={() => handleViewWorkout(workout)}
+      style={styles.workoutCard}
+      activeOpacity={0.8}
+    >
+      <BlurView
+        intensity={80}
+        tint={true ? 'dark' : 'light'}
+        style={styles.workoutCardBlur}
+      >
+        <LinearGradient
+          colors={workout.completed 
+            ? ['rgba(76,217,100,0.1)', 'rgba(76,217,100,0.05)']
+            : ['rgba(0,122,255,0.1)', 'rgba(0,122,255,0.05)']}
+          style={styles.workoutCardGradient}
+        >
+          <View style={styles.workoutHeader}>
+            <View>
+              <Text style={styles.workoutDay}>{workout.day}</Text>
+              <Text style={styles.workoutName}>{workout.name}</Text>
             </View>
-          ) : (
-            <View style={styles.exercisesList}>
-              {exercises.map((exercise, index) => renderExercise(exercise, index))}
-            </View>
-          )}
-        </View>
-      </ScrollView>
+            {workout.completed && (
+              <View style={styles.completedBadge}>
+                <Ionicons name="checkmark-circle" size={24} color="#4CD964" />
+              </View>
+            )}
+          </View>
 
-      {/* Fixed Start Workout Button */}
-      <View style={styles.startButtonContainer}>
-        <BlurView intensity={90} tint="light" style={styles.startButtonWrapper}>
-          <TouchableOpacity style={styles.startButton} onPress={startWorkout}>
-            <LinearGradient colors={['#4CAF50', '#45a049']} style={styles.startGradient}>
-              <Icon name="play" size={24} color="white" />
-              <Text style={styles.startButtonText}>Start Workout</Text>
-            </LinearGradient>
+          <View style={styles.workoutDetails}>
+            <View style={styles.workoutDetailItem}>
+              <Ionicons name="fitness" size={16} color="#999" />
+              <Text style={styles.workoutDetailText}>{workout.exercises} exercises</Text>
+            </View>
+            <View style={styles.workoutDetailItem}>
+              <Ionicons name="time" size={16} color="#999" />
+              <Text style={styles.workoutDetailText}>{workout.duration}</Text>
+            </View>
+          </View>
+
+          <View style={styles.focusAreas}>
+            {workout.focus.map((area, index) => (
+              <View key={index} style={styles.focusTag}>
+                <Text style={styles.focusTagText}>{area}</Text>
+              </View>
+            ))}
+          </View>
+
+          <TouchableOpacity
+            onPress={() => handleStartWorkout(workout)}
+            style={[
+              styles.startButton,
+              workout.completed && styles.startButtonCompleted,
+            ]}
+          >
+            <BlurView
+              intensity={100}
+              tint={true ? 'dark' : 'light'}
+              style={styles.startButtonBlur}
+            >
+              <Text style={styles.startButtonText}>
+                {workout.completed ? 'Do Again' : 'Start Workout'}
+              </Text>
+              <Ionicons 
+                name="arrow-forward" 
+                size={20} 
+                color={workout.completed ? '#4CD964' : '#007AFF'} 
+              />
+            </BlurView>
           </TouchableOpacity>
-        </BlurView>
+        </LinearGradient>
+      </BlurView>
+    </TouchableOpacity>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
       </View>
-    </LinearGradient>
+    );
+  }
+
+  if (!program) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Program not found</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <LinearGradient
+        colors={true 
+          ? ['#000000', '#1a1a1a', '#000000']
+          : ['#f8f9fa', '#ffffff', '#f8f9fa']}
+        style={StyleSheet.absoluteFillObject}
+      />
+
+      {/* Animated Header */}
+      <Animated.View 
+        style={[
+          styles.header,
+          {
+            opacity: headerOpacity,
+            transform: [{ scale: headerScale }],
+          },
+        ]}
+      >
+        <BlurView
+          intensity={100}
+          tint={true ? 'dark' : 'light'}
+          style={styles.headerBlur}
+        >
+          <SafeAreaView edges={['top']} style={styles.headerContent}>
+            <TouchableOpacity 
+              onPress={() => navigation.goBack()}
+              style={styles.backButton}
+            >
+              <Ionicons name="arrow-back" size={24} color={true ? '#fff' : '#000'} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle} numberOfLines={1}>{program.name}</Text>
+            <TouchableOpacity style={styles.moreButton}>
+              <Ionicons name="ellipsis-horizontal" size={24} color={true ? '#fff' : '#000'} />
+            </TouchableOpacity>
+          </SafeAreaView>
+        </BlurView>
+      </Animated.View>
+
+      <Animated.ScrollView
+        style={styles.scrollView}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
+      >
+        <Animated.View style={{ opacity: fadeAnim }}>
+          {/* Hero Section */}
+          <View style={styles.heroSection}>
+            <SafeAreaView edges={['top']}>
+              <TouchableOpacity 
+                onPress={() => navigation.goBack()}
+                style={styles.heroBackButton}
+              >
+                <BlurView
+                  intensity={80}
+                  tint={true ? 'dark' : 'light'}
+                  style={styles.heroBackButtonBlur}
+                >
+                  <Ionicons name="arrow-back" size={24} color={true ? '#fff' : '#000'} />
+                </BlurView>
+              </TouchableOpacity>
+            </SafeAreaView>
+
+            <View style={styles.heroContent}>
+              <Text style={styles.programName}>{program.name}</Text>
+              <Text style={styles.programDescription}>{program.description}</Text>
+
+              {/* Program Stats */}
+              <View style={styles.statsGrid}>
+                <View style={styles.statItem}>
+                  <BlurView
+                    intensity={80}
+                    tint={true ? 'dark' : 'light'}
+                    style={styles.statItemBlur}
+                  >
+                    <Ionicons name="calendar" size={24} color="#007AFF" />
+                    <Text style={styles.statValue}>{program.duration}</Text>
+                    <Text style={styles.statLabel}>Duration</Text>
+                  </BlurView>
+                </View>
+
+                <View style={styles.statItem}>
+                  <BlurView
+                    intensity={80}
+                    tint={true ? 'dark' : 'light'}
+                    style={styles.statItemBlur}
+                  >
+                    <Ionicons name="trending-up" size={24} color="#34C759" />
+                    <Text style={styles.statValue}>{program.level}</Text>
+                    <Text style={styles.statLabel}>Level</Text>
+                  </BlurView>
+                </View>
+
+                <View style={styles.statItem}>
+                  <BlurView
+                    intensity={80}
+                    tint={true ? 'dark' : 'light'}
+                    style={styles.statItemBlur}
+                  >
+                    <Ionicons name="fitness" size={24} color="#FF9500" />
+                    <Text style={styles.statValue}>{program.daysPerWeek}</Text>
+                    <Text style={styles.statLabel}>Days/Week</Text>
+                  </BlurView>
+                </View>
+              </View>
+
+              {/* Progress Bar */}
+              <View style={styles.progressSection}>
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressTitle}>Overall Progress</Text>
+                  <Text style={styles.progressPercentage}>{program.progress}%</Text>
+                </View>
+                <View style={styles.progressBarContainer}>
+                  <LinearGradient
+                    colors={['#007AFF', '#0051D5']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={[styles.progressBar, { width: `${program.progress}%` }]}
+                  />
+                </View>
+                <Text style={styles.progressText}>
+                  Week {program.currentWeek} of {program.totalWeeks}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Week Selector */}
+          {renderWeekSelector()}
+
+          {/* Workouts Section */}
+          <View style={styles.workoutsSection}>
+            <Text style={styles.sectionTitle}>Weekly Schedule</Text>
+            {program.workouts.map(renderWorkoutCard)}
+          </View>
+
+          {/* Equipment Section */}
+          <View style={styles.equipmentSection}>
+            <Text style={styles.sectionTitle}>Required Equipment</Text>
+            <View style={styles.equipmentGrid}>
+              {program.equipment.map((item, index) => (
+                <View key={index} style={styles.equipmentItem}>
+                  <BlurView
+                    intensity={80}
+                    tint={true ? 'dark' : 'light'}
+                    style={styles.equipmentItemBlur}
+                  >
+                    <Ionicons name="barbell" size={20} color="#007AFF" />
+                    <Text style={styles.equipmentText}>{item}</Text>
+                  </BlurView>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Bottom spacing */}
+          <View style={{ height: 100 }} />
+        </Animated.View>
+      </Animated.ScrollView>
+    </View>
   );
 };
 
@@ -524,263 +459,307 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 50,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  content: {
+  loadingContainer: {
     flex: 1,
-    paddingHorizontal: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  programOverview: {
-    marginBottom: 30,
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  overviewContainer: {
-    borderRadius: 20,
-    padding: 25,
+  errorText: {
+    fontSize: 16,
+    color: '#999',
+  },
+  header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+  },
+  headerBlur: {
     overflow: 'hidden',
   },
-  programName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 12,
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  backButton: {
+    padding: 5,
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000',
+    flex: 1,
     textAlign: 'center',
+    marginHorizontal: 10,
+  },
+  moreButton: {
+    padding: 5,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  heroSection: {
+    paddingTop: 20,
+    paddingBottom: 30,
+  },
+  heroBackButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    zIndex: 10,
+  },
+  heroBackButtonBlur: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  heroContent: {
+    paddingHorizontal: 20,
+    paddingTop: 80,
+  },
+  programName: {
+    fontSize: 34,
+    fontWeight: 'bold',
+    color: '#000',
+    marginBottom: 10,
   },
   programDescription: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.9)',
+    color: '#666',
     lineHeight: 24,
-    textAlign: 'center',
-    marginBottom: 25,
+    marginBottom: 30,
   },
-  programStats: {
+  statsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
+    justifyContent: 'space-between',
+    marginBottom: 30,
   },
   statItem: {
-    alignItems: 'center',
     flex: 1,
+    marginHorizontal: 5,
   },
-  statLabel: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-    marginTop: 8,
+  statItemBlur: {
+    padding: 20,
+    borderRadius: 20,
+    alignItems: 'center',
+    overflow: 'hidden',
   },
   statValue: {
-    color: 'white',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginTop: 4,
+    color: '#000',
+    marginTop: 10,
   },
-  programMeta: {
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 5,
+  },
+  progressSection: {
+    marginBottom: 20,
+  },
+  progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 10,
   },
-  levelBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  levelText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  trainerInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  trainerText: {
-    color: 'white',
-    fontSize: 14,
+  progressTitle: {
+    fontSize: 16,
     fontWeight: '600',
+    color: '#000',
   },
-  ratingInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  ratingText: {
-    color: 'white',
-    fontSize: 14,
+  progressPercentage: {
+    fontSize: 16,
     fontWeight: '600',
+    color: '#007AFF',
   },
-  exercisesSection: {
-    marginBottom: 100,
+  progressBarContainer: {
+    height: 8,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 10,
   },
-  sectionHeader: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: 'white',
+  progressBar: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  weekSelector: {
     marginBottom: 20,
   },
-  exercisesList: {
-    gap: 12,
+  weekSelectorContent: {
+    paddingHorizontal: 20,
   },
-  exerciseCard: {
-    marginBottom: 12,
+  weekTab: {
+    marginRight: 10,
   },
-  exerciseContainer: {
-    borderRadius: 16,
+  weekTabBlur: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
     overflow: 'hidden',
+    position: 'relative',
   },
-  exerciseHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
+  weekTabActive: {
+    transform: [{ scale: 1.05 }],
   },
-  exerciseNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
+  weekTabCurrent: {
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    borderRadius: 20,
   },
-  exerciseNumberText: {
-    color: 'white',
+  weekTabText: {
     fontSize: 14,
-    fontWeight: 'bold',
+    color: '#666',
+    fontWeight: '500',
   },
-  exerciseInfo: {
-    flex: 1,
+  weekTabTextActive: {
+    color: '#007AFF',
+    fontWeight: '600',
   },
-  exerciseName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 8,
+  currentWeekDot: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#007AFF',
   },
-  exerciseMeta: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  exerciseTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
-  },
-  exerciseTagText: {
-    color: 'white',
-    fontSize: 11,
-  },
-  exerciseRight: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  difficultyBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  difficultyText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  expandIcon: {
-    marginTop: 4,
-  },
-  exerciseDetails: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
-  },
-  exerciseDescription: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  instructionsSection: {
-    marginBottom: 16,
+  workoutsSection: {
+    paddingHorizontal: 20,
+    marginBottom: 30,
   },
   sectionTitle: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 20,
   },
-  instructionText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 4,
+  workoutCard: {
+    marginBottom: 15,
   },
-  tipsSection: {
-    marginBottom: 16,
-  },
-  tipText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 4,
-  },
-  musclesSection: {
-    marginBottom: 8,
-  },
-  musclesText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  loadingText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 16,
-    marginTop: 12,
-  },
-  startButtonContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    paddingBottom: 30,
-  },
-  startButtonWrapper: {
-    borderRadius: 25,
+  workoutCardBlur: {
+    borderRadius: 20,
     overflow: 'hidden',
   },
-  startButton: {
-    borderRadius: 25,
-    overflow: 'hidden',
+  workoutCardGradient: {
+    padding: 20,
   },
-  startGradient: {
+  workoutHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 15,
+  },
+  workoutDay: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+  },
+  workoutName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+  },
+  completedBadge: {
+    backgroundColor: 'rgba(76,217,100,0.1)',
+    borderRadius: 12,
+    padding: 4,
+  },
+  workoutDetails: {
+    flexDirection: 'row',
+    marginBottom: 15,
+  },
+  workoutDetailItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 40,
-    paddingVertical: 18,
-    gap: 12,
+    marginRight: 20,
+  },
+  workoutDetailText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 5,
+  },
+  focusAreas: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 15,
+  },
+  focusTag: {
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  focusTagText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  startButton: {
+    alignSelf: 'flex-start',
+  },
+  startButtonCompleted: {
+    opacity: 0.8,
+  },
+  startButtonBlur: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    overflow: 'hidden',
   },
   startButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
+    marginRight: 8,
+  },
+  equipmentSection: {
+    paddingHorizontal: 20,
+    marginBottom: 30,
+  },
+  equipmentGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  equipmentItem: {
+    marginRight: 10,
+    marginBottom: 10,
+  },
+  equipmentItemBlur: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  equipmentText: {
+    fontSize: 14,
+    color: '#000',
+    marginLeft: 8,
   },
 });
 
-export default ProgramDetailScreen;
+export default LiquidProgramDetailScreen;

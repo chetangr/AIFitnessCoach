@@ -38,6 +38,15 @@ class WorkoutActionService {
         case 'remove_workout':
           return await this.removeWorkout(action.data);
         
+        case 'get_suggestions':
+          return await this.getWorkoutSuggestions(action.data);
+        
+        case 'apply_suggestion':
+          return await this.applySuggestion(action.data);
+        
+        case 'swap_workout':
+          return await this.swapWorkout(action.data);
+        
         default:
           console.warn('Unknown action type:', action.type);
           return false;
@@ -393,6 +402,91 @@ class WorkoutActionService {
     if (name.includes('band')) equipment.push('resistance band');
     
     return equipment.length > 0 ? equipment : ['bodyweight'];
+  }
+
+  /**
+   * Get AI-powered workout suggestions
+   */
+  private async getWorkoutSuggestions(_data?: any): Promise<boolean> {
+    try {
+      // This will trigger the AI to generate workout suggestions
+      Alert.alert(
+        'Getting Suggestions',
+        'The AI coach is analyzing your stats and history to suggest personalized workouts...',
+        [{ text: 'OK' }]
+      );
+      
+      // The actual suggestions will come from the backend
+      // This just acknowledges the action
+      return true;
+    } catch (error) {
+      console.error('Error getting suggestions:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Apply a workout suggestion
+   */
+  private async applySuggestion(data?: any): Promise<boolean> {
+    try {
+      if (!data || !data.suggestionId) {
+        Alert.alert('Error', 'No suggestion selected to apply.');
+        return false;
+      }
+
+      // Get the date to apply to (default to today)
+      const targetDate = data.date ? new Date(data.date) : new Date();
+      targetDate.setHours(0, 0, 0, 0);
+
+      Alert.alert(
+        'Applying Suggestion',
+        `Applying the suggested workout to ${targetDate.toLocaleDateString()}...`,
+        [{ text: 'OK' }]
+      );
+
+      // The backend will handle the actual application
+      appEventEmitter.emitScheduleChanged();
+      
+      return true;
+    } catch (error) {
+      console.error('Error applying suggestion:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Swap current workout with a suggestion
+   */
+  private async swapWorkout(data?: any): Promise<boolean> {
+    try {
+      if (!data || !data.suggestionId) {
+        Alert.alert('Error', 'No suggestion selected to swap.');
+        return false;
+      }
+
+      const today = new Date();
+      const todayWorkout = await workoutScheduleService.getWorkoutForDate(today);
+
+      if (!todayWorkout) {
+        Alert.alert('No Workout', 'No workout found for today to swap.');
+        return false;
+      }
+
+      Alert.alert(
+        'Swapping Workout',
+        'Swapping today\'s workout with the suggested alternative...',
+        [{ text: 'OK' }]
+      );
+
+      // The backend will handle the actual swap
+      appEventEmitter.emitScheduleChanged();
+      
+      return true;
+    } catch (error) {
+      console.error('Error swapping workout:', error);
+      throw error;
+    }
   }
 }
 

@@ -18,7 +18,7 @@ class AICoachService {
     }
   }
 
-  async sendMessage(message: string, imageUri?: string): Promise<string> {
+  async sendMessage(message: string, imageUri?: string, context?: any): Promise<string> {
     // Ensure user context is loaded
     if (!this.userContext) {
       await this.loadUserContext();
@@ -75,14 +75,14 @@ class AICoachService {
       }
 
       // Enhanced fallback responses
-      return this.generateLocalResponse(message, imageUri);
+      return this.generateLocalResponse(message, imageUri, context);
     } catch (error) {
       console.error('AI Service Error:', error);
-      return this.generateLocalResponse(message, imageUri);
+      return this.generateLocalResponse(message, imageUri, context);
     }
   }
 
-  private generateLocalResponse(message: string, imageUri?: string): string {
+  private generateLocalResponse(message: string, imageUri?: string, context?: any): string {
     if (imageUri) {
       return "I can see you've uploaded an image! While I can't analyze images in the local mode, I can help you with:\n\n• Form checks and technique tips\n• Exercise recommendations\n• Workout plans\n• Nutrition advice\n\nWhat would you like to know about?";
     }
@@ -131,15 +131,36 @@ class AICoachService {
       return nutritionAdvice + "\n\nWould you like specific meal suggestions for today?";
     }
 
+    // Stats and Analytics queries
+    if (lowerMessage.includes('stats') || lowerMessage.includes('calories burnt') || lowerMessage.includes('calories burned') || lowerMessage.includes('progress')) {
+      return `I'll help you analyze your fitness stats! To provide accurate information about your calories burnt and progress, I need to access your workout history and data.\n\nFor now, here's what I can tell you:\n• Your current fitness level: ${fitnessLevel}\n• Your goals: ${goals.join(', ')}\n\nTo get detailed stats:\n1. Check your workout history for completed sessions\n2. Review your measurements and progress photos\n3. Look at your personal records\n\nWould you like me to help you track today's workout or review your recent performance?`;
+    }
+
     // Exercises
     if (lowerMessage.includes('exercise') || lowerMessage.includes('best')) {
       return "Here are some of the best exercises by muscle group:\n\n🏋️ **Chest**: Bench press, push-ups, dips\n💪 **Back**: Pull-ups, rows, deadlifts\n🦵 **Legs**: Squats, lunges, leg press\n🤸 **Core**: Planks, crunches, mountain climbers\n\nWhich muscle group would you like to focus on?";
     }
 
-    // Schedule queries
-    if (lowerMessage.includes('schedule') || lowerMessage.includes('today') || lowerMessage.includes('what should i do')) {
+    // Schedule queries - but not stats queries
+    if ((lowerMessage.includes('schedule') || lowerMessage.includes('today') || lowerMessage.includes('what should i do')) 
+        && !lowerMessage.includes('stats') 
+        && !lowerMessage.includes('calories') 
+        && !lowerMessage.includes('progress') 
+        && !lowerMessage.includes('analytics')) {
       const dayOfWeek = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-      return `Happy ${dayOfWeek}, ${name}! Based on your ${fitnessLevel} level and goals (${goals.join(', ')}), here's what I recommend:\n\n${this.getScheduleRecommendation(dayOfWeek, fitnessLevel, goals)}\n\nRemember to listen to your body and adjust intensity as needed!`;
+      
+      // Check if we have actual scheduled workout data in context
+      if (context?.scheduled_workouts && !context.is_rest_day) {
+        const workout = context.scheduled_workouts;
+        return `Happy ${dayOfWeek}, ${name}! Here's your scheduled workout for today:\n\n🏋️ **${workout.title}**\n${workout.description || ''}\n\n⏱️ Duration: ${workout.duration}\n🔥 Calories: ~${workout.calories}\n💪 Difficulty: ${workout.difficulty}\n\n**Exercises:**\n${workout.exercises.map((ex: any, idx: number) => 
+          `${idx + 1}. ${ex.name} - ${ex.sets} sets x ${ex.reps} reps`
+        ).join('\n')}\n\nReady to crush this workout? Remember to warm up first and listen to your body!`;
+      } else if (context?.is_rest_day) {
+        return `Happy ${dayOfWeek}, ${name}! Today is a rest day. Here's what I recommend:\n\n🧘‍♀️ **Rest Day Activities**:\n• Light stretching or yoga (15-20 min)\n• Focus on nutrition and hydration\n• Optional: 20-30 min walk\n• Foam rolling for recovery\n\nRest days are crucial for muscle recovery and growth. Enjoy your day off!`;
+      } else {
+        // Fallback to generic recommendation if no context
+        return `Happy ${dayOfWeek}, ${name}! Based on your ${fitnessLevel} level and goals (${goals.join(', ')}), here's what I recommend:\n\n${this.getScheduleRecommendation(dayOfWeek, fitnessLevel, goals)}\n\nRemember to listen to your body and adjust intensity as needed!`;
+      }
     }
 
     // Default response - Personalized greeting

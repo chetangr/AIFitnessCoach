@@ -10,3 +10,4 @@ node_modules
 # Ignore all temporary files
 *.tmp
 # Ignore all backup files   
+wger*

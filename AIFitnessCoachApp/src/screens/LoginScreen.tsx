@@ -1,54 +1,52 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
+  ScrollView,
   TouchableOpacity,
+  StyleSheet,
+  Dimensions,
   KeyboardAvoidingView,
   Platform,
   Alert,
   Animated,
+  ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { LiquidGlassView, LiquidButton, LiquidCard } from '../components/glass';
 import { useAuthStore } from '../store/authStore';
-import { theme } from '../config/theme';
-import { easings } from '../utils/animations';
-import GlassComponents from '../components/glass/GlassComponents';
-// Logger removed - causing import errors
+import { useThemeStore } from '../store/themeStore';
 
-const LoginScreen = ({ navigation }: any) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+export default function LiquidLoginScreen() {
+  const navigation = useNavigation();
+  const { theme } = useThemeStore();
+  const { colors } = theme;
   const { login } = useAuthStore();
   
-  // Animation values
-  const logoScale = useRef(new Animated.Value(0.5)).current;
-  const formOpacity = useRef(new Animated.Value(0)).current;
-  const formTranslateY = useRef(new Animated.Value(50)).current;
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
-  useEffect(() => {
-    // Entrance animations
+  const fadeAnimation = useRef(new Animated.Value(0)).current;
+  const scaleAnimation = useRef(new Animated.Value(0.9)).current;
+  const rippleAnimation = useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
     Animated.parallel([
-      Animated.spring(logoScale, {
+      Animated.timing(fadeAnimation, {
         toValue: 1,
-        tension: 50,
-        friction: 5,
+        duration: 1000,
         useNativeDriver: true,
       }),
-      Animated.timing(formOpacity, {
+      Animated.spring(scaleAnimation, {
         toValue: 1,
-        duration: 500,
-        delay: 200,
-        easing: easings.easeOut,
-        useNativeDriver: true,
-      }),
-      Animated.timing(formTranslateY, {
-        toValue: 0,
-        duration: 500,
-        delay: 200,
-        easing: easings.easeOut,
+        friction: 4,
         useNativeDriver: true,
       }),
     ]).start();
@@ -56,165 +54,210 @@ const LoginScreen = ({ navigation }: any) => {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please enter email and password');
+      Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
-    setLoading(true);
-    console.log('Login Attempt', { email });
+    setIsLoading(true);
+    
+    // Trigger ripple animation
+    Animated.sequence([
+      Animated.timing(rippleAnimation, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(rippleAnimation, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
     try {
-      // Call backend login API
-      const { API_BASE_URL } = await import('../config/api');
-      const response = await fetch(`${API_BASE_URL}/api/auth/login-json`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: email,
-          password: password,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || 'Login failed');
-      }
-
-      const data = await response.json();
+      // For now, create a mock user (same as demo login)
+      // In production, this would make an API call to authenticate
+      const user = {
+        id: Date.now().toString(),
+        email: email,
+        name: email.split('@')[0],
+        token: 'mock-token-' + Date.now(),
+      };
       
-      // Set the auth token in backend service
-      const { backendAgentService } = await import('../services/backendAgentService');
-      await backendAgentService.setAuthToken(data.access_token);
-      
-      // Login with user data
-      await login({
-        id: data.user.id,
-        email: data.user.email,
-        name: data.user.display_name || data.user.email,
-        token: data.access_token,
-      });
-      
-      console.log('Login Successful', { email });
+      await login(user);
+      // Navigation handled by auth store
     } catch (error) {
-      console.log('Login Failed', error);
-      
-      // If backend fails, check for demo credentials
-      if (email === 'demo@fitness.com' && password === 'demo123') {
-        const demoToken = 'demo-token-' + Date.now();
-        const { backendAgentService } = await import('../services/backendAgentService');
-        await backendAgentService.setAuthToken(demoToken);
-        await login({
-          id: 'demo-user-001',
-          email: 'demo@fitness.com',
-          name: 'Demo User',
-          token: demoToken,
-        });
-      } else {
-        Alert.alert('Error', 'Invalid credentials. Try demo@fitness.com / demo123');
-      }
+      Alert.alert('Login Failed', 'Invalid email or password');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const handleDemoLogin = () => {
     setEmail('demo@fitness.com');
     setPassword('demo123');
-    console.log('Demo Login Button Pressed');
   };
 
   return (
-    <LinearGradient 
-      colors={theme.colors.primary.gradient as [string, string, string]} 
-      style={styles.container}
-    >
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <LinearGradient
+        colors={[colors.primary + '20', colors.secondary + '20', colors.background]}
+        style={StyleSheet.absoluteFillObject}
+      />
+      
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <View style={styles.content}>
-          {/* Animated Logo Section */}
-          <Animated.View 
-            style={[
-              styles.logoSection,
-              { transform: [{ scale: logoScale }] }
-            ]}
-          >
-            <Text style={styles.logo}>💪</Text>
-            <Text style={[styles.title, theme.typography.largeTitle]}>AI Fitness Coach</Text>
-            <Text style={[styles.subtitle, theme.typography.subheadline]}>Your Personal AI Trainer</Text>
-          </Animated.View>
-
-          {/* Animated Login Form */}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           <Animated.View
             style={[
-              { 
-                opacity: formOpacity,
-                transform: [{ translateY: formTranslateY }]
-              }
+              styles.content,
+              {
+                opacity: fadeAnimation,
+                transform: [{ scale: scaleAnimation }],
+              },
             ]}
           >
-            <GlassComponents.GlassContainer intensity="medium" style={styles.formContainer}>
-              <Text style={[styles.formTitle, theme.typography.title2]}>Welcome Back!</Text>
+            {/* Logo Section */}
+            <LiquidGlassView intensity={90} style={styles.logoContainer}>
+              <Ionicons name="fitness" size={80} color={colors.primary.main} />
+              <Text style={[styles.appName, { color: colors.text }]}>AI Fitness Coach</Text>
+              <Text style={[styles.tagline, { color: colors.text + '80' }]}>
+                Your Personal Training Assistant
+              </Text>
+            </LiquidGlassView>
 
-              <GlassComponents.GlassTextInput
-                icon="mail-outline"
-                placeholder="Enter your email"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                style={styles.inputSpacing}
-              />
-
-              <GlassComponents.GlassTextInput
-                icon="lock-closed-outline"
-                placeholder="Enter your password"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                style={styles.inputSpacing}
-              />
-
-              <GlassComponents.GlassButton
-                title="Login"
-                onPress={handleLogin}
-                loading={loading}
-                variant="primary"
-                size="large"
-                style={styles.loginButton}
-              />
-
-              <GlassComponents.GlassButton
-                title="Use Demo Account"
-                onPress={handleDemoLogin}
-                variant="secondary"
-                size="medium"
-                style={styles.demoButton}
-              />
-
-              <View style={styles.footer}>
-                <Text style={[styles.footerText, theme.typography.footnote]}>Don't have an account? </Text>
-                <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-                  <Text style={[styles.linkText, theme.typography.footnote]}>Sign Up</Text>
-                </TouchableOpacity>
+            {/* Login Form */}
+            <LiquidCard style={styles.formCard}>
+              <Text style={[styles.formTitle, { color: colors.text }]}>Welcome Back</Text>
+              
+              {/* Email Input */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.text + '80' }]}>Email</Text>
+                <LiquidGlassView intensity={70} style={styles.inputContainer}>
+                  <Ionicons 
+                    name="mail-outline" 
+                    size={20} 
+                    color={colors.text + '60'} 
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="Enter your email"
+                    placeholderTextColor={colors.text + '40'}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    style={[styles.input, { color: colors.text }]}
+                  />
+                </LiquidGlassView>
               </View>
-            </GlassComponents.GlassContainer>
-          </Animated.View>
+              
+              {/* Password Input */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.text + '80' }]}>Password</Text>
+                <LiquidGlassView intensity={70} style={styles.inputContainer}>
+                  <Ionicons 
+                    name="lock-closed-outline" 
+                    size={20} 
+                    color={colors.text + '60'} 
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="Enter your password"
+                    placeholderTextColor={colors.text + '40'}
+                    secureTextEntry={!showPassword}
+                    style={[styles.input, styles.passwordInput, { color: colors.text }]}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    style={styles.eyeButton}
+                  >
+                    <Ionicons 
+                      name={showPassword ? "eye-outline" : "eye-off-outline"} 
+                      size={20} 
+                      color={colors.text + '60'} 
+                    />
+                  </TouchableOpacity>
+                </LiquidGlassView>
+              </View>
+              
+              {/* Forgot Password */}
+              <TouchableOpacity style={styles.forgotPassword}>
+                <Text style={[styles.forgotPasswordText, { color: colors.secondary }]}>
+                  Forgot Password?
+                </Text>
+              </TouchableOpacity>
+              
+              {/* Login Button */}
+              <TouchableOpacity onPress={handleLogin} disabled={isLoading}>
+                <LiquidGlassView intensity={90} style={styles.loginButton}>
+                  {isLoading ? (
+                    <ActivityIndicator color={colors.background} />
+                  ) : (
+                    <>
+                      <Animated.View
+                        style={[
+                          StyleSheet.absoluteFillObject,
+                          styles.ripple,
+                          {
+                            backgroundColor: colors.background + '20',
+                            transform: [
+                              {
+                                scale: rippleAnimation.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [0, 4],
+                                }),
+                              },
+                            ],
+                            opacity: rippleAnimation.interpolate({
+                              inputRange: [0, 0.5, 1],
+                              outputRange: [0, 0.3, 0],
+                            }),
+                          },
+                        ]}
+                      />
+                      <LinearGradient
+                        colors={[colors.primary.main, colors.secondary]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={StyleSheet.absoluteFillObject}
+                      />
+                      <Text style={styles.loginButtonText}>Login</Text>
+                    </>
+                  )}
+                </LiquidGlassView>
+              </TouchableOpacity>
+              
+              {/* Demo Account */}
+              <TouchableOpacity onPress={handleDemoLogin} style={styles.demoButton}>
+                <Text style={[styles.demoText, { color: colors.text + '60' }]}>
+                  Use Demo Account
+                </Text>
+              </TouchableOpacity>
+            </LiquidCard>
 
-          {/* Demo Credentials Info */}
-          <GlassComponents.GlassContainer intensity="light" style={styles.demoInfo} animated={true} delay={400}>
-            <Text style={[styles.demoInfoTitle, theme.typography.caption1]}>Demo Credentials:</Text>
-            <Text style={[styles.demoInfoText, theme.typography.caption2]}>Email: demo@fitness.com</Text>
-            <Text style={[styles.demoInfoText, theme.typography.caption2]}>Password: demo123</Text>
-          </GlassComponents.GlassContainer>
-        </View>
+            {/* Sign Up Link */}
+            <View style={styles.signupContainer}>
+              <Text style={[styles.signupText, { color: colors.text + '80' }]}>
+                Don't have an account?
+              </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Register' as never)}>
+                <Text style={[styles.signupLink, { color: colors.primary.main }]}> Sign Up</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </ScrollView>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -223,68 +266,115 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
-  content: {
-    flex: 1,
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
-    padding: theme.spacing.lg,
+    paddingVertical: 40,
   },
-  logoSection: {
+  content: {
+    paddingHorizontal: 20,
+  },
+  logoContainer: {
     alignItems: 'center',
-    marginBottom: theme.spacing.xxl,
+    marginBottom: 40,
+    padding: 32,
+    borderRadius: 30,
   },
-  logo: {
-    fontSize: 60,
-    marginBottom: theme.spacing.sm,
+  appName: {
+    fontSize: 28,
+    fontWeight: '700',
+    marginTop: 16,
+    marginBottom: 8,
   },
-  title: {
-    color: theme.colors.neutral.white,
-    marginBottom: theme.spacing.xs,
+  tagline: {
+    fontSize: 16,
   },
-  subtitle: {
-    color: theme.colors.neutral.gray300,
-  },
-  formContainer: {
-    padding: theme.spacing.lg,
+  formCard: {
+    padding: 24,
+    marginBottom: 24,
   },
   formTitle: {
-    color: theme.colors.neutral.gray900,
-    marginBottom: theme.spacing.lg,
+    fontSize: 24,
+    fontWeight: '600',
+    marginBottom: 24,
     textAlign: 'center',
   },
-  inputSpacing: {
-    marginBottom: theme.spacing.md,
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 56,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    height: '100%',
+  },
+  passwordInput: {
+    paddingRight: 40,
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 16,
+    height: 56,
+    justifyContent: 'center',
+  },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginBottom: 24,
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   loginButton: {
-    marginTop: theme.spacing.lg,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  ripple: {
+    borderRadius: 28,
+  },
+  loginButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+    zIndex: 1,
   },
   demoButton: {
-    marginTop: theme.spacing.md,
+    alignItems: 'center',
+    paddingVertical: 12,
   },
-  footer: {
+  demoText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: theme.spacing.lg,
+    alignItems: 'center',
   },
-  footerText: {
-    color: theme.colors.neutral.gray300,
+  signupText: {
+    fontSize: 16,
   },
-  linkText: {
-    color: theme.colors.primary.pink,
-    fontWeight: 'bold',
-    textDecorationLine: 'underline',
-  },
-  demoInfo: {
-    marginTop: theme.spacing.xl,
-    padding: theme.spacing.md,
-  },
-  demoInfoTitle: {
-    color: theme.colors.neutral.white,
-    marginBottom: theme.spacing.xs,
-  },
-  demoInfoText: {
-    color: theme.colors.neutral.gray300,
-    marginBottom: theme.spacing.xs,
+  signupLink: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
-
-export default LoginScreen;

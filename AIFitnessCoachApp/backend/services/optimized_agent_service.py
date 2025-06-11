@@ -175,6 +175,14 @@ class OptimizedAgentService:
         agents = ["primary_coach"]  # Always include primary coach
         
         # Add relevant specialists based on keywords
+        # FITNESS_ACTION agent for workout creation, modification, scheduling
+        if any(word in message_lower for word in ["add workout", "create workout", "schedule workout", 
+                                                   "modify workout", "change workout", "reschedule",
+                                                   "add exercise", "remove exercise", "workout today",
+                                                   "workout tomorrow", "workout plan", "add leg day",
+                                                   "sets", "reps", "weights"]):
+            agents.append("fitness_action")
+        
         if any(word in message_lower for word in ["eat", "food", "diet", "nutrition", "calorie", "meal"]):
             agents.append("nutrition")
         

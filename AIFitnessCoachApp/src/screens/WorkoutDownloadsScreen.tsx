@@ -8,11 +8,12 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  SafeAreaView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { modernTheme } from '../config/modernTheme';
+import { ModernCard, ModernButton, ModernHeader } from '../components/modern/ModernComponents';
 
 interface DownloadableWorkout {
   id: string;
@@ -217,7 +218,7 @@ const WorkoutDownloadsScreen = ({ navigation }: any) => {
     const isDownloading = downloadingIds.includes(item.id);
 
     return (
-      <BlurView intensity={20} tint="light" style={styles.workoutCard}>
+      <ModernCard variant="elevated" style={styles.workoutCard}>
         <View style={styles.workoutHeader}>
           <View style={styles.workoutInfo}>
             <Text style={styles.workoutName}>{item.name}</Text>
@@ -294,22 +295,13 @@ const WorkoutDownloadsScreen = ({ navigation }: any) => {
             </TouchableOpacity>
           )}
         </View>
-      </BlurView>
+      </ModernCard>
     );
   };
 
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={24} color="white" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Download Workouts</Text>
-        <TouchableOpacity onPress={handleUpgrade}>
-          <Icon name="diamond" size={24} color="#FFD700" />
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.container}>
+      <ModernHeader title="Download Workouts" />
 
       {/* Filter Tabs */}
       <View style={styles.filterContainer}>
@@ -334,13 +326,14 @@ const WorkoutDownloadsScreen = ({ navigation }: any) => {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
-    </LinearGradient>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: modernTheme.colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -366,19 +359,19 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: modernTheme.colors.surface,
     alignItems: 'center',
   },
   activeFilterTab: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: modernTheme.colors.primary,
   },
   filterText: {
-    color: 'rgba(255,255,255,0.7)',
+    color: modernTheme.colors.textSecondary,
     fontSize: 14,
     fontWeight: '600',
   },
   activeFilterText: {
-    color: 'white',
+    color: '#FFFFFF',
   },
   listContent: {
     paddingHorizontal: 20,
@@ -387,8 +380,6 @@ const styles = StyleSheet.create({
   workoutCard: {
     padding: 20,
     marginBottom: 16,
-    borderRadius: 20,
-    overflow: 'hidden',
   },
   workoutHeader: {
     flexDirection: 'row',
@@ -402,12 +393,12 @@ const styles = StyleSheet.create({
   workoutName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: 'white',
+    color: modernTheme.colors.textPrimary,
     marginBottom: 4,
   },
   workoutDescription: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
+    color: modernTheme.colors.textSecondary,
     lineHeight: 20,
   },
   premiumBadge: {
@@ -436,7 +427,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metaText: {
-    color: 'rgba(255,255,255,0.7)',
+    color: modernTheme.colors.textTertiary,
     fontSize: 12,
   },
   levelBadge: {
@@ -461,11 +452,11 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   statText: {
-    color: 'rgba(255,255,255,0.7)',
+    color: modernTheme.colors.textTertiary,
     fontSize: 12,
   },
   sizeText: {
-    color: 'rgba(255,255,255,0.5)',
+    color: modernTheme.colors.textTertiary,
     fontSize: 12,
     marginLeft: 'auto',
   },
@@ -479,14 +470,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#667eea',
+    backgroundColor: modernTheme.colors.primary,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 16,
+    borderRadius: modernTheme.borderRadius.md,
     gap: 8,
   },
   downloadingButton: {
-    backgroundColor: 'rgba(102, 126, 234, 0.5)',
+    backgroundColor: modernTheme.colors.primary + '80',
   },
   downloadButtonText: {
     color: 'white',
@@ -498,10 +489,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: modernTheme.colors.success,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 16,
+    borderRadius: modernTheme.borderRadius.md,
     gap: 8,
   },
   playButtonText: {
@@ -513,7 +504,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(244, 67, 54, 0.2)',
+    backgroundColor: modernTheme.colors.error + '20',
     justifyContent: 'center',
     alignItems: 'center',
   },

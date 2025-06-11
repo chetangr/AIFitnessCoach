@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from api import auth, users, workouts, coach, exercises, programs, program_management
 from api import measurements, fasting, settings, workout_sessions, personal_records
 from api import custom_exercises, workout_templates, exercise_history, workout_schedule
-from api import theme
+from api import theme, workout_suggestions, exercise_management
 from services.async_database import engine, db_available, sync_engine
 from services.agent_service import AgentService
 from utils.logger import setup_logger
@@ -133,6 +133,8 @@ app.include_router(workout_templates.router, prefix="/api/workout-templates", ta
 app.include_router(exercise_history.router, prefix="/api/exercise-history", tags=["Exercise History"])
 app.include_router(workout_schedule.router, prefix="/api/workout-schedule", tags=["Workout Schedule"])
 app.include_router(theme.router, tags=["Dynamic Themes"])
+app.include_router(workout_suggestions.router, prefix="/api", tags=["Workout Suggestions"])
+app.include_router(exercise_management.router, prefix="/api", tags=["Exercise Management"])
 
 # Health check endpoint
 @app.get("/health")

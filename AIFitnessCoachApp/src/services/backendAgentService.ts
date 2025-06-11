@@ -25,7 +25,7 @@ interface MultiAgentResponse {
 
 interface BackendChatRequest {
   message: string;
-  personality?: 'supportive' | 'aggressive' | 'steady_pace';
+  personality?: 'emma' | 'max' | 'dr_progress';
   session_id?: string;
   context?: Record<string, any>;
 }
@@ -48,7 +48,7 @@ interface MultiAgentChatRequest {
   message: string;
   context?: Record<string, any>;
   required_agents?: string[];
-  personality?: 'supportive' | 'aggressive' | 'steady_pace';
+  personality?: 'emma' | 'max' | 'dr_progress';
   single_agent_mode?: boolean;
   fast_mode?: boolean;
 }
@@ -214,7 +214,7 @@ export class BackendAgentService {
    */
   async sendMessage(
     message: string, 
-    personality: 'supportive' | 'aggressive' | 'steady_pace' = 'supportive',
+    personality: 'emma' | 'max' | 'dr_progress' = 'emma',
     context?: Record<string, any>
   ): Promise<AIResponse> {
     try {
@@ -253,7 +253,7 @@ export class BackendAgentService {
    */
   async sendMultiAgentMessage(
     message: string,
-    personality: 'supportive' | 'aggressive' | 'steady_pace' = 'supportive',
+    personality: 'emma' | 'max' | 'dr_progress' = 'emma',
     context?: Record<string, any>,
     requiredAgents?: string[],
     options?: { singleAgentMode?: boolean; fastMode?: boolean }
@@ -278,6 +278,14 @@ export class BackendAgentService {
         'POST',
         request
       );
+
+      console.log('Backend multi-agent response:', {
+        hasResponse: !!response,
+        hasPrimaryMessage: !!response?.primary_message,
+        primaryMessageLength: response?.primary_message?.length,
+        respondingAgentsCount: response?.responding_agents?.length || 0,
+        actionItemsCount: response?.action_items?.length || 0
+      });
 
       // Return response with action items
       return {

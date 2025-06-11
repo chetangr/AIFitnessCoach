@@ -124,8 +124,8 @@ interface ThemeState {
   toggleTheme: () => void;
   toggleDarkMode: () => void;
   setDarkMode: (isDark: boolean) => void;
-  setAutoMode: (enabled: boolean) => void;
   setThemeColor: (color: string) => void;
+  setAutoMode: (enabled: boolean) => Promise<void>;
   checkAndUpdateTheme: () => Promise<void>;
   initializeAutoMode: () => void;
 }

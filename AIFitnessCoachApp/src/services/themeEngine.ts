@@ -2,6 +2,16 @@ import { Animated, Easing } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme as baseTheme } from '../config/theme';
 
+// Liquid Glass Theme Extensions
+export interface LiquidGlassConfig {
+  intensity: number;
+  refractionStrength: number;
+  dynamicBackground: boolean;
+  shimmerSpeed: number;
+  morphSpeed: number;
+  adaptiveColors: boolean;
+}
+
 // Holiday/Festival Theme Definitions
 export interface HolidayTheme {
   id: string;
@@ -29,6 +39,7 @@ export interface HolidayTheme {
     sparkle?: boolean;
     float?: boolean;
   };
+  liquidGlass?: LiquidGlassConfig;
 }
 
 // Define holiday themes
@@ -184,11 +195,35 @@ const holidayThemes: HolidayTheme[] = [
   },
 ];
 
+// Default Liquid Glass Configuration
+const defaultLiquidGlassConfig: LiquidGlassConfig = {
+  intensity: 80,
+  refractionStrength: 1.5,
+  dynamicBackground: true,
+  shimmerSpeed: 2000,
+  morphSpeed: 4000,
+  adaptiveColors: true,
+};
+
+// Add Liquid Glass to all holiday themes
+holidayThemes.forEach(theme => {
+  theme.liquidGlass = {
+    ...defaultLiquidGlassConfig,
+    // Customize per theme
+    intensity: theme.id === 'new-year' ? 90 : 
+               theme.id === 'valentines' ? 70 : 
+               theme.id === 'spring' ? 60 : 80,
+    refractionStrength: theme.id === 'new-year' ? 2.0 : 1.5,
+    shimmerSpeed: theme.id === 'new-year' ? 1500 : 2000,
+  };
+});
+
 // Theme Engine Class
 class ThemeEngine {
   private currentTheme: HolidayTheme | null = null;
   private animationValues: Map<string, Animated.Value> = new Map();
   private listeners: Set<(theme: HolidayTheme | null) => void> = new Set();
+  private liquidGlassConfig: LiquidGlassConfig = defaultLiquidGlassConfig;
   
   constructor() {
     this.initializeAnimations();
@@ -399,6 +434,23 @@ class ThemeEngine {
   // Get animation values
   getAnimationValue(key: string): Animated.Value | undefined {
     return this.animationValues.get(key);
+  }
+  
+  // Get Liquid Glass configuration
+  getLiquidGlassConfig(): LiquidGlassConfig {
+    if (this.currentTheme?.liquidGlass) {
+      return this.currentTheme.liquidGlass;
+    }
+    return this.liquidGlassConfig;
+  }
+  
+  // Update Liquid Glass configuration
+  updateLiquidGlassConfig(config: Partial<LiquidGlassConfig>) {
+    this.liquidGlassConfig = {
+      ...this.liquidGlassConfig,
+      ...config,
+    };
+    this.notifyListeners();
   }
 
   // Subscribe to theme changes

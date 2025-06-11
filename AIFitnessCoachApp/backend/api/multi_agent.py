@@ -173,7 +173,9 @@ async def multi_agent_chat_demo(
         )
         
     except Exception as e:
+        import traceback
         logger.error(f"Error in demo chat: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         # Return friendly error message
         return MultiAgentChatResponse(
             primary_message=f"I'm having trouble connecting right now. Please make sure the backend is properly configured. Error: {str(e)}",

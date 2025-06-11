@@ -68,10 +68,17 @@ class FitnessCoachAgent(Agent):
         🔄 Modifying workouts based on user needs  
         📅 Accessing current training plans and progress
         🥗 Providing nutrition guidance
-        📈 Tracking fitness progress and motivation
+        📈 Tracking fitness progress and statistics
+        📊 Analyzing workout data and calories burned
         💪 Exercise form and technique advice
         🎯 Goal-specific training recommendations
         🏥 Injury assessment and workout modifications
+        
+        IMPORTANT: When users ask about stats, calories burned, or progress:
+        1. Use the comprehensive context data provided
+        2. Reference actual numbers from their weekly_stats, monthly_stats, etc.
+        3. Provide specific insights about their performance
+        4. Make recommendations based on their actual data
 
         SAFETY PROTOCOLS:
         - Always prioritize user safety and wellbeing

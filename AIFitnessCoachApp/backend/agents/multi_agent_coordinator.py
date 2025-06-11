@@ -197,6 +197,13 @@ class MultiAgentCoordinator:
         if hasattr(self, 'agents') and AgentType.PRIMARY_COACH in self.agents:
             try:
                 # Ask the primary coach to analyze and route
+                # Safely serialize context
+                try:
+                    context_str = json.dumps(context, default=str) if context else 'None'
+                except Exception as e:
+                    logger.warning(f"Failed to serialize context: {e}")
+                    context_str = str(context) if context else 'None'
+                
                 routing_prompt = f"""Analyze this user query and determine which specialized agents should handle it:
 
 Query: "{query}"
@@ -210,6 +217,16 @@ Available agents and their responsibilities:
    - Planning workout schedules
    - "What's my workout today/tomorrow/this week"
    - "Add leg day", "Remove squats", "Change to 3 sets"
+   - Analyzing user stats and suggesting personalized workouts
+   - "Suggest workouts based on my progress"
+   - "What should I focus on this week?"
+   - "Swap today's workout with something else"
+   
+PRIMARY_COACH (always handles):
+   - Stats queries ("what are my stats", "calories burned", "how many workouts")
+   - Progress analysis ("am I improving", "show my progress")
+   - General fitness questions
+   - Complex queries requiring data analysis
 
 2. NUTRITION:
    - Diet plans, meal suggestions
@@ -261,7 +278,7 @@ Special routing rules:
 - Multiple topics → Include all relevant agents
 - Vague queries → Include PRIMARY_COACH for clarification
 
-Context from conversation: {json.dumps(context) if context else 'None'}
+Context from conversation: {context_str}
 
 Analyze the query carefully. Consider:
 1. Primary intent (what they're asking for)
@@ -824,6 +841,8 @@ If unsure, include multiple relevant agents. PRIMARY_COACH will be included auto
             for agent_str in agents_to_consult:
                 if agent_str == "primary_coach":
                     agent_types.append(AgentType.PRIMARY_COACH)
+                elif agent_str == "fitness_action":
+                    agent_types.append(AgentType.FITNESS_ACTION)
                 elif agent_str == "nutrition":
                     agent_types.append(AgentType.NUTRITION)
                 elif agent_str == "recovery":

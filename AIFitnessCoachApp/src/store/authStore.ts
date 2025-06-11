@@ -16,6 +16,7 @@ interface AuthState {
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   getAuthToken: () => Promise<string | null>;
+  signUp: (userData: any) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -98,5 +99,19 @@ export const useAuthStore = create<AuthState>((set) => ({
       console.error('Error getting auth token:', error);
       return null;
     }
+  },
+
+  signUp: async (userData: any) => {
+    // For now, just create a mock user and login
+    const mockUser: User = {
+      id: Date.now().toString(),
+      email: userData.email,
+      name: userData.name,
+      token: 'mock-token-' + Date.now(),
+    };
+    
+    await AsyncStorage.setItem('user', JSON.stringify(mockUser));
+    await AsyncStorage.setItem('token', mockUser.token);
+    set({ user: mockUser, isAuthenticated: true });
   },
 }));
