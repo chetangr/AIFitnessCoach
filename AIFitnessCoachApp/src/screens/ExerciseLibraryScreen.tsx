@@ -16,7 +16,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LiquidGlassView, LiquidCard, LiquidEmptyState } from '../components/glass';
-import { useThemeStore } from '../store/themeStore';
+import { useTheme } from '../contexts/ThemeContext';
+import { Theme } from '../config/dynamicTheme';
+import { ModernHeader, ModernCard } from '../components/modern/ModernComponents';
 
 const { width } = Dimensions.get('window');
 
@@ -38,7 +40,7 @@ interface FilterChipProps {
 }
 
 const FilterChip: React.FC<FilterChipProps> = ({ label, selected, onPress }) => {
-  const { theme } = useThemeStore();
+  const { theme } = useTheme();
   const { colors } = theme;
   const scaleAnimation = useRef(new Animated.Value(1)).current;
   
@@ -69,7 +71,7 @@ const FilterChip: React.FC<FilterChipProps> = ({ label, selected, onPress }) => 
           <Text
             style={[
               styles.filterChipText,
-              { color: selected ? colors.primary : colors.text } as any,
+              { color: selected ? colors.primary : colors.textPrimary } as any,
             ]}
           >
             {label}
@@ -87,7 +89,7 @@ interface ExerciseCardProps {
 }
 
 const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onPress }) => {
-  const { theme } = useThemeStore();
+  const { theme } = useTheme();
   const { colors } = theme;
   const rotateAnimation = useRef(new Animated.Value(0)).current;
   const [isPressed, setIsPressed] = useState(false);
@@ -150,27 +152,27 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onPress }) => {
               </View>
             ) : (
               <View style={[styles.exerciseImagePlaceholder, { backgroundColor: colors.primary + '20' }]}>
-                <Ionicons name="fitness" size={32} color={typeof colors.primary === 'string' ? colors.primary : colors.primary.main} />
+                <Ionicons name="fitness" size={32} color={colors.primary} />
               </View>
             )}
             
             {/* Exercise Info */}
             <View style={styles.exerciseInfo}>
-              <Text style={[styles.exerciseName, { color: colors.text }]} numberOfLines={2}>
+              <Text style={[styles.exerciseName, { color: colors.textPrimary }]} numberOfLines={2}>
                 {exercise.name}
               </Text>
               
               {/* Category Badge */}
               <LiquidGlassView intensity={60} style={styles.categoryBadge}>
-                <Text style={[styles.categoryText, { color: colors.secondary }]}>
+                <Text style={[styles.categoryText, { color: colors.primary }]}>
                   {exercise.category}
                 </Text>
               </LiquidGlassView>
               
               {/* Muscles */}
               <View style={styles.musclesContainer}>
-                <Ionicons name="body" size={14} color={colors.text + '60'} />
-                <Text style={[styles.musclesText, { color: colors.text + '80' }]} numberOfLines={1}>
+                <Ionicons name="body" size={14} color={colors.textPrimary + '60'} />
+                <Text style={[styles.musclesText, { color: colors.textPrimary + '80' }]} numberOfLines={1}>
                   {exercise.muscles.join(', ')}
                 </Text>
               </View>
@@ -178,8 +180,8 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onPress }) => {
               {/* Equipment */}
               {exercise.equipment && exercise.equipment.length > 0 && (
                 <View style={styles.equipmentContainer}>
-                  <Ionicons name="barbell" size={14} color={colors.text + '60'} />
-                  <Text style={[styles.equipmentText, { color: colors.text + '80' }]} numberOfLines={1}>
+                  <Ionicons name="barbell" size={14} color={colors.textPrimary + '60'} />
+                  <Text style={[styles.equipmentText, { color: colors.textPrimary + '80' }]} numberOfLines={1}>
                     {exercise.equipment.join(', ')}
                   </Text>
                 </View>
@@ -193,8 +195,10 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, onPress }) => {
 };
 
 export default function LiquidExerciseLibraryScreen() {
+  console.log('[OLD ExerciseLibraryScreen] This is the OLD screen - should NOT be shown!');
+  console.trace('[OLD ExerciseLibraryScreen] Stack trace');
   const navigation = useNavigation();
-  const { theme } = useThemeStore();
+  const { theme } = useTheme();
   const { colors } = theme;
   
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -299,33 +303,33 @@ export default function LiquidExerciseLibraryScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient
-        colors={[colors.primary + '20', colors.secondary + '20', colors.background]}
+        colors={[colors.primary + '20', colors.primary + '20', colors.background]}
         style={StyleSheet.absoluteFillObject}
       />
       
       {/* Header */}
       <LiquidGlassView intensity={75} style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Exercise Library</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Exercise Library</Text>
         <View style={{ width: 40 }} />
       </LiquidGlassView>
       
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <LiquidGlassView intensity={60} style={styles.searchBar}>
-          <Ionicons name="search" size={20} color={colors.text + '60'} />
+          <Ionicons name="search" size={20} color={colors.textPrimary + '60'} />
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Search exercises..."
-            placeholderTextColor={colors.text + '40'}
-            style={[styles.searchInput, { color: colors.text }]}
+            placeholderTextColor={colors.textPrimary + '40'}
+            style={[styles.searchInput, { color: colors.textPrimary }]}
           />
           {searchQuery !== '' && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color={colors.text + '60'} />
+              <Ionicons name="close-circle" size={20} color={colors.textPrimary + '60'} />
             </TouchableOpacity>
           )}
         </LiquidGlassView>
@@ -342,15 +346,15 @@ export default function LiquidExerciseLibraryScreen() {
         {(selectedCategory || selectedMuscle || selectedEquipment) && (
           <TouchableOpacity onPress={clearFilters}>
             <LiquidGlassView intensity={75} style={styles.clearFiltersChip}>
-              <Ionicons name="close" size={16} color={colors.text} />
-              <Text style={[styles.clearFiltersText, { color: colors.text }]}>Clear</Text>
+              <Ionicons name="close" size={16} color={colors.textPrimary} />
+              <Text style={[styles.clearFiltersText, { color: colors.textPrimary }]}>Clear</Text>
             </LiquidGlassView>
           </TouchableOpacity>
         )}
         
         {/* Category Filters */}
         <View style={styles.filterSection}>
-          <Text style={[styles.filterSectionTitle, { color: colors.text + '60' }]}>Category</Text>
+          <Text style={[styles.filterSectionTitle, { color: colors.textPrimary + '60' }]}>Category</Text>
           <View style={styles.filterChips}>
             {categories.map(category => (
               <FilterChip
@@ -365,7 +369,7 @@ export default function LiquidExerciseLibraryScreen() {
         
         {/* Muscle Filters */}
         <View style={styles.filterSection}>
-          <Text style={[styles.filterSectionTitle, { color: colors.text + '60' }]}>Muscle</Text>
+          <Text style={[styles.filterSectionTitle, { color: colors.textPrimary + '60' }]}>Muscle</Text>
           <View style={styles.filterChips}>
             {muscles.map(muscle => (
               <FilterChip
@@ -380,7 +384,7 @@ export default function LiquidExerciseLibraryScreen() {
         
         {/* Equipment Filters */}
         <View style={styles.filterSection}>
-          <Text style={[styles.filterSectionTitle, { color: colors.text + '60' }]}>Equipment</Text>
+          <Text style={[styles.filterSectionTitle, { color: colors.textPrimary + '60' }]}>Equipment</Text>
           <View style={styles.filterChips}>
             {equipment.map(equip => (
               <FilterChip
@@ -396,7 +400,7 @@ export default function LiquidExerciseLibraryScreen() {
       
       {/* Results Count */}
       <View style={styles.resultsContainer}>
-        <Text style={[styles.resultsText, { color: colors.text + '80' }]}>
+        <Text style={[styles.resultsText, { color: colors.textPrimary + '80' }]}>
           {filteredExercises.length} exercises found
         </Text>
       </View>
@@ -405,7 +409,7 @@ export default function LiquidExerciseLibraryScreen() {
       <Animated.View style={[styles.listContainer, { opacity: fadeAnimation }]}>
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={typeof colors.primary === 'string' ? colors.primary : colors.primary.main} />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : (
           <FlatList

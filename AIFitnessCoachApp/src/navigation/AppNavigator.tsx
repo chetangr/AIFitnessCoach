@@ -29,6 +29,14 @@ console.log('[AppNavigator] Importing ModernDiscoverScreen...');
 import ModernDiscoverScreen from '../screens/ModernDiscoverScreen';
 console.log('[AppNavigator] ModernDiscoverScreen imported');
 
+console.log('[AppNavigator] About to import ModernExerciseLibraryScreen...');
+try {
+  const ModernExerciseLib = require('../screens/ModernExerciseLibraryScreen').default;
+  console.log('[AppNavigator] ModernExerciseLibraryScreen loaded:', typeof ModernExerciseLib);
+} catch (error) {
+  console.error('[AppNavigator] Error loading ModernExerciseLibraryScreen:', error);
+}
+
 console.log('[AppNavigator] Importing ModernProfileScreen...');
 import ModernProfileScreen from '../screens/ModernProfileScreen';
 console.log('[AppNavigator] ModernProfileScreen imported');
@@ -50,8 +58,11 @@ import StatsScreen from '../screens/StatsScreen';
 console.log('[AppNavigator] StatsScreen imported');
 
 // Workout Screens
+console.log('[AppNavigator] Importing workout screens...');
 import ActiveWorkoutScreen from '../screens/ActiveWorkoutScreen';
-import ExerciseLibraryScreen from '../screens/ExerciseLibraryScreen';
+console.log('[AppNavigator] Importing ModernExerciseLibraryScreen directly...');
+import ModernExerciseLibraryScreen from '../screens/ModernExerciseLibraryScreen';
+console.log('[AppNavigator] ModernExerciseLibraryScreen imported successfully');
 import WorkoutDetailScreen from '../screens/WorkoutDetailScreen';
 import WorkoutTrackingScreen from '../screens/WorkoutTrackingScreen';
 import WorkoutOverviewScreen from '../screens/WorkoutOverviewScreen';
@@ -139,12 +150,12 @@ const CustomTabBar = ({ state, navigation }: BottomTabBarProps) => {
     <View style={styles.tabBarContainer}>
       {/* Main navigation bar with 4 items */}
       <BlurView 
-        intensity={85} 
+        intensity={95} 
         tint={theme.colors.tabBarBlur}
         style={[
           styles.tabBar,
           {
-            backgroundColor: theme.colors.tabBarBackground,
+            backgroundColor: Platform.OS === 'ios' ? theme.colors.tabBarBackground : theme.colors.surface,
             borderColor: theme.colors.tabBarBorder,
           }
         ]}
@@ -219,12 +230,12 @@ const CustomTabBar = ({ state, navigation }: BottomTabBarProps) => {
       
       {/* Separate bubble for Settings/Profile */}
       <BlurView 
-        intensity={85} 
+        intensity={95} 
         tint={theme.colors.tabBarBlur}
         style={[
           styles.searchBubble,
           {
-            backgroundColor: theme.colors.tabBarBackground,
+            backgroundColor: Platform.OS === 'ios' ? theme.colors.tabBarBackground : theme.colors.surface,
             borderColor: theme.colors.tabBarBorder,
           }
         ]}
@@ -263,7 +274,9 @@ const MainTabs = () => (
   </Tab.Navigator>
 );
 
-const MainStack = () => (
+const MainStack = () => {
+  console.log('[MainStack] Creating stack with ModernExerciseLibraryScreen:', !!ModernExerciseLibraryScreen);
+  return (
   <Stack.Navigator
     screenOptions={{
       headerShown: false,
@@ -278,7 +291,14 @@ const MainStack = () => (
     <Stack.Screen name="WorkoutTracking" component={WorkoutTrackingScreen} />
     <Stack.Screen name="ProgramDetail" component={ProgramDetailScreen as any} />
     <Stack.Screen name="Programs" component={ProgramsScreen} />
-    <Stack.Screen name="ExerciseLibrary" component={ExerciseLibraryScreen} />
+    <Stack.Screen 
+      name="ExerciseLibrary" 
+      component={ModernExerciseLibraryScreen}
+      listeners={{
+        focus: () => console.log('[Navigation] ExerciseLibrary screen focused'),
+        beforeRemove: () => console.log('[Navigation] Leaving ExerciseLibrary screen')
+      }}
+    />
     <Stack.Screen name="Stats" component={StatsScreen} />
     <Stack.Screen name="WorkoutHistory" component={WorkoutHistoryScreen} />
     <Stack.Screen name="ProgressPhotos" component={ProgressPhotosScreen} />
@@ -288,7 +308,8 @@ const MainStack = () => (
     <Stack.Screen name="Workouts" component={WorkoutsScreen} />
     <Stack.Screen name="Home" component={HomeScreen} />
   </Stack.Navigator>
-);
+  );
+};
 
 const AppNavigator = () => {
   const { isAuthenticated } = useAuthStore();
@@ -310,6 +331,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    pointerEvents: 'box-none', // Allow touches to pass through empty areas
   },
   tabBar: {
     flex: 1,

@@ -307,7 +307,10 @@ const ModernDiscoverScreen = () => {
   const renderActivityType = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.activityCard}
-      onPress={() => (navigation as any).navigate('ExerciseLibrary', { category: item.id })}
+      onPress={() => {
+        console.log('[ModernDiscoverScreen] Navigating to ExerciseLibrary with category:', item.id);
+        (navigation as any).navigate('ExerciseLibrary', { category: item.id });
+      }}
     >
       <View style={[styles.activityIcon, { backgroundColor: item.color + '20' }]}>
         <Ionicons name={item.icon as any} size={32} color={item.color} />

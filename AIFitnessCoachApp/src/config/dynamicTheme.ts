@@ -175,7 +175,7 @@ const lightColors: ThemeColors = {
   divider: '#E5E5EA',
   
   // Tab bar specific
-  tabBarBackground: 'rgba(255, 255, 255, 0.9)',
+  tabBarBackground: 'rgba(255, 255, 255, 0.7)',
   tabBarTint: 'light',
   tabBarBlur: 'light',
   tabBarIcon: '#8E8E93',
@@ -211,7 +211,7 @@ const darkColors: ThemeColors = {
   divider: '#48484A',
   
   // Tab bar specific
-  tabBarBackground: 'rgba(30, 30, 30, 0.9)',
+  tabBarBackground: 'rgba(30, 30, 30, 0.7)',
   tabBarTint: 'dark',
   tabBarBlur: 'dark',
   tabBarIcon: '#8E8E93',
