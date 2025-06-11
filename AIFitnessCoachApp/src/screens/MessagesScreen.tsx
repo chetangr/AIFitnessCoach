@@ -1074,7 +1074,7 @@ const LiquidMessagesScreen = ({ route }: any) => {
       >
         <LiquidGlassView intensity={90} style={styles.headerContent}>
           <View style={styles.headerRow}>
-            <Icon name="flash" size={24} color={theme.colors.primary.main} />
+            <Icon name="flash" size={24} color={theme.colors.primary} />
             <View style={styles.titleContainer}>
               <Text style={styles.headerTitle}>
                 {selectedAgentsForChat.length > 0 
@@ -1086,7 +1086,7 @@ const LiquidMessagesScreen = ({ route }: any) => {
                 <Icon 
                   name={isTurboMode ? "flash" : "planet"} 
                   size={14} 
-                  color={isTurboMode ? "#FF9800" : theme.colors.primary.main} 
+                  color={isTurboMode ? "#FF9800" : theme.colors.primary} 
                 />
                 <Text style={styles.modeText}>
                   {isTurboMode ? 'Turbo' : 'Quantum'}
@@ -1103,7 +1103,7 @@ const LiquidMessagesScreen = ({ route }: any) => {
               <Icon 
                 name={useMultiAgent ? "people" : "person"} 
                 size={20} 
-                color={useMultiAgent ? theme.colors.primary.main : theme.colors.textSecondary} 
+                color={useMultiAgent ? theme.colors.primary : theme.colors.textSecondary} 
               />
             </TouchableOpacity>
             
@@ -1117,7 +1117,7 @@ const LiquidMessagesScreen = ({ route }: any) => {
               <Icon 
                 name="git-compare" 
                 size={20} 
-                color={theme.colors.primary.main} 
+                color={theme.colors.primary} 
               />
             </TouchableOpacity>
           </View>
@@ -1157,7 +1157,7 @@ const LiquidMessagesScreen = ({ route }: any) => {
           isTyping ? (
             <Animated.View style={styles.typingIndicator}>
               <LiquidCard style={styles.typingBubble}>
-                <ActivityIndicator size="small" color={theme.colors.primary.main} />
+                <ActivityIndicator size="small" color={theme.colors.primary} />
                 <Text style={styles.typingText}>AI Coach is typing...</Text>
               </LiquidCard>
             </Animated.View>
@@ -1184,14 +1184,14 @@ const LiquidMessagesScreen = ({ route }: any) => {
                   style={styles.optionButton}
                   onPress={handleAskOtherAgent}
                 >
-                  <Icon name="people" size={20} color={theme.colors.primary.main} />
+                  <Icon name="people" size={20} color={theme.colors.primary} />
                   <Text style={styles.optionText}>Ask Other Agent</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.optionButton}
                   onPress={handleRegenerateMessage}
                 >
-                  <Icon name="refresh" size={20} color={theme.colors.primary.main} />
+                  <Icon name="refresh" size={20} color={theme.colors.primary} />
                   <Text style={styles.optionText}>Regenerate</Text>
                 </TouchableOpacity>
               </>
@@ -1201,7 +1201,7 @@ const LiquidMessagesScreen = ({ route }: any) => {
                   style={styles.optionButton}
                   onPress={handleEditMessage}
                 >
-                  <Icon name="create" size={20} color={theme.colors.primary.main} />
+                  <Icon name="create" size={20} color={theme.colors.primary} />
                   <Text style={styles.optionText}>Edit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -1313,7 +1313,7 @@ const LiquidMessagesScreen = ({ route }: any) => {
                     style={styles.quickActionButton}
                     onPress={action.action}
                   >
-                    <Icon name={action.icon} size={24} color={theme.colors.primary.main} />
+                    <Icon name={action.icon} size={24} color={theme.colors.primary} />
                     <Text style={styles.quickActionText}>{action.text}</Text>
                   </TouchableOpacity>
                 ))}
@@ -1335,11 +1335,11 @@ const LiquidMessagesScreen = ({ route }: any) => {
         <LiquidGlassView intensity={95} style={styles.inputContainer}>
           <View style={styles.inputRow}>
             <TouchableOpacity onPress={toggleQuickActions} style={styles.quickActionsButton}>
-              <Icon name="flash" size={20} color={theme.colors.primary.main} />
+              <Icon name="flash" size={20} color={theme.colors.primary} />
             </TouchableOpacity>
             
             <TouchableOpacity onPress={pickImage} style={styles.attachButton}>
-              <Icon name="image-outline" size={20} color={theme.colors.primary.main} />
+              <Icon name="image-outline" size={20} color={theme.colors.primary} />
             </TouchableOpacity>
             
             <LiquidInput

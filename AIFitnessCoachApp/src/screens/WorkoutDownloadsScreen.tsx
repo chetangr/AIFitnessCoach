@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { modernTheme } from '../config/modernTheme';
+import { useTheme } from '../contexts/ThemeContext';
 import { ModernCard, ModernButton, ModernHeader } from '../components/modern/ModernComponents';
 
 interface DownloadableWorkout {
@@ -31,6 +31,7 @@ interface DownloadableWorkout {
 }
 
 const WorkoutDownloadsScreen = ({ navigation }: any) => {
+  const { theme } = useTheme();
   const [downloadingIds, setDownloadingIds] = useState<string[]>([]);
   const [filter, setFilter] = useState<'all' | 'free' | 'premium'>('all');
 
@@ -299,6 +300,186 @@ const WorkoutDownloadsScreen = ({ navigation }: any) => {
     );
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingTop: Platform.OS === 'ios' ? 50 : 30,
+      paddingHorizontal: 20,
+      paddingBottom: 20,
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: 'white',
+    },
+    filterContainer: {
+      flexDirection: 'row',
+      marginHorizontal: 20,
+      marginBottom: 20,
+      borderRadius: 25,
+      overflow: 'hidden',
+    },
+    filterTab: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      backgroundColor: theme.colors.surface,
+      alignItems: 'center',
+    },
+    activeFilterTab: {
+      backgroundColor: theme.colors.primary,
+    },
+    filterText: {
+      color: theme.colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    activeFilterText: {
+      color: '#FFFFFF',
+    },
+    listContent: {
+      paddingHorizontal: 20,
+      paddingBottom: Platform.OS === 'ios' ? 90 : 80,
+    },
+    workoutCard: {
+      padding: 20,
+      marginBottom: 16,
+    },
+    workoutHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 12,
+    },
+    workoutInfo: {
+      flex: 1,
+    },
+    workoutName: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: theme.colors.textPrimary,
+      marginBottom: 4,
+    },
+    workoutDescription: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+      lineHeight: 20,
+    },
+    premiumBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 215, 0, 0.2)',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+      gap: 4,
+    },
+    premiumText: {
+      color: '#FFD700',
+      fontSize: 12,
+      fontWeight: 'bold',
+    },
+    workoutMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+      marginBottom: 12,
+    },
+    metaItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    metaText: {
+      color: theme.colors.textTertiary,
+      fontSize: 12,
+    },
+    levelBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    levelText: {
+      color: 'white',
+      fontSize: 12,
+      fontWeight: 'bold',
+    },
+    workoutStats: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+      marginBottom: 16,
+    },
+    statItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    statText: {
+      color: theme.colors.textTertiary,
+      fontSize: 12,
+    },
+    sizeText: {
+      color: theme.colors.textTertiary,
+      fontSize: 12,
+      marginLeft: 'auto',
+    },
+    actionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    downloadButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.primary,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: theme.borderRadius.md,
+      gap: 8,
+    },
+    downloadingButton: {
+      backgroundColor: theme.colors.primary + '80',
+    },
+    downloadButtonText: {
+      color: 'white',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    playButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.success,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: theme.borderRadius.md,
+      gap: 8,
+    },
+    playButtonText: {
+      color: 'white',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    removeButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: theme.colors.error + '20',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+  });
+
   return (
     <SafeAreaView style={styles.container}>
       <ModernHeader title="Download Workouts" />
@@ -329,185 +510,5 @@ const WorkoutDownloadsScreen = ({ navigation }: any) => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: modernTheme.colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 25,
-    overflow: 'hidden',
-  },
-  filterTab: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: modernTheme.colors.surface,
-    alignItems: 'center',
-  },
-  activeFilterTab: {
-    backgroundColor: modernTheme.colors.primary,
-  },
-  filterText: {
-    color: modernTheme.colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  activeFilterText: {
-    color: '#FFFFFF',
-  },
-  listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 90 : 80,
-  },
-  workoutCard: {
-    padding: 20,
-    marginBottom: 16,
-  },
-  workoutHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  workoutInfo: {
-    flex: 1,
-  },
-  workoutName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: modernTheme.colors.textPrimary,
-    marginBottom: 4,
-  },
-  workoutDescription: {
-    fontSize: 14,
-    color: modernTheme.colors.textSecondary,
-    lineHeight: 20,
-  },
-  premiumBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 215, 0, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  premiumText: {
-    color: '#FFD700',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  workoutMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 12,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    color: modernTheme.colors.textTertiary,
-    fontSize: 12,
-  },
-  levelBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  levelText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  workoutStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 16,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statText: {
-    color: modernTheme.colors.textTertiary,
-    fontSize: 12,
-  },
-  sizeText: {
-    color: modernTheme.colors.textTertiary,
-    fontSize: 12,
-    marginLeft: 'auto',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  downloadButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: modernTheme.colors.primary,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: modernTheme.borderRadius.md,
-    gap: 8,
-  },
-  downloadingButton: {
-    backgroundColor: modernTheme.colors.primary + '80',
-  },
-  downloadButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  playButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: modernTheme.colors.success,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: modernTheme.borderRadius.md,
-    gap: 8,
-  },
-  playButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  removeButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: modernTheme.colors.error + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
 
 export default WorkoutDownloadsScreen;

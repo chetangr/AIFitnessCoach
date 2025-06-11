@@ -297,6 +297,53 @@ class OpenAIFitnessCoachAgent:
             # Cancel any existing runs on this thread
             await self._cancel_active_runs(thread_id)
             
+            # Build enhanced message with context
+            enhanced_message = message
+            
+            # Add relevant context to the message
+            if context:
+                context_parts = []
+                
+                # Add today's workout if available (from frontend)
+                if "todaysWorkout" in context and isinstance(context["todaysWorkout"], dict):
+                    workout = context["todaysWorkout"]
+                    if workout.get("title"):
+                        context_parts.append(f"Today's scheduled workout: {workout['title']}")
+                        if workout.get("type"):
+                            context_parts.append(f"Type: {workout['type']}")
+                        if workout.get("exercises"):
+                            exercise_names = [ex.get("name", "") for ex in workout["exercises"] if ex.get("name")]
+                            if exercise_names:
+                                context_parts.append(f"Exercises: {', '.join(exercise_names[:3])}...")
+                
+                # Add workout timeline if available
+                elif "workout_timeline" in context:
+                    timeline = context["workout_timeline"]
+                    if isinstance(timeline, dict) and "current_week_schedule" in timeline:
+                        schedule = timeline["current_week_schedule"]
+                        if "workouts" in schedule:
+                            # Find today's workout
+                            today = date.today().isoformat()
+                            for workout in schedule["workouts"]:
+                                if workout.get("date") == today and workout.get("title"):
+                                    context_parts.append(f"Today's workout: {workout['title']}")
+                                    if "focus_areas" in workout:
+                                        context_parts.append(f"Focus areas: {', '.join(workout['focus_areas'])}")
+                                    break
+                
+                # Add weekly stats if available
+                if "weekly_stats" in context and isinstance(context["weekly_stats"], dict):
+                    stats = context["weekly_stats"]
+                    if "total_workouts" in stats:
+                        context_parts.append(f"This week: {stats['total_workouts']} workouts completed")
+                    if "total_calories" in stats:
+                        context_parts.append(f"Calories burned: {stats['total_calories']}")
+                
+                # If we have context to add, prepend it to the message
+                if context_parts:
+                    context_info = " | ".join(context_parts)
+                    enhanced_message = f"[Context: {context_info}]\n\n{message}"
+            
             # Add user message to thread
             # Convert context to string metadata if provided
             metadata = {}
@@ -317,7 +364,7 @@ class OpenAIFitnessCoachAgent:
             self.client.beta.threads.messages.create(
                 thread_id=thread_id,
                 role="user",
-                content=message,
+                content=enhanced_message,
                 metadata=metadata
             )
             

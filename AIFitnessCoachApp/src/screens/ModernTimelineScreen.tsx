@@ -1,3 +1,5 @@
+console.log('[ModernTimelineScreen] Starting imports...');
+
 import React, { useState } from 'react';
 import {
   View,
@@ -7,21 +9,24 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Alert,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
 import { useNavigation } from '@react-navigation/native';
-import { modernTheme } from '../config/modernTheme';
+
+console.log('[ModernTimelineScreen] Importing useTheme...');
+import { useTheme } from '../contexts/ThemeContext';
+console.log('[ModernTimelineScreen] Importing ModernComponents...');
 import {
   ModernCard,
-  ModernButton,
   ModernHeader,
-  ModernContainer,
 } from '../components/modern/ModernComponents';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 
+console.log('[ModernTimelineScreen] All imports complete');
+
 const ModernTimelineScreen = () => {
+  const { theme } = useTheme();
   const navigation = useNavigation();
   const [currentWeek, setCurrentWeek] = useState(moment());
 
@@ -63,6 +68,181 @@ const ModernTimelineScreen = () => {
     return days;
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    weekHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.md,
+      backgroundColor: theme.colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    weekNavButton: {
+      padding: theme.spacing.sm,
+    },
+    weekRange: {
+      ...theme.typography.headline,
+      color: theme.colors.textPrimary,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingHorizontal: theme.spacing.md,
+      paddingBottom: 100,
+    },
+    dayContainer: {
+      marginTop: theme.spacing.lg,
+    },
+    dayHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: theme.spacing.sm,
+    },
+    dayName: {
+      ...theme.typography.subheadline,
+      color: theme.colors.textSecondary,
+      width: 40,
+    },
+    dayNumber: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.surface,
+      marginLeft: theme.spacing.sm,
+    },
+    todayNumber: {
+      backgroundColor: theme.colors.primary,
+    },
+    dayNumberText: {
+      ...theme.typography.headline,
+      color: theme.colors.textPrimary,
+    },
+    todayNumberText: {
+      color: '#FFFFFF',
+    },
+    todayLabel: {
+      ...theme.typography.caption1,
+      color: theme.colors.primary,
+      marginLeft: theme.spacing.sm,
+      fontWeight: '600' as '600',
+    },
+    workoutCard: {
+      marginBottom: 0,
+    },
+    workoutHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+    },
+    workoutTypeIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 12,
+      backgroundColor: theme.colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: theme.spacing.md,
+    },
+    workoutInfo: {
+      flex: 1,
+    },
+    workoutTitle: {
+      ...theme.typography.headline,
+      color: theme.colors.textPrimary,
+      marginBottom: theme.spacing.xs,
+    },
+    workoutMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+    },
+    metaItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginRight: theme.spacing.md,
+    },
+    metaText: {
+      ...theme.typography.footnote,
+      color: theme.colors.textSecondary,
+      marginLeft: theme.spacing.xs,
+    },
+    difficultyBadge: {
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: theme.spacing.sm,
+      paddingVertical: 2,
+      borderRadius: theme.borderRadius.sm,
+    },
+    difficultyText: {
+      ...theme.typography.caption1,
+      color: theme.colors.primary,
+      fontWeight: '600' as '600',
+      textTransform: 'capitalize' as 'capitalize',
+    },
+    workoutTime: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: theme.spacing.sm,
+      paddingTop: theme.spacing.sm,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+    },
+    timeText: {
+      ...theme.typography.footnote,
+      color: theme.colors.textTertiary,
+      marginLeft: theme.spacing.xs,
+    },
+    emptyDay: {
+      height: 100,
+      borderRadius: theme.borderRadius.md,
+      borderWidth: 2,
+      borderColor: theme.colors.border,
+      borderStyle: 'dashed',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.surface,
+    },
+    emptyDayText: {
+      ...theme.typography.footnote,
+      color: theme.colors.textTertiary,
+      marginTop: theme.spacing.xs,
+    },
+    swipeActionContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      height: '100%',
+      paddingHorizontal: theme.spacing.md,
+    },
+    swipeAction: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.md,
+      borderRadius: theme.borderRadius.md,
+      marginHorizontal: theme.spacing.xs,
+    },
+    swipeActionRest: {
+      backgroundColor: theme.colors.warning,
+    },
+    swipeActionMove: {
+      backgroundColor: theme.colors.primary,
+    },
+    swipeActionText: {
+      ...theme.typography.footnote,
+      color: '#FFFFFF',
+      fontWeight: '600' as '600',
+      marginTop: theme.spacing.xs,
+    },
+  });
+
   const renderRightActions = () => (
     <View style={styles.swipeActionContainer}>
       <TouchableOpacity style={[styles.swipeAction, styles.swipeActionRest]}>
@@ -81,7 +261,7 @@ const ModernTimelineScreen = () => {
     </View>
   );
 
-  const handleSwipe = (direction: 'left' | 'right', workout: any, date: string) => {
+  const handleSwipe = (direction: 'left' | 'right') => {
     if (direction === 'right') {
       Alert.alert(
         'Move to Rest Day',
@@ -109,7 +289,7 @@ const ModernTimelineScreen = () => {
       key={date}
       renderRightActions={renderRightActions}
       renderLeftActions={renderLeftActions}
-      onSwipeableOpen={(direction) => handleSwipe(direction as 'left' | 'right', workout, date)}
+      onSwipeableOpen={(direction) => handleSwipe(direction as 'left' | 'right')}
     >
       <ModernCard
         variant="elevated"
@@ -118,17 +298,17 @@ const ModernTimelineScreen = () => {
       >
         <View style={styles.workoutHeader}>
           <View style={styles.workoutTypeIcon}>
-            <Ionicons name="barbell" size={24} color={modernTheme.colors.primary} />
+            <Ionicons name="barbell" size={24} color={theme.colors.primary} />
           </View>
           <View style={styles.workoutInfo}>
             <Text style={styles.workoutTitle}>{workout.title}</Text>
             <View style={styles.workoutMeta}>
               <View style={styles.metaItem}>
-                <Ionicons name="time-outline" size={16} color={modernTheme.colors.textSecondary} />
+                <Ionicons name="time-outline" size={16} color={theme.colors.textSecondary} />
                 <Text style={styles.metaText}>{workout.duration} min</Text>
               </View>
               <View style={styles.metaItem}>
-                <Ionicons name="flame-outline" size={16} color={modernTheme.colors.textSecondary} />
+                <Ionicons name="flame-outline" size={16} color={theme.colors.textSecondary} />
                 <Text style={styles.metaText}>{workout.calories} cal</Text>
               </View>
               <View style={styles.difficultyBadge}>
@@ -138,7 +318,7 @@ const ModernTimelineScreen = () => {
           </View>
         </View>
         <View style={styles.workoutTime}>
-          <Ionicons name="alarm-outline" size={16} color={modernTheme.colors.textTertiary} />
+          <Ionicons name="alarm-outline" size={16} color={theme.colors.textTertiary} />
           <Text style={styles.timeText}>{workout.time}</Text>
         </View>
       </ModernCard>
@@ -169,7 +349,7 @@ const ModernTimelineScreen = () => {
             style={styles.emptyDay}
             onPress={() => navigation.navigate('Discover' as never)}
           >
-            <Ionicons name="add-circle-outline" size={24} color={modernTheme.colors.textTertiary} />
+            <Ionicons name="add-circle-outline" size={24} color={theme.colors.textTertiary} />
             <Text style={styles.emptyDayText}>Add workout</Text>
           </TouchableOpacity>
         )}
@@ -181,20 +361,15 @@ const ModernTimelineScreen = () => {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={styles.container}>
         <ModernHeader
-        title="Your Journey"
-        rightAction={
-          <TouchableOpacity onPress={() => navigation.navigate('Calendar' as never)}>
-            <Ionicons name="calendar-outline" size={24} color={modernTheme.colors.primary} />
-          </TouchableOpacity>
-        }
-      />
+          title="Your Journey"
+        />
 
       <View style={styles.weekHeader}>
         <TouchableOpacity
           onPress={() => navigateWeek('prev')}
           style={styles.weekNavButton}
         >
-          <Ionicons name="chevron-back" size={24} color={modernTheme.colors.primary} />
+          <Ionicons name="chevron-back" size={24} color={theme.colors.primary} />
         </TouchableOpacity>
         
         <Text style={styles.weekRange}>
@@ -205,7 +380,7 @@ const ModernTimelineScreen = () => {
           onPress={() => navigateWeek('next')}
           style={styles.weekNavButton}
         >
-          <Ionicons name="chevron-forward" size={24} color={modernTheme.colors.primary} />
+          <Ionicons name="chevron-forward" size={24} color={theme.colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -221,180 +396,5 @@ const ModernTimelineScreen = () => {
     </GestureHandlerRootView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: modernTheme.colors.background,
-  },
-  weekHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: modernTheme.spacing.md,
-    paddingVertical: modernTheme.spacing.md,
-    backgroundColor: modernTheme.colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: modernTheme.colors.border,
-  },
-  weekNavButton: {
-    padding: modernTheme.spacing.sm,
-  },
-  weekRange: {
-    ...modernTheme.typography.headline,
-    color: modernTheme.colors.textPrimary,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: modernTheme.spacing.md,
-    paddingBottom: 100,
-  },
-  dayContainer: {
-    marginTop: modernTheme.spacing.lg,
-  },
-  dayHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: modernTheme.spacing.sm,
-  },
-  dayName: {
-    ...modernTheme.typography.subheadline,
-    color: modernTheme.colors.textSecondary,
-    width: 40,
-  },
-  dayNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: modernTheme.colors.surface,
-    marginLeft: modernTheme.spacing.sm,
-  },
-  todayNumber: {
-    backgroundColor: modernTheme.colors.primary,
-  },
-  dayNumberText: {
-    ...modernTheme.typography.headline,
-    color: modernTheme.colors.textPrimary,
-  },
-  todayNumberText: {
-    color: '#FFFFFF',
-  },
-  todayLabel: {
-    ...modernTheme.typography.caption1,
-    color: modernTheme.colors.primary,
-    marginLeft: modernTheme.spacing.sm,
-    fontWeight: '600' as '600',
-  },
-  workoutCard: {
-    marginBottom: 0,
-  },
-  workoutHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  workoutTypeIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: modernTheme.colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: modernTheme.spacing.md,
-  },
-  workoutInfo: {
-    flex: 1,
-  },
-  workoutTitle: {
-    ...modernTheme.typography.headline,
-    color: modernTheme.colors.textPrimary,
-    marginBottom: modernTheme.spacing.xs,
-  },
-  workoutMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: modernTheme.spacing.md,
-  },
-  metaText: {
-    ...modernTheme.typography.footnote,
-    color: modernTheme.colors.textSecondary,
-    marginLeft: modernTheme.spacing.xs,
-  },
-  difficultyBadge: {
-    backgroundColor: modernTheme.colors.surface,
-    paddingHorizontal: modernTheme.spacing.sm,
-    paddingVertical: 2,
-    borderRadius: modernTheme.borderRadius.sm,
-  },
-  difficultyText: {
-    ...modernTheme.typography.caption1,
-    color: modernTheme.colors.primary,
-    fontWeight: '600' as '600',
-    textTransform: 'capitalize' as 'capitalize',
-  },
-  workoutTime: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: modernTheme.spacing.sm,
-    paddingTop: modernTheme.spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: modernTheme.colors.border,
-  },
-  timeText: {
-    ...modernTheme.typography.footnote,
-    color: modernTheme.colors.textTertiary,
-    marginLeft: modernTheme.spacing.xs,
-  },
-  emptyDay: {
-    height: 100,
-    borderRadius: modernTheme.borderRadius.md,
-    borderWidth: 2,
-    borderColor: modernTheme.colors.border,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: modernTheme.colors.surface,
-  },
-  emptyDayText: {
-    ...modernTheme.typography.footnote,
-    color: modernTheme.colors.textTertiary,
-    marginTop: modernTheme.spacing.xs,
-  },
-  swipeActionContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    height: '100%',
-    paddingHorizontal: modernTheme.spacing.md,
-  },
-  swipeAction: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: modernTheme.spacing.lg,
-    paddingVertical: modernTheme.spacing.md,
-    borderRadius: modernTheme.borderRadius.md,
-    marginHorizontal: modernTheme.spacing.xs,
-  },
-  swipeActionRest: {
-    backgroundColor: modernTheme.colors.warning,
-  },
-  swipeActionMove: {
-    backgroundColor: modernTheme.colors.primary,
-  },
-  swipeActionText: {
-    ...modernTheme.typography.footnote,
-    color: '#FFFFFF',
-    fontWeight: '600' as '600',
-    marginTop: modernTheme.spacing.xs,
-  },
-});
 
 export default ModernTimelineScreen;

@@ -8,7 +8,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { modernTheme } from '../config/modernTheme';
+import { useTheme } from '../contexts/ThemeContext';
 import {
   ModernCard,
   ModernHeader,
@@ -18,6 +18,7 @@ import moment from 'moment';
 // const { width } = Dimensions.get('window');
 
 const ModernDietScreen = () => {
+  const { theme } = useTheme();
   const [calories] = useState(0);
   const [protein] = useState(0);
   const [carbs] = useState(0);
@@ -49,6 +50,190 @@ const ModernDietScreen = () => {
     return Math.min((current / goal) * 100, 100);
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingHorizontal: theme.spacing.md,
+      paddingBottom: 100,
+    },
+    sectionTitle: {
+      ...theme.typography.title3,
+      color: theme.colors.textPrimary,
+    },
+    summaryCard: {
+      marginTop: theme.spacing.lg,
+    },
+    summaryHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: theme.spacing.md,
+    },
+    caloriesRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: theme.spacing.sm,
+    },
+    caloriesLabel: {
+      ...theme.typography.body,
+      color: theme.colors.textSecondary,
+    },
+    caloriesValue: {
+      ...theme.typography.headline,
+      color: theme.colors.textPrimary,
+      fontWeight: '600' as '600',
+    },
+    caloriesProgress: {
+      height: 8,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 4,
+      overflow: 'hidden',
+      marginBottom: theme.spacing.lg,
+    },
+    caloriesProgressFill: {
+      height: '100%',
+      backgroundColor: theme.colors.primary,
+      borderRadius: 4,
+    },
+    macrosGrid: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+    },
+    macroItem: {
+      alignItems: 'center',
+    },
+    macroCircle: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      borderWidth: 3,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: theme.spacing.sm,
+    },
+    macroLabel: {
+      ...theme.typography.footnote,
+      color: theme.colors.textSecondary,
+      marginBottom: theme.spacing.xs,
+    },
+    macroValue: {
+      ...theme.typography.headline,
+      color: theme.colors.textPrimary,
+      fontWeight: '600' as '600',
+    },
+    waterCard: {
+      marginTop: theme.spacing.lg,
+    },
+    waterHeader: {
+      marginBottom: theme.spacing.md,
+    },
+    waterTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    waterTitle: {
+      ...theme.typography.title3,
+      color: theme.colors.textPrimary,
+      marginLeft: theme.spacing.sm,
+    },
+    waterAmount: {
+      ...theme.typography.title2,
+      color: theme.colors.textPrimary,
+      marginBottom: theme.spacing.sm,
+    },
+    waterProgress: {
+      height: 12,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 6,
+      overflow: 'hidden',
+      marginBottom: theme.spacing.md,
+    },
+    waterProgressFill: {
+      height: '100%',
+      backgroundColor: theme.colors.primary,
+      borderRadius: 6,
+    },
+    waterButtons: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    waterButton: {
+      flex: 1,
+      backgroundColor: theme.colors.primary,
+      paddingVertical: theme.spacing.sm,
+      marginHorizontal: theme.spacing.xs,
+      borderRadius: theme.borderRadius.sm,
+      alignItems: 'center',
+    },
+    waterButtonText: {
+      ...theme.typography.subheadline,
+      color: '#FFFFFF',
+      fontWeight: '600' as '600',
+    },
+    mealsSection: {
+      marginTop: theme.spacing.xl,
+    },
+    mealCard: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: theme.colors.cardBackground,
+      padding: theme.spacing.md,
+      borderRadius: theme.borderRadius.md,
+      marginTop: theme.spacing.sm,
+      ...theme.shadows.sm,
+    },
+    mealLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    mealIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.colors.warning + '20',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: theme.spacing.md,
+    },
+    mealName: {
+      ...theme.typography.headline,
+      color: theme.colors.textPrimary,
+    },
+    mealRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    mealCalories: {
+      ...theme.typography.body,
+      color: theme.colors.textSecondary,
+      marginRight: theme.spacing.md,
+    },
+    quickActions: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      marginTop: theme.spacing.xl,
+      paddingTop: theme.spacing.lg,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+    },
+    actionButton: {
+      alignItems: 'center',
+    },
+    actionText: {
+      ...theme.typography.footnote,
+      color: theme.colors.textSecondary,
+      marginTop: theme.spacing.xs,
+    },
+  });
+
   return (
     <SafeAreaView style={styles.container}>
       <ModernHeader 
@@ -56,7 +241,7 @@ const ModernDietScreen = () => {
         subtitle={moment().format('dddd, MMMM D')}
         rightAction={
           <TouchableOpacity onPress={() => console.log('Settings')}>
-            <Ionicons name="settings-outline" size={24} color={modernTheme.colors.primary} />
+            <Ionicons name="settings-outline" size={24} color={theme.colors.primary} />
           </TouchableOpacity>
         }
       />
@@ -71,7 +256,7 @@ const ModernDietScreen = () => {
           <View style={styles.summaryHeader}>
             <Text style={styles.sectionTitle}>Daily Summary</Text>
             <TouchableOpacity>
-              <Ionicons name="settings-outline" size={20} color={modernTheme.colors.textSecondary} />
+              <Ionicons name="settings-outline" size={20} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -93,16 +278,16 @@ const ModernDietScreen = () => {
 
           <View style={styles.macrosGrid}>
             <View style={styles.macroItem}>
-              <View style={[styles.macroCircle, { borderColor: modernTheme.colors.info }]}>
-                <Ionicons name="fitness" size={24} color={modernTheme.colors.info} />
+              <View style={[styles.macroCircle, { borderColor: theme.colors.info }]}>
+                <Ionicons name="fitness" size={24} color={theme.colors.info} />
               </View>
               <Text style={styles.macroLabel}>Protein</Text>
               <Text style={styles.macroValue}>{protein}g</Text>
             </View>
 
             <View style={styles.macroItem}>
-              <View style={[styles.macroCircle, { borderColor: modernTheme.colors.warning }]}>
-                <Ionicons name="pizza" size={24} color={modernTheme.colors.warning} />
+              <View style={[styles.macroCircle, { borderColor: theme.colors.warning }]}>
+                <Ionicons name="pizza" size={24} color={theme.colors.warning} />
               </View>
               <Text style={styles.macroLabel}>Carbs</Text>
               <Text style={styles.macroValue}>{carbs}g</Text>
@@ -122,7 +307,7 @@ const ModernDietScreen = () => {
         <ModernCard variant="elevated" style={styles.waterCard}>
           <View style={styles.waterHeader}>
             <View style={styles.waterTitleRow}>
-              <Ionicons name="water" size={24} color={modernTheme.colors.primary} />
+              <Ionicons name="water" size={24} color={theme.colors.primary} />
               <Text style={styles.waterTitle}>Water Intake</Text>
             </View>
           </View>
@@ -167,13 +352,13 @@ const ModernDietScreen = () => {
             <TouchableOpacity key={meal.id} style={styles.mealCard}>
               <View style={styles.mealLeft}>
                 <View style={styles.mealIcon}>
-                  <Ionicons name={meal.icon as any} size={24} color={modernTheme.colors.warning} />
+                  <Ionicons name={meal.icon as any} size={24} color={theme.colors.warning} />
                 </View>
                 <Text style={styles.mealName}>{meal.name}</Text>
               </View>
               <View style={styles.mealRight}>
                 <Text style={styles.mealCalories}>{meal.calories} cal</Text>
-                <Ionicons name="add-circle" size={24} color={modernTheme.colors.primary} />
+                <Ionicons name="add-circle" size={24} color={theme.colors.primary} />
               </View>
             </TouchableOpacity>
           ))}
@@ -182,15 +367,15 @@ const ModernDietScreen = () => {
         {/* Quick Actions */}
         <View style={styles.quickActions}>
           <TouchableOpacity style={styles.actionButton}>
-            <Ionicons name="barcode-outline" size={24} color={modernTheme.colors.primary} />
+            <Ionicons name="barcode-outline" size={24} color={theme.colors.primary} />
             <Text style={styles.actionText}>Scan Food</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton}>
-            <Ionicons name="search-outline" size={24} color={modernTheme.colors.primary} />
+            <Ionicons name="search-outline" size={24} color={theme.colors.primary} />
             <Text style={styles.actionText}>Search</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton}>
-            <Ionicons name="time-outline" size={24} color={modernTheme.colors.primary} />
+            <Ionicons name="time-outline" size={24} color={theme.colors.primary} />
             <Text style={styles.actionText}>Recent</Text>
           </TouchableOpacity>
         </View>
@@ -198,189 +383,5 @@ const ModernDietScreen = () => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: modernTheme.colors.background,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: modernTheme.spacing.md,
-    paddingBottom: 100,
-  },
-  sectionTitle: {
-    ...modernTheme.typography.title3,
-    color: modernTheme.colors.textPrimary,
-  },
-  summaryCard: {
-    marginTop: modernTheme.spacing.lg,
-  },
-  summaryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: modernTheme.spacing.md,
-  },
-  caloriesRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: modernTheme.spacing.sm,
-  },
-  caloriesLabel: {
-    ...modernTheme.typography.body,
-    color: modernTheme.colors.textSecondary,
-  },
-  caloriesValue: {
-    ...modernTheme.typography.headline,
-    color: modernTheme.colors.textPrimary,
-    fontWeight: '600' as '600',
-  },
-  caloriesProgress: {
-    height: 8,
-    backgroundColor: modernTheme.colors.surface,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: modernTheme.spacing.lg,
-  },
-  caloriesProgressFill: {
-    height: '100%',
-    backgroundColor: modernTheme.colors.primary,
-    borderRadius: 4,
-  },
-  macrosGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  macroItem: {
-    alignItems: 'center',
-  },
-  macroCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: modernTheme.spacing.sm,
-  },
-  macroLabel: {
-    ...modernTheme.typography.footnote,
-    color: modernTheme.colors.textSecondary,
-    marginBottom: modernTheme.spacing.xs,
-  },
-  macroValue: {
-    ...modernTheme.typography.headline,
-    color: modernTheme.colors.textPrimary,
-    fontWeight: '600' as '600',
-  },
-  waterCard: {
-    marginTop: modernTheme.spacing.lg,
-  },
-  waterHeader: {
-    marginBottom: modernTheme.spacing.md,
-  },
-  waterTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  waterTitle: {
-    ...modernTheme.typography.title3,
-    color: modernTheme.colors.textPrimary,
-    marginLeft: modernTheme.spacing.sm,
-  },
-  waterAmount: {
-    ...modernTheme.typography.title2,
-    color: modernTheme.colors.textPrimary,
-    marginBottom: modernTheme.spacing.sm,
-  },
-  waterProgress: {
-    height: 12,
-    backgroundColor: modernTheme.colors.surface,
-    borderRadius: 6,
-    overflow: 'hidden',
-    marginBottom: modernTheme.spacing.md,
-  },
-  waterProgressFill: {
-    height: '100%',
-    backgroundColor: modernTheme.colors.primary,
-    borderRadius: 6,
-  },
-  waterButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  waterButton: {
-    flex: 1,
-    backgroundColor: modernTheme.colors.primary,
-    paddingVertical: modernTheme.spacing.sm,
-    marginHorizontal: modernTheme.spacing.xs,
-    borderRadius: modernTheme.borderRadius.sm,
-    alignItems: 'center',
-  },
-  waterButtonText: {
-    ...modernTheme.typography.subheadline,
-    color: '#FFFFFF',
-    fontWeight: '600' as '600',
-  },
-  mealsSection: {
-    marginTop: modernTheme.spacing.xl,
-  },
-  mealCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: modernTheme.colors.cardBackground,
-    padding: modernTheme.spacing.md,
-    borderRadius: modernTheme.borderRadius.md,
-    marginTop: modernTheme.spacing.sm,
-    ...modernTheme.shadows.sm,
-  },
-  mealLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  mealIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: modernTheme.colors.warning + '20',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: modernTheme.spacing.md,
-  },
-  mealName: {
-    ...modernTheme.typography.headline,
-    color: modernTheme.colors.textPrimary,
-  },
-  mealRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  mealCalories: {
-    ...modernTheme.typography.body,
-    color: modernTheme.colors.textSecondary,
-    marginRight: modernTheme.spacing.md,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: modernTheme.spacing.xl,
-    paddingTop: modernTheme.spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: modernTheme.colors.border,
-  },
-  actionButton: {
-    alignItems: 'center',
-  },
-  actionText: {
-    ...modernTheme.typography.footnote,
-    color: modernTheme.colors.textSecondary,
-    marginTop: modernTheme.spacing.xs,
-  },
-});
 
 export default ModernDietScreen;

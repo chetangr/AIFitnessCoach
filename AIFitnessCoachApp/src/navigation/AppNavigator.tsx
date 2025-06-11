@@ -1,25 +1,53 @@
+console.log('[AppNavigator] Starting imports...');
+
 import React, { useRef, useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { View, StyleSheet, Platform, TouchableOpacity, Animated, Text } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { BlurView } from 'expo-blur';
-import { modernTheme } from '../config/modernTheme';
+
+console.log('[AppNavigator] Importing useTheme...');
+import { useTheme } from '../contexts/ThemeContext';
+console.log('[AppNavigator] useTheme imported');
 
 // Auth Screens
+console.log('[AppNavigator] Importing LoginScreen...');
 import LoginScreen from '../screens/LoginScreen';
+console.log('[AppNavigator] LoginScreen imported');
+
+console.log('[AppNavigator] Importing RegisterScreen...');
 import RegisterScreen from '../screens/RegisterScreen';
+console.log('[AppNavigator] RegisterScreen imported');
 
 // Main Screens
+console.log('[AppNavigator] Importing ModernTimelineScreen...');
 import ModernTimelineScreen from '../screens/ModernTimelineScreen';
+console.log('[AppNavigator] ModernTimelineScreen imported');
+
+console.log('[AppNavigator] Importing ModernDiscoverScreen...');
 import ModernDiscoverScreen from '../screens/ModernDiscoverScreen';
+console.log('[AppNavigator] ModernDiscoverScreen imported');
+
+console.log('[AppNavigator] Importing ModernProfileScreen...');
 import ModernProfileScreen from '../screens/ModernProfileScreen';
+console.log('[AppNavigator] ModernProfileScreen imported');
+
+console.log('[AppNavigator] Importing ModernMessagesScreen...');
 import ModernMessagesScreen from '../screens/ModernMessagesScreen';
+console.log('[AppNavigator] ModernMessagesScreen imported');
+
+console.log('[AppNavigator] Importing ModernFastingScreen...');
 import ModernFastingScreen from '../screens/ModernFastingScreen';
+console.log('[AppNavigator] ModernFastingScreen imported');
+
+console.log('[AppNavigator] Importing ModernDietScreen...');
 import ModernDietScreen from '../screens/ModernDietScreen';
+console.log('[AppNavigator] ModernDietScreen imported');
+
+console.log('[AppNavigator] Importing StatsScreen...');
 import StatsScreen from '../screens/StatsScreen';
-import SettingsScreen from '../screens/SettingsScreen';
+console.log('[AppNavigator] StatsScreen imported');
 
 // Workout Screens
 import ActiveWorkoutScreen from '../screens/ActiveWorkoutScreen';
@@ -65,6 +93,7 @@ const AuthStack = () => (
 );
 
 const CustomTabBar = ({ state, navigation }: BottomTabBarProps) => {
+  const { theme } = useTheme();
   const scaleValues = useRef(
     state.routes.map(() => new Animated.Value(1))
   ).current;
@@ -109,7 +138,17 @@ const CustomTabBar = ({ state, navigation }: BottomTabBarProps) => {
   return (
     <View style={styles.tabBarContainer}>
       {/* Main navigation bar with 4 items */}
-      <BlurView intensity={95} tint="dark" style={styles.tabBar}>
+      <BlurView 
+        intensity={85} 
+        tint={theme.colors.tabBarBlur}
+        style={[
+          styles.tabBar,
+          {
+            backgroundColor: theme.colors.tabBarBackground,
+            borderColor: theme.colors.tabBarBorder,
+          }
+        ]}
+      >
         <View style={styles.tabBarContent}>
         {mainRoutes.map((route: any, index: number) => {
           const isFocused = state.index === state.routes.findIndex((r: any) => r.name === route.name);
@@ -161,12 +200,14 @@ const CustomTabBar = ({ state, navigation }: BottomTabBarProps) => {
                 <Icon
                   name={iconMap[route.name] || 'ellipse-outline'}
                   size={24}
-                  color={isFocused ? modernTheme.colors.primary : modernTheme.colors.textTertiary}
+                  color={isFocused ? theme.colors.tabBarIconActive : theme.colors.tabBarIcon}
                 />
               </Animated.View>
               <Text style={[
                 styles.tabLabel,
-                isFocused && styles.tabLabelActive
+                {
+                  color: isFocused ? theme.colors.tabBarIconActive : theme.colors.tabBarIcon,
+                }
               ]}>
                 {labelMap[route.name] || route.name}
               </Text>
@@ -176,17 +217,27 @@ const CustomTabBar = ({ state, navigation }: BottomTabBarProps) => {
         </View>
       </BlurView>
       
-      {/* Separate bubble for Settings */}
-      <BlurView intensity={95} tint="dark" style={styles.searchBubble}>
+      {/* Separate bubble for Settings/Profile */}
+      <BlurView 
+        intensity={85} 
+        tint={theme.colors.tabBarBlur}
+        style={[
+          styles.searchBubble,
+          {
+            backgroundColor: theme.colors.tabBarBackground,
+            borderColor: theme.colors.tabBarBorder,
+          }
+        ]}
+      >
         <TouchableOpacity 
           style={styles.searchItem}
           onPress={() => navigation.navigate('Profile')}
           activeOpacity={0.7}
         >
           <Icon
-            name="settings-outline"
+            name="person-outline"
             size={24}
-            color={state.routes[state.index].name === 'Profile' ? modernTheme.colors.primary : modernTheme.colors.textTertiary}
+            color={state.routes[state.index].name === 'Profile' ? theme.colors.tabBarIconActive : theme.colors.tabBarIcon}
           />
         </TouchableOpacity>
       </BlurView>
@@ -228,7 +279,6 @@ const MainStack = () => (
     <Stack.Screen name="ProgramDetail" component={ProgramDetailScreen as any} />
     <Stack.Screen name="Programs" component={ProgramsScreen} />
     <Stack.Screen name="ExerciseLibrary" component={ExerciseLibraryScreen} />
-    <Stack.Screen name="Settings" component={SettingsScreen} />
     <Stack.Screen name="Stats" component={StatsScreen} />
     <Stack.Screen name="WorkoutHistory" component={WorkoutHistoryScreen} />
     <Stack.Screen name="ProgressPhotos" component={ProgressPhotosScreen} />
@@ -240,15 +290,13 @@ const MainStack = () => (
   </Stack.Navigator>
 );
 
-export const AppNavigator = () => {
+const AppNavigator = () => {
   const { isAuthenticated } = useAuthStore();
 
-  return (
-    <NavigationContainer>
-      {isAuthenticated ? <MainStack /> : <AuthStack />}
-    </NavigationContainer>
-  );
+  return isAuthenticated ? <MainStack /> : <AuthStack />;
 };
+
+export default AppNavigator;
 
 const styles = StyleSheet.create({
   tabBarContainer: {
@@ -257,7 +305,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingBottom: Platform.OS === 'ios' ? 34 : 10, // Account for iPhone notch
-    paddingHorizontal: modernTheme.spacing.md,
+    paddingHorizontal: 16,
     backgroundColor: 'transparent',
     flexDirection: 'row',
     alignItems: 'center',
@@ -267,11 +315,14 @@ const styles = StyleSheet.create({
     flex: 1,
     height: Platform.OS === 'ios' ? 70 : 65,
     borderRadius: 35,
-    backgroundColor: 'rgba(30, 30, 30, 0.9)',
     overflow: 'hidden',
-    ...modernTheme.shadows.lg,
     borderWidth: 0.5,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    // Dynamic shadows based on theme
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
   },
   tabBarContent: {
     flex: 1,
@@ -302,8 +353,6 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: modernTheme.colors.primary,
-    shadowColor: modernTheme.colors.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
     shadowRadius: 6,
@@ -312,7 +361,7 @@ const styles = StyleSheet.create({
   settingsBarContainer: {
     position: 'absolute',
     bottom: Platform.OS === 'ios' ? 100 : 85,
-    right: modernTheme.spacing.md,
+    right: 16,
   },
   settingsButton: {
     width: 56,
@@ -322,17 +371,18 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: modernTheme.colors.cardBackground,
     alignItems: 'center',
     justifyContent: 'center',
-    ...modernTheme.shadows.lg,
     borderWidth: 1,
-    borderColor: modernTheme.colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
   },
   divider: {
     width: 1,
     height: 32,
-    backgroundColor: modernTheme.colors.border,
     marginHorizontal: 12,
   },
   settingsItem: {
@@ -344,23 +394,24 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 10,
     marginTop: 4,
-    color: modernTheme.colors.textTertiary,
     fontWeight: '500',
   },
   tabLabelActive: {
-    color: modernTheme.colors.primary,
+    // Dynamic color handled inline
   },
   searchBubble: {
     width: Platform.OS === 'ios' ? 56 : 52,
     height: Platform.OS === 'ios' ? 56 : 52,
     borderRadius: 28,
-    backgroundColor: 'rgba(30, 30, 30, 0.9)',
     overflow: 'hidden',
-    ...modernTheme.shadows.lg,
     borderWidth: 0.5,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
   },
   searchItem: {
     width: '100%',

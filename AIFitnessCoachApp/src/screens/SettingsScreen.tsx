@@ -327,17 +327,6 @@ const LiquidSettingsScreen = () => {
         {/* Advanced Settings */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Advanced Settings</Text>
-          <TouchableOpacity activeOpacity={0.7}>
-            <LiquidCard style={styles.menuCard}>
-              <View style={styles.menuRow}>
-                <View style={styles.menuLeft}>
-                  <Icon name="settings-outline" size={22} color="white" />
-                  <Text style={styles.menuLabel}>Advanced Options</Text>
-                </View>
-                <Icon name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
-              </View>
-            </LiquidCard>
-          </TouchableOpacity>
         </View>
 
         {/* Hide the old settings sections

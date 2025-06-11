@@ -10,14 +10,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { modernTheme } from '../config/modernTheme';
+import { useTheme } from '../contexts/ThemeContext';
 import {
   ModernCard,
-  ModernTabs,
   ModernHeader,
 } from '../components/modern/ModernComponents';
 
 const ModernDiscoverScreen = () => {
+  const { theme } = useTheme();
   const navigation = useNavigation();
   const [activeTab, setActiveTab] = useState('forYou');
 
@@ -93,6 +93,217 @@ const ModernDiscoverScreen = () => {
     { key: 'library', title: 'Library' },
   ];
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    tabContainer: {
+      paddingHorizontal: theme.spacing.md,
+      paddingBottom: theme.spacing.sm,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingBottom: theme.spacing.xxl,
+    },
+    section: {
+      marginTop: theme.spacing.lg,
+      paddingHorizontal: theme.spacing.md,
+    },
+    sectionTitle: {
+      ...theme.typography.title2,
+      color: theme.colors.textPrimary,
+      marginBottom: theme.spacing.md,
+    },
+    horizontalList: {
+      paddingRight: theme.spacing.md,
+    },
+    activityRow: {
+      justifyContent: 'space-between',
+      marginBottom: theme.spacing.md,
+    },
+    activityCard: {
+      width: '31%',
+      alignItems: 'center',
+      marginBottom: theme.spacing.md,
+    },
+    activityIcon: {
+      width: 80,
+      height: 80,
+      borderRadius: theme.borderRadius.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: theme.spacing.sm,
+    },
+    activityName: {
+      ...theme.typography.footnote,
+      color: theme.colors.textPrimary,
+      fontWeight: '600' as '600',
+    },
+    exerciseCard: {
+      marginBottom: theme.spacing.sm,
+    },
+    exerciseContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    exerciseImagePlaceholder: {
+      width: 60,
+      height: 60,
+      borderRadius: theme.borderRadius.sm,
+      backgroundColor: theme.colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: theme.spacing.md,
+    },
+    exerciseInfo: {
+      flex: 1,
+    },
+    exerciseName: {
+      ...theme.typography.headline,
+      color: theme.colors.textPrimary,
+      marginBottom: theme.spacing.xs,
+    },
+    exerciseMuscle: {
+      ...theme.typography.footnote,
+      color: theme.colors.textSecondary,
+      marginBottom: theme.spacing.sm,
+    },
+    exerciseTags: {
+      flexDirection: 'row',
+    },
+    tag: {
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: theme.spacing.sm,
+      paddingVertical: 4,
+      borderRadius: theme.borderRadius.sm,
+      marginRight: theme.spacing.sm,
+    },
+    difficultyTag: {
+      backgroundColor: theme.colors.primary + '20',
+    },
+    tagText: {
+      ...theme.typography.caption1,
+      color: theme.colors.textSecondary,
+      fontWeight: '500' as '500',
+    },
+    workoutCard: {
+      width: 200,
+      marginRight: theme.spacing.md,
+    },
+    workoutImageContainer: {
+      width: '100%',
+      height: 140,
+      borderRadius: theme.borderRadius.md,
+      overflow: 'hidden',
+      marginBottom: theme.spacing.sm,
+    },
+    workoutImagePlaceholder: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: theme.colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    workoutDuration: {
+      position: 'absolute',
+      top: theme.spacing.sm,
+      right: theme.spacing.sm,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      paddingHorizontal: theme.spacing.sm,
+      paddingVertical: 4,
+      borderRadius: theme.borderRadius.sm,
+    },
+    durationText: {
+      ...theme.typography.caption1,
+      color: '#FFFFFF',
+      fontWeight: '600' as '600',
+    },
+    workoutTitle: {
+      ...theme.typography.headline,
+      color: theme.colors.textPrimary,
+      marginBottom: theme.spacing.xs,
+    },
+    workoutMeta: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    workoutMetaText: {
+      ...theme.typography.footnote,
+      color: theme.colors.textSecondary,
+    },
+    workoutDifficulty: {
+      ...theme.typography.footnote,
+      color: theme.colors.primary,
+      fontWeight: '600' as '600',
+      textTransform: 'capitalize' as 'capitalize',
+    },
+    libraryStats: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: theme.spacing.lg,
+    },
+    statCard: {
+      flex: 1,
+      backgroundColor: theme.colors.surface,
+      padding: theme.spacing.lg,
+      borderRadius: theme.borderRadius.md,
+      alignItems: 'center',
+      marginHorizontal: theme.spacing.xs,
+    },
+    statNumber: {
+      ...theme.typography.largeTitle,
+      color: theme.colors.primary,
+      marginBottom: theme.spacing.xs,
+    },
+    statLabel: {
+      ...theme.typography.footnote,
+      color: theme.colors.textSecondary,
+      textAlign: 'center',
+    },
+    libraryItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.md,
+      paddingHorizontal: theme.spacing.md,
+      backgroundColor: theme.colors.cardBackground,
+      borderRadius: theme.borderRadius.md,
+      marginBottom: theme.spacing.sm,
+      ...theme.shadows.sm,
+    },
+    libraryItemText: {
+      ...theme.typography.body,
+      color: theme.colors.textPrimary,
+      flex: 1,
+      marginLeft: theme.spacing.md,
+    },
+    tabBar: {
+      flexDirection: 'row',
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.md,
+      padding: 4,
+    },
+    tab: {
+      flex: 1,
+      paddingVertical: theme.spacing.sm,
+      alignItems: 'center',
+      borderRadius: theme.borderRadius.sm,
+    },
+    tabActive: {
+      backgroundColor: theme.colors.primary,
+    },
+    tabText: {
+      ...theme.typography.callout,
+      color: theme.colors.textSecondary,
+      fontWeight: '600' as '600',
+    },
+    tabTextActive: {
+      color: '#FFFFFF',
+    },
+  });
+
   const renderActivityType = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.activityCard}
@@ -114,7 +325,7 @@ const ModernDiscoverScreen = () => {
     >
       <View style={styles.exerciseContent}>
         <View style={styles.exerciseImagePlaceholder}>
-          <Ionicons name="fitness" size={32} color={modernTheme.colors.textTertiary} />
+          <Ionicons name="fitness" size={32} color={theme.colors.textTertiary} />
         </View>
         <View style={styles.exerciseInfo}>
           <Text style={styles.exerciseName}>{exercise.name}</Text>
@@ -128,7 +339,7 @@ const ModernDiscoverScreen = () => {
             </View>
           </View>
         </View>
-        <Ionicons name="chevron-forward" size={20} color={modernTheme.colors.textTertiary} />
+        <Ionicons name="chevron-forward" size={20} color={theme.colors.textTertiary} />
       </View>
     </ModernCard>
   );
@@ -140,7 +351,7 @@ const ModernDiscoverScreen = () => {
     >
       <View style={styles.workoutImageContainer}>
         <View style={styles.workoutImagePlaceholder}>
-          <Ionicons name="barbell" size={40} color={modernTheme.colors.textTertiary} />
+          <Ionicons name="barbell" size={40} color={theme.colors.textTertiary} />
         </View>
         <View style={styles.workoutDuration}>
           <Text style={styles.durationText}>{item.duration} min</Text>
@@ -210,21 +421,21 @@ const ModernDiscoverScreen = () => {
       </View>
 
       <TouchableOpacity style={styles.libraryItem}>
-        <Ionicons name="bookmark" size={24} color={modernTheme.colors.primary} />
+        <Ionicons name="bookmark" size={24} color={theme.colors.primary} />
         <Text style={styles.libraryItemText}>Saved Workouts</Text>
-        <Ionicons name="chevron-forward" size={20} color={modernTheme.colors.textTertiary} />
+        <Ionicons name="chevron-forward" size={20} color={theme.colors.textTertiary} />
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.libraryItem}>
-        <Ionicons name="time" size={24} color={modernTheme.colors.primary} />
+        <Ionicons name="time" size={24} color={theme.colors.primary} />
         <Text style={styles.libraryItemText}>Workout History</Text>
-        <Ionicons name="chevron-forward" size={20} color={modernTheme.colors.textTertiary} />
+        <Ionicons name="chevron-forward" size={20} color={theme.colors.textTertiary} />
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.libraryItem}>
-        <Ionicons name="create" size={24} color={modernTheme.colors.primary} />
+        <Ionicons name="create" size={24} color={theme.colors.primary} />
         <Text style={styles.libraryItemText}>Create Custom Workout</Text>
-        <Ionicons name="chevron-forward" size={20} color={modernTheme.colors.textTertiary} />
+        <Ionicons name="chevron-forward" size={20} color={theme.colors.textTertiary} />
       </TouchableOpacity>
     </View>
   );
@@ -235,17 +446,33 @@ const ModernDiscoverScreen = () => {
         title="Discover"
         rightAction={
           <TouchableOpacity onPress={() => (navigation as any).navigate('Search')}>
-            <Ionicons name="search" size={24} color={modernTheme.colors.primary} />
+            <Ionicons name="search" size={24} color={theme.colors.primary} />
           </TouchableOpacity>
         }
       />
 
       <View style={styles.tabContainer}>
-        <ModernTabs
-          tabs={tabs}
-          activeTab={activeTab}
-          onTabPress={setActiveTab}
-        />
+        <View style={styles.tabBar}>
+          {tabs.map((tab) => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[
+                styles.tab,
+                activeTab === tab.key && styles.tabActive,
+              ]}
+              onPress={() => setActiveTab(tab.key)}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  activeTab === tab.key && styles.tabTextActive,
+                ]}
+              >
+                {tab.title}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       <ScrollView
@@ -260,193 +487,5 @@ const ModernDiscoverScreen = () => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: modernTheme.colors.background,
-  },
-  tabContainer: {
-    paddingHorizontal: modernTheme.spacing.md,
-    paddingBottom: modernTheme.spacing.sm,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: modernTheme.spacing.xxl,
-  },
-  section: {
-    marginTop: modernTheme.spacing.lg,
-    paddingHorizontal: modernTheme.spacing.md,
-  },
-  sectionTitle: {
-    ...modernTheme.typography.title2,
-    color: modernTheme.colors.textPrimary,
-    marginBottom: modernTheme.spacing.md,
-  },
-  horizontalList: {
-    paddingRight: modernTheme.spacing.md,
-  },
-  activityRow: {
-    justifyContent: 'space-between',
-    marginBottom: modernTheme.spacing.md,
-  },
-  activityCard: {
-    width: '31%',
-    alignItems: 'center',
-    marginBottom: modernTheme.spacing.md,
-  },
-  activityIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: modernTheme.borderRadius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: modernTheme.spacing.sm,
-  },
-  activityName: {
-    ...modernTheme.typography.footnote,
-    color: modernTheme.colors.textPrimary,
-    fontWeight: '600' as '600',
-  },
-  exerciseCard: {
-    marginBottom: modernTheme.spacing.sm,
-  },
-  exerciseContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  exerciseImagePlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: modernTheme.borderRadius.sm,
-    backgroundColor: modernTheme.colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: modernTheme.spacing.md,
-  },
-  exerciseInfo: {
-    flex: 1,
-  },
-  exerciseName: {
-    ...modernTheme.typography.headline,
-    color: modernTheme.colors.textPrimary,
-    marginBottom: modernTheme.spacing.xs,
-  },
-  exerciseMuscle: {
-    ...modernTheme.typography.footnote,
-    color: modernTheme.colors.textSecondary,
-    marginBottom: modernTheme.spacing.sm,
-  },
-  exerciseTags: {
-    flexDirection: 'row',
-  },
-  tag: {
-    backgroundColor: modernTheme.colors.surface,
-    paddingHorizontal: modernTheme.spacing.sm,
-    paddingVertical: 4,
-    borderRadius: modernTheme.borderRadius.sm,
-    marginRight: modernTheme.spacing.sm,
-  },
-  difficultyTag: {
-    backgroundColor: modernTheme.colors.primary + '20',
-  },
-  tagText: {
-    ...modernTheme.typography.caption1,
-    color: modernTheme.colors.textSecondary,
-    fontWeight: '500' as '500',
-  },
-  workoutCard: {
-    width: 200,
-    marginRight: modernTheme.spacing.md,
-  },
-  workoutImageContainer: {
-    width: '100%',
-    height: 140,
-    borderRadius: modernTheme.borderRadius.md,
-    overflow: 'hidden',
-    marginBottom: modernTheme.spacing.sm,
-  },
-  workoutImagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: modernTheme.colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  workoutDuration: {
-    position: 'absolute',
-    top: modernTheme.spacing.sm,
-    right: modernTheme.spacing.sm,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: modernTheme.spacing.sm,
-    paddingVertical: 4,
-    borderRadius: modernTheme.borderRadius.sm,
-  },
-  durationText: {
-    ...modernTheme.typography.caption1,
-    color: '#FFFFFF',
-    fontWeight: '600' as '600',
-  },
-  workoutTitle: {
-    ...modernTheme.typography.headline,
-    color: modernTheme.colors.textPrimary,
-    marginBottom: modernTheme.spacing.xs,
-  },
-  workoutMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  workoutMetaText: {
-    ...modernTheme.typography.footnote,
-    color: modernTheme.colors.textSecondary,
-  },
-  workoutDifficulty: {
-    ...modernTheme.typography.footnote,
-    color: modernTheme.colors.primary,
-    fontWeight: '600' as '600',
-    textTransform: 'capitalize' as 'capitalize',
-  },
-  libraryStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: modernTheme.spacing.lg,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: modernTheme.colors.surface,
-    padding: modernTheme.spacing.lg,
-    borderRadius: modernTheme.borderRadius.md,
-    alignItems: 'center',
-    marginHorizontal: modernTheme.spacing.xs,
-  },
-  statNumber: {
-    ...modernTheme.typography.largeTitle,
-    color: modernTheme.colors.primary,
-    marginBottom: modernTheme.spacing.xs,
-  },
-  statLabel: {
-    ...modernTheme.typography.footnote,
-    color: modernTheme.colors.textSecondary,
-    textAlign: 'center',
-  },
-  libraryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: modernTheme.spacing.md,
-    paddingHorizontal: modernTheme.spacing.md,
-    backgroundColor: modernTheme.colors.cardBackground,
-    borderRadius: modernTheme.borderRadius.md,
-    marginBottom: modernTheme.spacing.sm,
-    ...modernTheme.shadows.sm,
-  },
-  libraryItemText: {
-    ...modernTheme.typography.body,
-    color: modernTheme.colors.textPrimary,
-    flex: 1,
-    marginLeft: modernTheme.spacing.md,
-  },
-});
 
 export default ModernDiscoverScreen;

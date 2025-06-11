@@ -398,7 +398,7 @@ const LiquidDietScreen = ({ navigation }: any) => {
                     </View>
                     <View style={styles.mealRight}>
                       <Text style={styles.mealCalories}>{mealCalories} cal</Text>
-                      <Icon name="add-circle" size={24} color={theme.colors.primary.main} />
+                      <Icon name="add-circle" size={24} color={theme.colors.primary} />
                     </View>
                   </View>
                   
@@ -507,7 +507,7 @@ const LiquidDietScreen = ({ navigation }: any) => {
                       </Text>
                     </View>
                   </View>
-                  <Icon name="add-circle" size={24} color={theme.colors.primary.main} />
+                  <Icon name="add-circle" size={24} color={theme.colors.primary} />
                 </TouchableOpacity>
               )}
             />

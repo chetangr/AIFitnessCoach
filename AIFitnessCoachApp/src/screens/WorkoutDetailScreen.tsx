@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useThemeStore } from '../store/themeStore';
+import { useTheme } from '../contexts/ThemeContext';
 import {
   LiquidGlassView,
   LiquidButton,
@@ -49,7 +49,7 @@ interface WorkoutDetailScreenProps {
 }
 
 const LiquidWorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({ route, navigation }) => {
-  const { theme } = useThemeStore();
+  const { theme } = useTheme();
   const { workout } = route.params || {};
   const scrollY = useRef(new Animated.Value(0)).current;
   const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
@@ -164,14 +164,14 @@ const LiquidWorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({ route, 
             {isExpanded && (
               <Animated.View style={styles.exerciseDetails}>
                 <View style={styles.detailRow}>
-                  <Icon name="barbell-outline" size={20} color={theme.colors.primary.main} />
+                  <Icon name="barbell-outline" size={20} color={theme.colors.primary} />
                   <Text style={styles.detailText}>
                     Equipment: {exercise.equipment || 'None required'}
                   </Text>
                 </View>
                 {exercise.duration && (
                   <View style={styles.detailRow}>
-                    <Icon name="time-outline" size={20} color={theme.colors.primary.main} />
+                    <Icon name="time-outline" size={20} color={theme.colors.primary} />
                     <Text style={styles.detailText}>Duration: {exercise.duration}</Text>
                   </View>
                 )}
@@ -246,7 +246,7 @@ const LiquidWorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({ route, 
           
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Icon name="time-outline" size={24} color={theme.colors.primary.main} />
+              <Icon name="time-outline" size={24} color={theme.colors.primary} />
               <Text style={styles.statValue}>{workout.duration}</Text>
               <Text style={styles.statLabel}>Duration</Text>
             </View>
@@ -254,7 +254,7 @@ const LiquidWorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({ route, 
             <View style={styles.statDivider} />
             
             <View style={styles.statItem}>
-              <Icon name="fitness-outline" size={24} color={theme.colors.primary.main} />
+              <Icon name="fitness-outline" size={24} color={theme.colors.primary} />
               <Text style={styles.statValue}>{totalSets}</Text>
               <Text style={styles.statLabel}>Total Sets</Text>
             </View>
@@ -262,7 +262,7 @@ const LiquidWorkoutDetailScreen: React.FC<WorkoutDetailScreenProps> = ({ route, 
             <View style={styles.statDivider} />
             
             <View style={styles.statItem}>
-              <Icon name="flame-outline" size={24} color={theme.colors.primary.main} />
+              <Icon name="flame-outline" size={24} color={theme.colors.primary} />
               <Text style={styles.statValue}>{workout.calories || '300'}</Text>
               <Text style={styles.statLabel}>Calories</Text>
             </View>

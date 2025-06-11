@@ -157,6 +157,12 @@ class MultiAgentCoordinator:
             context.update(full_context)
             context["workout_timeline"] = timeline_data
             
+            # Log the complete context being sent
+            logger.info(f"Complete context for query '{query[:50]}...':")
+            logger.info(f"Context keys: {list(context.keys())}")
+            if 'todaysWorkout' in context:
+                logger.info(f"Today's workout: {context['todaysWorkout']}")
+            
             # Store context for action extraction
             self._current_context = context
             

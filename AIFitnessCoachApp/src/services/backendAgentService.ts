@@ -217,6 +217,13 @@ export class BackendAgentService {
     personality: 'emma' | 'max' | 'dr_progress' = 'emma',
     context?: Record<string, any>
   ): Promise<AIResponse> {
+    console.log('[BackendAgentService] sendMessage called:', {
+      message,
+      personality,
+      hasContext: !!context,
+      endpoint: '/api/agent/chat'
+    });
+
     try {
       const request: BackendChatRequest = {
         message,
@@ -231,6 +238,13 @@ export class BackendAgentService {
         request
       );
 
+      console.log('[BackendAgentService] sendMessage response:', {
+        hasMessage: !!response?.message,
+        messageLength: response?.message?.length,
+        hasActions: !!response?.actions,
+        actionsCount: response?.actions?.length
+      });
+
       // Update session ID
       this.sessionId = response.session_id;
 
@@ -242,7 +256,7 @@ export class BackendAgentService {
       };
 
     } catch (error) {
-      console.error('Backend chat error:', error);
+      console.error('[BackendAgentService] sendMessage error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       throw new Error(`Failed to communicate with AI coach: ${errorMessage}`);
     }
@@ -258,6 +272,15 @@ export class BackendAgentService {
     requiredAgents?: string[],
     options?: { singleAgentMode?: boolean; fastMode?: boolean }
   ): Promise<MultiAgentResponse> {
+    console.log('[BackendAgentService] sendMultiAgentMessage called:', {
+      message,
+      personality,
+      hasContext: !!context,
+      contextKeys: context ? Object.keys(context) : [],
+      requiredAgents,
+      options
+    });
+
     try {
       const request: MultiAgentChatRequest = {
         message,
@@ -272,6 +295,8 @@ export class BackendAgentService {
       const endpoint = this.authToken && !this.authToken.startsWith('demo-token-') 
         ? '/api/multi-agent/chat'
         : '/api/multi-agent/chat/demo';
+      
+      console.log('[BackendAgentService] Using endpoint:', endpoint);
         
       const response: MultiAgentChatResponse = await this.makeRequest(
         endpoint,
@@ -279,7 +304,7 @@ export class BackendAgentService {
         request
       );
 
-      console.log('Backend multi-agent response:', {
+      console.log('[BackendAgentService] Multi-agent response:', {
         hasResponse: !!response,
         hasPrimaryMessage: !!response?.primary_message,
         primaryMessageLength: response?.primary_message?.length,

@@ -9,7 +9,8 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { modernTheme } from '../config/modernTheme';
+import { useTheme } from '../contexts/ThemeContext';
+import { Theme } from '../config/dynamicTheme';
 import {
   ModernCard,
   ModernButton,
@@ -21,10 +22,13 @@ import moment from 'moment';
 const { width } = Dimensions.get('window');
 
 const ModernFastingScreen = () => {
+  const { theme } = useTheme();
   const [selectedPlan, setSelectedPlan] = useState('16:8');
   const [isFasting, setIsFasting] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [startTime, setStartTime] = useState<Date | null>(null);
+  
+  const styles = createStyles(theme);
 
   const fastingPlans = [
     { id: '12:12', name: '12:12', fasting: 12, eating: 12, difficulty: 'Beginner' },
@@ -136,7 +140,7 @@ const ModernFastingScreen = () => {
             <Ionicons 
               name="time-outline" 
               size={20} 
-              color={selectedPlan === 'custom' ? '#FFFFFF' : modernTheme.colors.primary} 
+              color={selectedPlan === 'custom' ? '#FFFFFF' : theme.colors.primary} 
             />
             <Text style={[
               styles.customPlanText,
@@ -162,7 +166,7 @@ const ModernFastingScreen = () => {
 
           {isFasting && getNextPhase() && (
             <View style={styles.phaseInfo}>
-              <Ionicons name="restaurant-outline" size={20} color={modernTheme.colors.textSecondary} />
+              <Ionicons name="restaurant-outline" size={20} color={theme.colors.textSecondary} />
               <Text style={styles.phaseText}>Eating window opens at {getNextPhase()}</Text>
             </View>
           )}
@@ -200,7 +204,7 @@ const ModernFastingScreen = () => {
 
         <ModernCard variant="default" style={styles.tipsCard}>
           <View style={styles.tipsHeader}>
-            <Ionicons name="bulb-outline" size={24} color={modernTheme.colors.warning} />
+            <Ionicons name="bulb-outline" size={24} color={theme.colors.warning} />
             <Text style={styles.tipsTitle}>Today's Tip</Text>
           </View>
           <Text style={styles.tipsText}>
@@ -223,7 +227,7 @@ const ModernFastingScreen = () => {
               <Text style={styles.historyTime}>16h 32m</Text>
             </View>
             <View style={styles.historySuccess}>
-              <Ionicons name="checkmark-circle" size={20} color={modernTheme.colors.success} />
+              <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
               <Text style={styles.historyStatus}>Completed</Text>
             </View>
           </ModernCard>
@@ -234,7 +238,7 @@ const ModernFastingScreen = () => {
               <Text style={styles.historyTime}>18h 15m</Text>
             </View>
             <View style={styles.historySuccess}>
-              <Ionicons name="checkmark-circle" size={20} color={modernTheme.colors.success} />
+              <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
               <Text style={styles.historyStatus}>Completed</Text>
             </View>
           </ModernCard>
@@ -244,59 +248,59 @@ const ModernFastingScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: modernTheme.colors.background,
+    backgroundColor: theme.colors.background,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: modernTheme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
     paddingBottom: 100,
   },
   sectionTitle: {
-    ...modernTheme.typography.title3,
-    color: modernTheme.colors.textPrimary,
-    marginBottom: modernTheme.spacing.md,
+    ...theme.typography.title3,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.md,
   },
   planSelector: {
-    marginTop: modernTheme.spacing.lg,
+    marginTop: theme.spacing.lg,
   },
   planGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    marginHorizontal: -modernTheme.spacing.xs,
+    marginHorizontal: -theme.spacing.xs,
   },
   planCard: {
     minWidth: 65,
     maxWidth: 75,
-    margin: modernTheme.spacing.xs / 2,
-    paddingVertical: modernTheme.spacing.sm,
-    paddingHorizontal: modernTheme.spacing.xs,
-    borderRadius: modernTheme.borderRadius.md,
-    backgroundColor: modernTheme.colors.surface,
+    margin: theme.spacing.xs / 2,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.xs,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.surface,
     alignItems: 'center',
   },
   planCardActive: {
-    backgroundColor: modernTheme.colors.primary,
+    backgroundColor: theme.colors.primary,
   },
   planName: {
-    ...modernTheme.typography.subheadline,
+    ...theme.typography.subheadline,
     fontSize: 14,
     fontWeight: '600' as '600',
-    color: modernTheme.colors.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: 2,
   },
   planNameActive: {
     color: '#FFFFFF',
   },
   planDifficulty: {
-    ...modernTheme.typography.caption2,
+    ...theme.typography.caption2,
     fontSize: 11,
-    color: modernTheme.colors.textSecondary,
+    color: theme.colors.textSecondary,
   },
   planDifficultyActive: {
     color: '#FFFFFF',
@@ -304,20 +308,20 @@ const styles = StyleSheet.create({
   },
   timerSection: {
     alignItems: 'center',
-    marginTop: modernTheme.spacing.xl,
+    marginTop: theme.spacing.xl,
   },
   timerContainer: {
     width: width * 0.6,
     height: width * 0.6,
-    marginBottom: modernTheme.spacing.lg,
+    marginBottom: theme.spacing.lg,
   },
   progressRing: {
     width: '100%',
     height: '100%',
     borderRadius: width * 0.3,
-    backgroundColor: modernTheme.colors.surface,
+    backgroundColor: theme.colors.surface,
     borderWidth: 3,
-    borderColor: modernTheme.colors.border,
+    borderColor: theme.colors.border,
     overflow: 'hidden',
     position: 'relative',
     alignItems: 'center',
@@ -328,50 +332,50 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: modernTheme.colors.primary + '20',
+    backgroundColor: theme.colors.primary + '20',
     borderTopWidth: 3,
-    borderTopColor: modernTheme.colors.primary,
+    borderTopColor: theme.colors.primary,
   },
   timerContent: {
     alignItems: 'center',
   },
   timerText: {
-    ...modernTheme.typography.largeTitle,
+    ...theme.typography.largeTitle,
     fontSize: 48,
-    color: modernTheme.colors.textPrimary,
+    color: theme.colors.textPrimary,
     fontWeight: '300' as '300',
   },
   timerLabel: {
-    ...modernTheme.typography.subheadline,
-    color: modernTheme.colors.textSecondary,
-    marginTop: modernTheme.spacing.sm,
+    ...theme.typography.subheadline,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.sm,
   },
   phaseInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: modernTheme.spacing.lg,
-    paddingHorizontal: modernTheme.spacing.md,
-    paddingVertical: modernTheme.spacing.sm,
-    backgroundColor: modernTheme.colors.surface,
-    borderRadius: modernTheme.borderRadius.sm,
+    marginBottom: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.sm,
   },
   phaseText: {
-    ...modernTheme.typography.footnote,
-    color: modernTheme.colors.textSecondary,
-    marginLeft: modernTheme.spacing.sm,
+    ...theme.typography.footnote,
+    color: theme.colors.textSecondary,
+    marginLeft: theme.spacing.sm,
   },
   statsSection: {
-    marginTop: modernTheme.spacing.xxl,
+    marginTop: theme.spacing.xxl,
   },
   statsGrid: {
     flexDirection: 'row',
-    marginHorizontal: -modernTheme.spacing.xs,
+    marginHorizontal: -theme.spacing.xs,
   },
   statCard: {
     flex: 1,
-    margin: modernTheme.spacing.xs,
+    margin: theme.spacing.xs,
     alignItems: 'center',
-    paddingVertical: modernTheme.spacing.lg,
+    paddingVertical: theme.spacing.lg,
   },
   statIcon: {
     width: 48,
@@ -379,102 +383,102 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: modernTheme.spacing.sm,
+    marginBottom: theme.spacing.sm,
   },
   statValue: {
-    ...modernTheme.typography.title1,
-    color: modernTheme.colors.textPrimary,
-    marginBottom: modernTheme.spacing.xs,
+    ...theme.typography.title1,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.xs,
   },
   statLabel: {
-    ...modernTheme.typography.caption1,
-    color: modernTheme.colors.textSecondary,
+    ...theme.typography.caption1,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
   },
   tipsCard: {
-    marginTop: modernTheme.spacing.lg,
-    backgroundColor: modernTheme.colors.warning + '10',
+    marginTop: theme.spacing.lg,
+    backgroundColor: theme.colors.warning + '10',
     borderWidth: 1,
-    borderColor: modernTheme.colors.warning + '30',
+    borderColor: theme.colors.warning + '30',
   },
   tipsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: modernTheme.spacing.sm,
+    marginBottom: theme.spacing.sm,
   },
   tipsTitle: {
-    ...modernTheme.typography.headline,
-    color: modernTheme.colors.textPrimary,
-    marginLeft: modernTheme.spacing.sm,
+    ...theme.typography.headline,
+    color: theme.colors.textPrimary,
+    marginLeft: theme.spacing.sm,
   },
   tipsText: {
-    ...modernTheme.typography.body,
-    color: modernTheme.colors.textSecondary,
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
     lineHeight: 22,
   },
   historySection: {
-    marginTop: modernTheme.spacing.xl,
+    marginTop: theme.spacing.xl,
   },
   historyHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: modernTheme.spacing.md,
+    marginBottom: theme.spacing.md,
   },
   viewAllText: {
-    ...modernTheme.typography.footnote,
-    color: modernTheme.colors.primary,
+    ...theme.typography.footnote,
+    color: theme.colors.primary,
     fontWeight: '600' as '600',
   },
   historyItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: modernTheme.spacing.sm,
+    marginBottom: theme.spacing.sm,
   },
   historyDate: {
     flex: 1,
   },
   historyDay: {
-    ...modernTheme.typography.body,
-    color: modernTheme.colors.textPrimary,
-    marginBottom: modernTheme.spacing.xs,
+    ...theme.typography.body,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.xs,
   },
   historyTime: {
-    ...modernTheme.typography.footnote,
-    color: modernTheme.colors.textSecondary,
+    ...theme.typography.footnote,
+    color: theme.colors.textSecondary,
   },
   historySuccess: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   historyStatus: {
-    ...modernTheme.typography.footnote,
-    color: modernTheme.colors.success,
-    marginLeft: modernTheme.spacing.xs,
+    ...theme.typography.footnote,
+    color: theme.colors.success,
+    marginLeft: theme.spacing.xs,
     fontWeight: '600' as '600',
   },
   customPlanCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: modernTheme.spacing.md,
-    paddingVertical: modernTheme.spacing.md,
-    paddingHorizontal: modernTheme.spacing.lg,
-    borderRadius: modernTheme.borderRadius.md,
-    backgroundColor: modernTheme.colors.surface,
+    marginTop: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: modernTheme.colors.border,
+    borderColor: theme.colors.border,
   },
   customPlanCardActive: {
-    backgroundColor: modernTheme.colors.primary,
-    borderColor: modernTheme.colors.primary,
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
   },
   customPlanText: {
-    ...modernTheme.typography.body,
-    color: modernTheme.colors.primary,
+    ...theme.typography.body,
+    color: theme.colors.primary,
     fontWeight: '600' as '600',
-    marginLeft: modernTheme.spacing.sm,
+    marginLeft: theme.spacing.sm,
   },
   customPlanTextActive: {
     color: '#FFFFFF',

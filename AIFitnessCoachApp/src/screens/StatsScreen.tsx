@@ -181,7 +181,7 @@ const LiquidStatsScreen = ({ navigation }: any) => {
       title: 'Total Workouts', 
       value: stats.totalWorkouts.toString(), 
       icon: 'fitness', 
-      color: theme.colors.primary.main,
+      color: theme.colors.primary,
       index: 0 
     },
     { 
@@ -350,7 +350,7 @@ const LiquidStatsScreen = ({ navigation }: any) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Export Your Data</Text>
           <LiquidCard style={styles.exportCard}>
-            <Icon name="document-text" size={48} color={theme.colors.primary.main} />
+            <Icon name="document-text" size={48} color={theme.colors.primary} />
             <Text style={styles.exportTitle}>Export to Hevy or JSON</Text>
             <Text style={styles.exportDescription}>
               Export your workout data to import into other fitness apps or for your records

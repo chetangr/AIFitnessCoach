@@ -8,8 +8,9 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
-import { modernTheme } from '../../config/modernTheme';
+import { useTheme } from '../../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Theme } from '../../config/dynamicTheme';
 
 // Modern Card Component
 interface ModernCardProps {
@@ -25,6 +26,9 @@ export const ModernCard: React.FC<ModernCardProps> = ({
   onPress,
   variant = 'default',
 }) => {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
+  
   const cardStyle = [
     styles.card,
     variant === 'elevated' && styles.cardElevated,
@@ -49,9 +53,11 @@ interface ModernButtonProps {
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   size?: 'small' | 'medium' | 'large';
-  fullWidth?: boolean;
   disabled?: boolean;
+  loading?: boolean;
   icon?: React.ReactNode;
+  fullWidth?: boolean;
+  style?: ViewStyle;
 }
 
 export const ModernButton: React.FC<ModernButtonProps> = ({
@@ -59,88 +65,84 @@ export const ModernButton: React.FC<ModernButtonProps> = ({
   onPress,
   variant = 'primary',
   size = 'medium',
-  fullWidth = false,
   disabled = false,
+  loading = false,
   icon,
+  fullWidth = false,
+  style,
 }) => {
-  const buttonStyles = [
-    styles.button,
-    variant === 'primary' && styles.buttonPrimary,
-    variant === 'secondary' && styles.buttonSecondary,
-    variant === 'ghost' && styles.buttonGhost,
-    variant === 'danger' && styles.buttonDanger,
-    size === 'small' && styles.buttonSmall,
-    size === 'medium' && styles.buttonMedium,
-    size === 'large' && styles.buttonLarge,
-    fullWidth && styles.buttonFullWidth,
-    disabled && styles.buttonDisabled,
-  ];
-
-  const textStyles = [
-    styles.buttonText,
-    variant === 'primary' && styles.buttonTextPrimary,
-    variant === 'secondary' && styles.buttonTextSecondary,
-    variant === 'ghost' && styles.buttonTextGhost,
-    variant === 'danger' && styles.buttonTextDanger,
-    size === 'small' && styles.buttonTextSmall,
-    size === 'medium' && styles.buttonTextMedium,
-    size === 'large' && styles.buttonTextLarge,
-  ];
-
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
+  
   return (
     <TouchableOpacity
-      style={buttonStyles}
+      style={[
+        styles.button,
+        variant === 'primary' && styles.buttonPrimary,
+        variant === 'secondary' && styles.buttonSecondary,
+        variant === 'ghost' && styles.buttonGhost,
+        variant === 'danger' && styles.buttonDanger,
+        size === 'small' && styles.buttonSmall,
+        size === 'medium' && styles.buttonMedium,
+        size === 'large' && styles.buttonLarge,
+        fullWidth && styles.buttonFullWidth,
+        (disabled || loading) && styles.buttonDisabled,
+        style,
+      ]}
       onPress={onPress}
+      disabled={disabled || loading}
       activeOpacity={0.7}
-      disabled={disabled}
     >
       {icon && <View style={styles.buttonIcon}>{icon}</View>}
-      <Text style={textStyles}>{title}</Text>
+      <Text
+        style={[
+          styles.buttonText,
+          variant === 'primary' && styles.buttonTextPrimary,
+          variant === 'secondary' && styles.buttonTextSecondary,
+          variant === 'ghost' && styles.buttonTextGhost,
+          variant === 'danger' && styles.buttonTextDanger,
+          size === 'small' && styles.buttonTextSmall,
+          size === 'medium' && styles.buttonTextMedium,
+          size === 'large' && styles.buttonTextLarge,
+        ]}
+      >
+        {loading ? 'Loading...' : title}
+      </Text>
     </TouchableOpacity>
   );
 };
 
-// Modern Tab Component
-interface Tab {
-  key: string;
-  title: string;
-}
-
-interface ModernTabsProps {
-  tabs: Tab[];
-  activeTab: string;
-  onTabPress: (key: string) => void;
+// Modern Section Component
+interface ModernSectionProps {
+  title?: string;
+  subtitle?: string;
+  children: React.ReactNode;
   style?: ViewStyle;
+  action?: React.ReactNode;
 }
 
-export const ModernTabs: React.FC<ModernTabsProps> = ({
-  tabs,
-  activeTab,
-  onTabPress,
+export const ModernSection: React.FC<ModernSectionProps> = ({
+  title,
+  subtitle,
+  children,
   style,
+  action,
 }) => {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
+  
   return (
-    <View style={[styles.tabContainer, style]}>
-      {tabs.map((tab) => (
-        <TouchableOpacity
-          key={tab.key}
-          style={[
-            styles.tab,
-            activeTab === tab.key && styles.tabActive,
-          ]}
-          onPress={() => onTabPress(tab.key)}
-          activeOpacity={0.7}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === tab.key && styles.tabTextActive,
-            ]}
-          >
-            {tab.title}
-          </Text>
-        </TouchableOpacity>
-      ))}
+    <View style={[styles.section, style]}>
+      {(title || subtitle || action) && (
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionTitles}>
+            {title && <Text style={styles.sectionTitle}>{title}</Text>}
+            {subtitle && <Text style={styles.sectionSubtitle}>{subtitle}</Text>}
+          </View>
+          {action && <View style={styles.sectionAction}>{action}</View>}
+        </View>
+      )}
+      {children}
     </View>
   );
 };
@@ -151,7 +153,8 @@ interface ModernHeaderProps {
   subtitle?: string;
   leftAction?: React.ReactNode;
   rightAction?: React.ReactNode;
-  variant?: 'default' | 'large' | 'transparent';
+  variant?: 'default' | 'large';
+  style?: ViewStyle;
 }
 
 export const ModernHeader: React.FC<ModernHeaderProps> = ({
@@ -160,26 +163,31 @@ export const ModernHeader: React.FC<ModernHeaderProps> = ({
   leftAction,
   rightAction,
   variant = 'default',
+  style,
 }) => {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
   const insets = useSafeAreaInsets();
   
   return (
-    <View style={[
-      styles.header, 
-      variant === 'transparent' && styles.headerTransparent,
-      { paddingTop: insets.top + modernTheme.spacing.sm }
-    ]}>
-      <View style={styles.headerLeft}>{leftAction}</View>
-      <View style={styles.headerCenter}>
-        <Text style={[
-          styles.headerTitle,
-          variant === 'large' && styles.headerTitleLarge
-        ]}>
-          {title}
-        </Text>
-        {subtitle && <Text style={styles.headerSubtitle}>{subtitle}</Text>}
+    <View
+      style={[
+        styles.header,
+        variant === 'large' && styles.headerLarge,
+        { paddingTop: insets.top + theme.spacing.sm },
+        style,
+      ]}
+    >
+      <View style={styles.headerContent}>
+        {leftAction && <View style={styles.headerLeft}>{leftAction}</View>}
+        <View style={styles.headerCenter}>
+          <Text style={[styles.headerTitle, variant === 'large' && styles.headerTitleLarge]}>
+            {title}
+          </Text>
+          {subtitle && <Text style={styles.headerSubtitle}>{subtitle}</Text>}
+        </View>
+        {rightAction && <View style={styles.headerRight}>{rightAction}</View>}
       </View>
-      <View style={styles.headerRight}>{rightAction}</View>
     </View>
   );
 };
@@ -202,6 +210,9 @@ export const ModernListItem: React.FC<ModernListItemProps> = ({
   onPress,
   variant = 'default',
 }) => {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
+  
   const content = (
     <>
       {leftIcon && <View style={styles.listItemIcon}>{leftIcon}</View>}
@@ -244,6 +255,9 @@ export const ModernContainer: React.FC<ModernContainerProps> = ({
   style,
   scroll = false,
 }) => {
+  const { theme } = useTheme();
+  const styles = createStyles(theme);
+  
   if (scroll) {
     return (
       <ScrollView
@@ -259,20 +273,20 @@ export const ModernContainer: React.FC<ModernContainerProps> = ({
   return <View style={[styles.container, style]}>{children}</View>;
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   // Card styles
   card: {
-    backgroundColor: modernTheme.colors.cardBackground,
-    borderRadius: modernTheme.borderRadius.md,
-    padding: modernTheme.spacing.md,
-    marginVertical: modernTheme.spacing.sm,
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    marginVertical: theme.spacing.sm,
   },
   cardElevated: {
-    ...modernTheme.shadows.md,
+    ...theme.shadows.md,
   },
   cardOutlined: {
     borderWidth: 1,
-    borderColor: modernTheme.colors.border,
+    borderColor: theme.colors.border,
   },
 
   // Button styles
@@ -280,30 +294,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: modernTheme.spacing.lg,
-    borderRadius: modernTheme.borderRadius.sm,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.borderRadius.sm,
   },
   buttonPrimary: {
-    backgroundColor: modernTheme.colors.primary,
+    backgroundColor: theme.colors.primary,
   },
   buttonSecondary: {
-    backgroundColor: modernTheme.colors.surface,
+    backgroundColor: theme.colors.surface,
   },
   buttonGhost: {
     backgroundColor: 'transparent',
   },
   buttonDanger: {
-    backgroundColor: modernTheme.colors.error,
+    backgroundColor: theme.colors.error,
   },
   buttonSmall: {
-    paddingVertical: modernTheme.spacing.sm,
-    paddingHorizontal: modernTheme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
   },
   buttonMedium: {
-    paddingVertical: modernTheme.spacing.md - 4,
+    paddingVertical: theme.spacing.sm,
   },
   buttonLarge: {
-    paddingVertical: modernTheme.spacing.md,
+    paddingVertical: theme.spacing.md,
   },
   buttonFullWidth: {
     width: '100%',
@@ -312,93 +326,93 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   buttonIcon: {
-    marginRight: modernTheme.spacing.sm,
+    marginRight: theme.spacing.sm,
   },
   buttonText: {
-    ...modernTheme.typography.headline,
+    ...theme.typography.body,
+    fontWeight: '600' as '600',
   },
   buttonTextPrimary: {
     color: '#FFFFFF',
   },
   buttonTextSecondary: {
-    color: modernTheme.colors.textPrimary,
+    color: theme.colors.textPrimary,
   },
   buttonTextGhost: {
-    color: modernTheme.colors.primary,
+    color: theme.colors.primary,
   },
   buttonTextDanger: {
     color: '#FFFFFF',
   },
   buttonTextSmall: {
-    ...modernTheme.typography.subheadline,
+    ...theme.typography.footnote,
   },
   buttonTextMedium: {
-    ...modernTheme.typography.headline,
+    ...theme.typography.body,
   },
   buttonTextLarge: {
-    ...modernTheme.typography.title3,
+    ...theme.typography.headline,
   },
 
-  // Tab styles
-  tabContainer: {
+  // Section styles
+  section: {
+    marginVertical: theme.spacing.md,
+  },
+  sectionHeader: {
     flexDirection: 'row',
-    backgroundColor: modernTheme.colors.surface,
-    borderRadius: modernTheme.borderRadius.sm,
-    padding: 2,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: modernTheme.spacing.sm,
-    paddingHorizontal: modernTheme.spacing.md,
+    justifyContent: 'space-between',
     alignItems: 'center',
-    borderRadius: modernTheme.borderRadius.sm - 2,
+    marginBottom: theme.spacing.md,
   },
-  tabActive: {
-    backgroundColor: modernTheme.colors.cardBackground,
-    ...modernTheme.shadows.sm,
+  sectionTitles: {
+    flex: 1,
   },
-  tabText: {
-    ...modernTheme.typography.subheadline,
-    color: modernTheme.colors.textSecondary,
+  sectionTitle: {
+    ...theme.typography.title3,
+    color: theme.colors.textPrimary,
   },
-  tabTextActive: {
-    color: modernTheme.colors.textPrimary,
-    fontWeight: '600',
+  sectionSubtitle: {
+    ...theme.typography.footnote,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  sectionAction: {
+    marginLeft: theme.spacing.md,
   },
 
   // Header styles
   header: {
+    backgroundColor: theme.colors.background,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  headerLarge: {
+    paddingVertical: theme.spacing.md,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: modernTheme.spacing.md,
-    paddingBottom: modernTheme.spacing.sm,
-    backgroundColor: modernTheme.colors.background,
-  },
-  headerTransparent: {
-    backgroundColor: 'transparent',
   },
   headerLeft: {
-    width: 44,
-    alignItems: 'flex-start',
+    marginRight: theme.spacing.md,
   },
   headerCenter: {
     flex: 1,
-    alignItems: 'center',
   },
   headerRight: {
-    width: 44,
-    alignItems: 'flex-end',
+    marginLeft: theme.spacing.md,
   },
   headerTitle: {
-    ...modernTheme.typography.headline,
-    color: modernTheme.colors.textPrimary,
+    ...theme.typography.headline,
+    color: theme.colors.textPrimary,
+    fontWeight: '600' as '600',
   },
   headerTitleLarge: {
-    ...modernTheme.typography.largeTitle,
+    ...theme.typography.title1,
   },
   headerSubtitle: {
-    ...modernTheme.typography.footnote,
-    color: modernTheme.colors.textSecondary,
+    ...theme.typography.footnote,
+    color: theme.colors.textSecondary,
     marginTop: 2,
   },
 
@@ -406,39 +420,39 @@ const styles = StyleSheet.create({
   listItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: modernTheme.spacing.md,
-    paddingHorizontal: modernTheme.spacing.md,
-    backgroundColor: modernTheme.colors.cardBackground,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    backgroundColor: theme.colors.cardBackground,
   },
   listItemCompact: {
-    paddingVertical: modernTheme.spacing.sm,
+    paddingVertical: theme.spacing.sm,
   },
   listItemIcon: {
-    marginRight: modernTheme.spacing.md,
+    marginRight: theme.spacing.md,
   },
   listItemContent: {
     flex: 1,
   },
   listItemTitle: {
-    ...modernTheme.typography.body,
-    color: modernTheme.colors.textPrimary,
+    ...theme.typography.body,
+    color: theme.colors.textPrimary,
   },
   listItemSubtitle: {
-    ...modernTheme.typography.footnote,
-    color: modernTheme.colors.textSecondary,
+    ...theme.typography.footnote,
+    color: theme.colors.textSecondary,
     marginTop: 2,
   },
   listItemRight: {
-    marginLeft: modernTheme.spacing.md,
+    marginLeft: theme.spacing.md,
   },
 
   // Container styles
   container: {
     flex: 1,
-    backgroundColor: modernTheme.colors.background,
+    backgroundColor: theme.colors.background,
   },
   scrollContent: {
-    paddingHorizontal: modernTheme.spacing.md,
-    paddingBottom: modernTheme.spacing.xl,
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.xl,
   },
 });

@@ -16,11 +16,11 @@ import { useAuthStore } from '../store/authStore';
 import { workoutTrackingService } from '../services/workoutTrackingService';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
-import { useThemeStore } from '../store/themeStore';
+import { useTheme } from '../contexts/ThemeContext';
 import { LiquidGlassView, LiquidButton, LiquidCard, LiquidInput } from '../components/glass';
 
 const LiquidProfileScreen = ({ navigation }: any) => {
-  const { theme } = useThemeStore();
+  const { theme } = useTheme();
   const { user, logout } = useAuthStore();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showGoalsModal, setShowGoalsModal] = useState(false);
@@ -52,7 +52,7 @@ const LiquidProfileScreen = ({ navigation }: any) => {
 
   const profileStats = [
     { label: 'Workouts Completed', value: '24', icon: 'fitness', color: theme.colors.success },
-    { label: 'Total Minutes', value: '1,240', icon: 'time', color: theme.colors.primary.main },
+    { label: 'Total Minutes', value: '1,240', icon: 'time', color: theme.colors.primary },
     { label: 'Calories Burned', value: '12,500', icon: 'flame', color: theme.colors.error },
     { label: 'Current Streak', value: '7 days', icon: 'trending-up', color: theme.colors.warning },
   ];

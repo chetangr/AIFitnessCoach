@@ -286,7 +286,7 @@ const LiquidTimelineScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       {/* Background Gradient */}
       <LinearGradient 
-        colors={theme.colors.primary.gradient as any} 
+        colors={[theme.colors.primary, theme.colors.primaryLight] as any} 
         style={StyleSheet.absoluteFillObject}
       />
       
