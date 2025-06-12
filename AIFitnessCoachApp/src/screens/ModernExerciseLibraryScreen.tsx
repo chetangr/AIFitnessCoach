@@ -9,6 +9,7 @@ import {
   FlatList,
   ActivityIndicator,
   TextInput,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -19,6 +20,7 @@ import {
   ModernHeader,
 } from '../components/modern/ModernComponents';
 import { exerciseService } from '../services/exerciseService';
+import { wgerExerciseService } from '../services/wgerExerciseService';
 
 interface Exercise {
   id: string;
@@ -30,9 +32,10 @@ interface Exercise {
   description: string;
   instructions: string;
   imageUrl?: string;
+  videoUrl?: string;
 }
 
-const ModernExerciseLibraryScreen = () => {
+const ModernExerciseLibraryScreen = ({ route }: any) => {
   console.log('[ModernExerciseLibraryScreen] Rendering...');
   const { theme } = useTheme();
   const navigation = useNavigation();
@@ -41,13 +44,21 @@ const ModernExerciseLibraryScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Get select mode and callback from route params
+  const selectMode = route?.params?.selectMode || false;
+  const swapMode = route?.params?.swapMode || false;
+  const onSelectExercise = route?.params?.onSelectExercise;
 
   const categories = [
     { id: 'all', name: 'All', icon: 'grid' },
-    { id: 'strength', name: 'Strength', icon: 'barbell' },
+    { id: 'arms', name: 'Arms', icon: 'barbell' },
+    { id: 'legs', name: 'Legs', icon: 'walk' },
+    { id: 'abs', name: 'Abs', icon: 'body' },
+    { id: 'chest', name: 'Chest', icon: 'shield' },
+    { id: 'back', name: 'Back', icon: 'swap-vertical' },
+    { id: 'shoulders', name: 'Shoulders', icon: 'resize' },
     { id: 'cardio', name: 'Cardio', icon: 'bicycle' },
-    { id: 'flexibility', name: 'Flexibility', icon: 'body' },
-    { id: 'balance', name: 'Balance', icon: 'swap-horizontal' },
   ];
 
   useEffect(() => {
@@ -60,11 +71,35 @@ const ModernExerciseLibraryScreen = () => {
 
   const loadExercises = async () => {
     try {
-      const result = await exerciseService.getExercises({ limit: 100 });
-      setExercises(result);
-      setFilteredExercises(result);
+      // Load exercises from Wger data
+      const wgerExercises = wgerExerciseService.getAllExercises();
+      console.log('Loaded', wgerExercises.length, 'exercises from Wger');
+      
+      // Convert to the format expected by the screen
+      const formattedExercises = wgerExercises.map(ex => ({
+        id: ex.id,
+        name: ex.name,
+        category: ex.category,
+        muscles: ex.muscles,
+        equipment: ex.equipment,
+        difficulty: ex.difficulty,
+        description: ex.description || '',
+        instructions: ex.instructions?.join(' ') || '',
+        imageUrl: ex.imageUrl
+      }));
+      
+      setExercises(formattedExercises);
+      setFilteredExercises(formattedExercises);
     } catch (error) {
       console.error('Error loading exercises:', error);
+      // Fallback to old service if needed
+      try {
+        const result = await exerciseService.getExercises({ limit: 100 });
+        setExercises(result);
+        setFilteredExercises(result);
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -92,14 +127,36 @@ const ModernExerciseLibraryScreen = () => {
     setFilteredExercises(filtered);
   };
 
+  const handleExercisePress = (exercise: Exercise) => {
+    // Always navigate to detail page, regardless of select mode
+    (navigation as any).navigate('ExerciseDetail', { 
+      exercise, 
+      selectMode,
+      onSelectExercise 
+    });
+  };
+
   const renderExercise = ({ item }: { item: Exercise }) => (
     <TouchableOpacity
-      onPress={() => (navigation as any).navigate('ExerciseDetail', { exercise: item })}
+      onPress={() => handleExercisePress(item)}
     >
       <ModernCard variant="outlined" style={styles.exerciseCard}>
         <View style={styles.exerciseContent}>
           <View style={[styles.exerciseIcon, { backgroundColor: theme.colors.primary + '20' }]}>
-            <Ionicons name="fitness" size={24} color={theme.colors.primary} />
+            {item.imageUrl ? (
+              <Image 
+                source={{ uri: item.imageUrl }} 
+                style={styles.exerciseImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Ionicons name="fitness" size={24} color={theme.colors.primary} />
+            )}
+            {item.videoUrl && (
+              <View style={styles.videoIndicator}>
+                <Ionicons name="play-circle" size={16} color="#FFFFFF" />
+              </View>
+            )}
           </View>
           <View style={styles.exerciseInfo}>
             <Text style={styles.exerciseName} numberOfLines={1}>
@@ -112,11 +169,26 @@ const ModernExerciseLibraryScreen = () => {
               </View>
               <View style={styles.metaItem}>
                 <Ionicons name="barbell" size={14} color={theme.colors.textSecondary} />
-                <Text style={styles.metaText}>{item.equipment[0] || 'None'}</Text>
+                <Text style={styles.metaText}>{item.equipment[0] || 'Bodyweight'}</Text>
               </View>
             </View>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={theme.colors.textTertiary} />
+          {selectMode ? (
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+              onPress={(e) => {
+                e.stopPropagation();
+                if (onSelectExercise) {
+                  onSelectExercise(item);
+                }
+              }}
+            >
+              <Ionicons name="add" size={20} color="#FFFFFF" />
+              <Text style={styles.addButtonText}>{swapMode ? 'Swap' : 'Add'}</Text>
+            </TouchableOpacity>
+          ) : (
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.textTertiary} />
+          )}
         </View>
       </ModernCard>
     </TouchableOpacity>
@@ -127,7 +199,7 @@ const ModernExerciseLibraryScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ModernHeader
-        title="Exercise Library"
+        title={selectMode ? (swapMode ? "Select Exercise to Swap" : "Add Exercise") : "Exercise Library"}
         leftAction={
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={theme.colors.primary} />
@@ -300,6 +372,19 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: theme.spacing.md,
+    overflow: 'hidden',
+  },
+  exerciseImage: {
+    width: '100%',
+    height: '100%',
+  },
+  videoIndicator: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 8,
+    padding: 2,
   },
   exerciseInfo: {
     flex: 1,
@@ -322,6 +407,20 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     ...theme.typography.caption1,
     color: theme.colors.textSecondary,
     marginLeft: 4,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    marginLeft: theme.spacing.sm,
+  },
+  addButtonText: {
+    ...theme.typography.footnote,
+    color: '#FFFFFF',
+    fontWeight: '600',
+    marginLeft: theme.spacing.xs,
   },
 });
 

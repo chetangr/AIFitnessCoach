@@ -47,9 +47,23 @@ const ModernTimelineScreen = () => {
     initializeSchedule();
   }, []);
 
+  // Refresh workouts when screen comes into focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('Timeline screen focused, refreshing workouts...');
+      loadWorkoutsForWeek();
+    });
+
+    return unsubscribe;
+  }, [navigation, currentWeek]);
+
   const initializeSchedule = async () => {
     try {
+      // Initialize default schedule first
       await workoutScheduleService.initializeDefaultSchedule();
+      // Then generate some workouts with Wger data if needed
+      // This is optional - only if you want to auto-populate with real exercises
+      // await workoutScheduleService.generateWeeklyWorkoutsWithWgerData();
     } catch (error) {
       console.error('Error initializing schedule:', error);
     }
@@ -63,11 +77,14 @@ const ModernTimelineScreen = () => {
         endOfWeek.toDate()
       );
 
+      console.log('Loaded workouts for week:', weekWorkouts);
+
       // Convert array to object with date keys
       const workoutsObject: { [key: string]: WorkoutEvent } = {};
       weekWorkouts.forEach(workout => {
         const dateKey = moment(workout.date).format('YYYY-MM-DD');
         workoutsObject[dateKey] = workout;
+        console.log(`Workout for ${dateKey}:`, workout.title, 'Exercises:', workout.exercises.length);
       });
 
       setWorkouts(workoutsObject);
@@ -279,6 +296,19 @@ const ModernTimelineScreen = () => {
       color: theme.colors.textSecondary,
       marginTop: theme.spacing.md,
     },
+    modifiedBadge: {
+      backgroundColor: theme.colors.info,
+      paddingHorizontal: theme.spacing.xs,
+      paddingVertical: 2,
+      borderRadius: theme.borderRadius.sm,
+      marginLeft: theme.spacing.sm,
+    },
+    modifiedBadgeText: {
+      ...theme.typography.caption2,
+      color: '#FFFFFF',
+      fontWeight: '600',
+      fontSize: 10,
+    },
   });
 
   const renderRightActions = () => (
@@ -397,8 +427,19 @@ const ModernTimelineScreen = () => {
               <Ionicons name={getWorkoutIcon() as any} size={24} color={theme.colors.primary} />
             </View>
             <View style={styles.workoutInfo}>
-              <Text style={styles.workoutTitle}>{workout.title}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={styles.workoutTitle}>{workout.title}</Text>
+                {workout.modifiedAt && (
+                  <View style={styles.modifiedBadge}>
+                    <Text style={styles.modifiedBadgeText}>AI Modified</Text>
+                  </View>
+                )}
+              </View>
               <View style={styles.workoutMeta}>
+                <View style={styles.metaItem}>
+                  <Ionicons name="barbell-outline" size={16} color={theme.colors.textSecondary} />
+                  <Text style={styles.metaText}>{workout.exercises.length} exercises</Text>
+                </View>
                 <View style={styles.metaItem}>
                   <Ionicons name="time-outline" size={16} color={theme.colors.textSecondary} />
                   <Text style={styles.metaText}>{workout.duration} min</Text>

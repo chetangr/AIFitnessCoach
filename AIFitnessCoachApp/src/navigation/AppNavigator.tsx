@@ -63,7 +63,7 @@ import ActiveWorkoutScreen from '../screens/ActiveWorkoutScreen';
 console.log('[AppNavigator] Importing ModernExerciseLibraryScreen directly...');
 import ModernExerciseLibraryScreen from '../screens/ModernExerciseLibraryScreen';
 console.log('[AppNavigator] ModernExerciseLibraryScreen imported successfully');
-import WorkoutDetailScreen from '../screens/WorkoutDetailScreen';
+import ModernWorkoutDetailScreen from '../screens/ModernWorkoutDetailScreen';
 import WorkoutTrackingScreen from '../screens/WorkoutTrackingScreen';
 import WorkoutOverviewScreen from '../screens/WorkoutOverviewScreen';
 import WorkoutHistoryScreen from '../screens/WorkoutHistoryScreen';
@@ -81,7 +81,7 @@ import HomeScreen from '../screens/HomeScreen';
 import TrainerSelectionScreen from '../screens/TrainerSelectionScreen';
 import WorkoutDownloadsScreen from '../screens/WorkoutDownloadsScreen';
 import WorkoutsScreen from '../screens/WorkoutsScreen';
-import ExerciseDetailScreen from '../screens/ExerciseDetailScreen';
+import ModernExerciseDetailScreen from '../screens/ModernExerciseDetailScreen';
 import DebugLogScreen from '../screens/DebugLogScreen';
 
 // Store
@@ -285,8 +285,8 @@ const MainStack = () => {
   >
     <Stack.Screen name="MainTabs" component={MainTabs} />
     <Stack.Screen name="ActiveWorkout" component={ActiveWorkoutScreen} />
-    <Stack.Screen name="ExerciseDetail" component={ExerciseDetailScreen} />
-    <Stack.Screen name="WorkoutDetail" component={WorkoutDetailScreen as any} />
+    <Stack.Screen name="ExerciseDetail" component={ModernExerciseDetailScreen} />
+    <Stack.Screen name="WorkoutDetail" component={ModernWorkoutDetailScreen as any} />
     <Stack.Screen name="WorkoutOverview" component={WorkoutOverviewScreen} />
     <Stack.Screen name="WorkoutTracking" component={WorkoutTrackingScreen} />
     <Stack.Screen name="ProgramDetail" component={ProgramDetailScreen as any} />

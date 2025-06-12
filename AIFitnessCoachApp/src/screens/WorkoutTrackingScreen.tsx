@@ -18,6 +18,7 @@ import { RouteProp } from '@react-navigation/native';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import { workoutTrackingService } from '../services/workoutTrackingService';
+import { workoutProgressService } from '../services/workoutProgressService';
 import { 
   LiquidGlassView,
   LiquidButton,
@@ -53,7 +54,7 @@ const WorkoutTrackingScreen: React.FC<WorkoutTrackingScreenProps> = ({
   navigation, 
   route 
 }) => {
-  const { workoutTemplate } = route.params || {};
+  const { workout: workoutTemplate, date, resumeFromIndex = 0 } = route.params || {};
   const { user } = useAuthStore();
   const { theme } = useThemeStore();
   const { colors } = theme;
@@ -62,6 +63,7 @@ const WorkoutTrackingScreen: React.FC<WorkoutTrackingScreenProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [startTime] = useState(Date.now());
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(resumeFromIndex);
   
   const scrollViewRef = useRef<ScrollView>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;

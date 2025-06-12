@@ -18,7 +18,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { LiquidGlassView, LiquidButton, LiquidCard, LiquidInput } from '../components/glass';
 import { workoutTrackingService } from '../services/workoutTrackingService';
+import { workoutProgressService } from '../services/workoutProgressService';
 import { useThemeStore } from '../store/themeStore';
+import moment from 'moment';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -47,9 +49,13 @@ export default function LiquidActiveWorkoutScreen() {
   const route = useRoute();
   const { theme } = useThemeStore();
   const { colors } = theme;
-  const { workout } = route.params as { workout: { id: string; name: string; exercises: Exercise[] } };
+  const { workout, date, resumeFromIndex = 0 } = route.params as { 
+    workout: { id: string; name: string; exercises: Exercise[] }; 
+    date?: string;
+    resumeFromIndex?: number;
+  };
   
-  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
+  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(resumeFromIndex);
   const [sets, setSets] = useState<Set[]>([]);
   const [isResting, setIsResting] = useState(false);
   const [restTimeLeft, setRestTimeLeft] = useState(0);
@@ -64,10 +70,27 @@ export default function LiquidActiveWorkoutScreen() {
   const shimmerAnimation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Initialize sets for first exercise
-    if (workout.exercises.length > 0) {
-      initializeSets(workout.exercises[0]);
-    }
+    // Load previous progress if resuming
+    const loadProgress = async () => {
+      if (resumeFromIndex > 0 && workout.id && date) {
+        const progress = await workoutProgressService.getProgress(workout.id, date);
+        if (progress && progress.exerciseSets[currentExercise.id]) {
+          // Load saved sets for current exercise
+          const savedSets = progress.exerciseSets[currentExercise.id].sets;
+          setSets(savedSets.map((set, index) => ({
+            id: `set-${index}`,
+            ...set
+          })));
+          return;
+        }
+      }
+      // Initialize sets for current exercise
+      if (workout.exercises.length > 0) {
+        initializeSets(workout.exercises[currentExerciseIndex]);
+      }
+    };
+    
+    loadProgress();
     
     // Start shimmer animation
     Animated.loop(
@@ -139,6 +162,32 @@ export default function LiquidActiveWorkoutScreen() {
   const completedSets = sets.filter(s => s.completed).length;
   const progress = (currentExerciseIndex / workout.exercises.length) * 100;
 
+  // Save progress after each exercise
+  const saveProgress = async () => {
+    if (!workout.id || !date) return;
+    
+    const progressData = {
+      workoutId: workout.id,
+      workoutDate: date,
+      currentExerciseIndex,
+      completedExercises: workout.exercises.slice(0, currentExerciseIndex).map(ex => ex.id),
+      exerciseSets: {
+        [currentExercise.id]: {
+          sets: sets.map(set => ({
+            weight: set.weight,
+            reps: set.reps,
+            completed: set.completed
+          }))
+        }
+      },
+      startTime: workoutStartTime.toISOString(),
+      lastUpdateTime: new Date().toISOString(),
+      totalRestTime: 0
+    };
+    
+    await workoutProgressService.saveProgress(progressData);
+  };
+
   const completeSet = (setId: string) => {
     setSets(prev => prev.map(s => 
       s.id === setId ? { ...s, completed: true } : s
@@ -153,7 +202,8 @@ export default function LiquidActiveWorkoutScreen() {
       if (currentExerciseIndex < workout.exercises.length - 1) {
         setIsResting(true);
         setRestTimeLeft(currentExercise.restTime || 60);
-        setTimeout(() => {
+        setTimeout(async () => {
+          await saveProgress(); // Save progress before moving to next exercise
           setCurrentExerciseIndex(currentExerciseIndex + 1);
           initializeSets(workout.exercises[currentExerciseIndex + 1]);
         }, (currentExercise.restTime || 60) * 1000);
@@ -175,16 +225,18 @@ export default function LiquidActiveWorkoutScreen() {
       [
         {
           text: 'Save & Exit',
-          onPress: () => {
+          onPress: async () => {
             // Save workout data
             workoutTrackingService.finishWorkout({
               workoutId: workout.id,
               duration: Math.floor((new Date().getTime() - workoutStartTime.getTime()) / 1000),
-              exercises: workout.exercises.map((ex, idx) => ({
+              exercises: workout.exercises.map((ex) => ({
                 ...ex,
                 sets: sets,
               })),
             });
+            // Clear the progress since workout is completed
+            await workoutProgressService.clearProgress();
             navigation.goBack();
           },
         },

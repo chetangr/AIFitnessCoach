@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import moment from 'moment';
+import { wgerExerciseService } from './wgerExerciseService';
 
 interface Exercise {
   id: string;
@@ -1005,6 +1006,136 @@ class WorkoutScheduleService {
     } catch (error) {
       console.error('Error adding workout:', error);
       throw error;
+    }
+  }
+
+  // Generate workout using Wger data
+  async generateWorkoutWithWgerData(
+    type: string,
+    targetMuscles: string[],
+    difficulty: 'beginner' | 'intermediate' | 'advanced' = 'intermediate'
+  ): Promise<WorkoutEvent> {
+    try {
+      // Get exercises from Wger data
+      const wgerExercises = wgerExerciseService.generateWorkout(targetMuscles, 6);
+      
+      // Convert to our Exercise format
+      const exercises: Exercise[] = wgerExercises.map(ex => ({
+        id: ex.id,
+        name: ex.name,
+        sets: ex.sets || 3,
+        reps: ex.reps || '10-12',
+        weight: ex.weight,
+        equipment: ex.equipment,
+        muscleGroups: [...ex.muscles, ...(ex.musclesSecondary || [])],
+        category: this.mapCategory(ex.category),
+        difficulty: ex.difficulty,
+        instructions: ex.instructions,
+        imageUrl: ex.imageUrl,
+        caloriesPerMinute: this.estimateCalories(ex.category)
+      }));
+
+      // Calculate total duration
+      const totalDuration = exercises.reduce((sum, ex) => sum + this.calculateExerciseDuration(ex), 0);
+      const totalCalories = exercises.reduce((sum, ex) => sum + (ex.caloriesPerMinute || 5) * this.calculateExerciseDuration(ex), 0);
+
+      const workout: WorkoutEvent = {
+        id: `workout_${Date.now()}`,
+        title: `${targetMuscles.join(' & ')} Workout`,
+        description: `Custom workout targeting ${targetMuscles.join(', ')}`,
+        date: new Date(),
+        time: '09:00',
+        duration: totalDuration,
+        difficulty: difficulty,
+        type: type as any,
+        calories: totalCalories,
+        completed: false,
+        exercises: exercises,
+        createdBy: 'system',
+        tags: targetMuscles
+      };
+
+      return workout;
+    } catch (error) {
+      console.error('Error generating workout with Wger data:', error);
+      throw error;
+    }
+  }
+
+  private mapCategory(category: string): 'strength' | 'cardio' | 'flexibility' | 'balance' {
+    const categoryMap: { [key: string]: 'strength' | 'cardio' | 'flexibility' | 'balance' } = {
+      'arms': 'strength',
+      'legs': 'strength',
+      'abs': 'strength',
+      'chest': 'strength',
+      'back': 'strength',
+      'shoulders': 'strength',
+      'cardio': 'cardio',
+      'stretching': 'flexibility',
+      'yoga': 'flexibility',
+      'balance': 'balance'
+    };
+    
+    return categoryMap[category.toLowerCase()] || 'strength';
+  }
+
+  private estimateCalories(category: string): number {
+    const calorieMap: { [key: string]: number } = {
+      'cardio': 12,
+      'strength': 6,
+      'flexibility': 3,
+      'balance': 4,
+      'arms': 5,
+      'legs': 7,
+      'abs': 6,
+      'chest': 6,
+      'back': 6,
+      'shoulders': 5
+    };
+    
+    return calorieMap[category.toLowerCase()] || 5;
+  }
+
+  // Generate fresh workouts with Wger data for specific days
+  async generateWeeklyWorkoutsWithWgerData(): Promise<void> {
+    try {
+      const workoutConfigs = [
+        { dayOffset: 0, type: 'strength', muscles: ['chest', 'triceps'], title: 'Chest & Triceps Power' },
+        { dayOffset: 2, type: 'strength', muscles: ['back', 'biceps'], title: 'Back & Biceps Power' },
+        { dayOffset: 4, type: 'strength', muscles: ['legs', 'glutes'], title: 'Leg Day' },
+        { dayOffset: 1, type: 'cardio', muscles: ['full body'], title: 'HIIT Cardio' },
+        { dayOffset: 3, type: 'strength', muscles: ['shoulders', 'abs'], title: 'Shoulders & Core' }
+      ];
+
+      for (const config of workoutConfigs) {
+        const targetDate = new Date();
+        targetDate.setDate(targetDate.getDate() + config.dayOffset);
+        
+        // Check if workout already exists for this date
+        const existingWorkout = await this.getWorkoutForDate(targetDate);
+        if (existingWorkout) {
+          console.log('Workout already exists for', moment(targetDate).format('YYYY-MM-DD'));
+          continue;
+        }
+
+        // Generate workout with Wger data
+        const workout = await this.generateWorkoutWithWgerData(
+          config.type,
+          config.muscles,
+          'intermediate'
+        );
+        
+        workout.title = config.title;
+        workout.date = targetDate;
+        
+        // Save the workout
+        await this.saveWorkout(workout);
+        console.log('Generated workout for', moment(targetDate).format('YYYY-MM-DD'), ':', config.title);
+      }
+
+      console.log('Generated weekly workouts with Wger data');
+    } catch (error) {
+      console.error('Error generating weekly workouts:', error);
     }
   }
 

@@ -11,10 +11,9 @@ import {
   Platform,
   Alert,
   Keyboard,
-  Clipboard,
-  Modal,
   Pressable,
   Dimensions,
+  Clipboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -50,6 +49,7 @@ const ModernMessagesScreen = () => {
   const [actionSheetVisible, setActionSheetVisible] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<{ message: Message; index: number } | null>(null);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
   const selectedPersonality = isQuantumMode ? 'dr_progress' : (isTurboMode ? 'max' : 'emma');
 
@@ -71,11 +71,17 @@ const ModernMessagesScreen = () => {
       // Pattern 1: "1. **Exercise Name:** 3 sets of 10-12 reps"
       // Pattern 2: "1. Exercise Name: 3 sets of 10-12 reps"
       // Pattern 3: "**Exercise Name:** 3 sets of 10-12 reps"
+      // Pattern 4: "- Exercise Name: 3 sets of 10-12 reps"
       let exerciseMatch = line.match(/\d+\.\s*\*?\*?([^:*]+?)(?:\s*\([^)]+\))?\*?\*?:\*?\*?\s*(\d+)\s*sets?\s*of\s*(\d+(?:-\d+)?)\s*reps?/i);
       
       // If first pattern doesn't match, try without number prefix
       if (!exerciseMatch) {
         exerciseMatch = line.match(/\*?\*?([^:*]+?)(?:\s*\([^)]+\))?\*?\*?:\*?\*?\s*(\d+)\s*sets?\s*of\s*(\d+(?:-\d+)?)\s*reps?/i);
+      }
+      
+      // Try pattern with dash
+      if (!exerciseMatch) {
+        exerciseMatch = line.match(/[-•]\s*([^:]+?):\s*(\d+)\s*sets?\s*of\s*(\d+(?:-\d+)?)\s*reps?/i);
       }
       
       if (exerciseMatch) {
@@ -122,14 +128,16 @@ const ModernMessagesScreen = () => {
         return;
       }
       
-      // Update the workout
+      // Update the workout - ensure date is included
       const updatedWorkout = {
         ...currentWorkout,
+        date: today, // Make sure date is included
         exercises: modifiedExercises,
         modifiedAt: new Date(),
         notes: `Modified by AI Coach for injury/pain accommodation on ${new Date().toLocaleDateString()}`
       };
       
+      console.log('Saving updated workout:', updatedWorkout);
       await workoutScheduleService.saveWorkout(updatedWorkout);
       
       Alert.alert(
@@ -295,7 +303,9 @@ const ModernMessagesScreen = () => {
         const hasWorkoutModifications = 
           response.response.includes('modified version') ||
           response.response.includes('Here\'s a modified') ||
-          response.response.includes('customize your workout') ||
+          response.response.includes('customize your') ||
+          response.response.includes('Shoulder-Friendly') ||
+          response.response.includes('modifications') ||
           (response.response.includes('sets') && response.response.includes('reps'));
 
         const aiMessage: Message = {
@@ -377,9 +387,30 @@ const ModernMessagesScreen = () => {
     scrollViewRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
 
-  const copyToClipboard = async (text: string) => {
+  useEffect(() => {
+    const keyboardWillShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+
+    const keyboardWillHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
+    };
+  }, []);
+
+  const copyToClipboard = (text: string) => {
     try {
-      await Clipboard.setString(text);
+      Clipboard.setString(text);
       Alert.alert('Copied', 'Message copied to clipboard');
     } catch (error) {
       console.error('Failed to copy text:', error);
@@ -436,6 +467,10 @@ const ModernMessagesScreen = () => {
   };
 
   const handleMessageLongPress = (event: any, message: Message, messageIndex: number) => {
+    // Prevent keyboard from dismissing
+    event.preventDefault();
+    event.stopPropagation();
+    
     const { pageX, pageY } = event.nativeEvent;
     setMenuPosition({ x: pageX, y: pageY });
     setSelectedMessage({ message, index: messageIndex });
@@ -464,7 +499,7 @@ const ModernMessagesScreen = () => {
   };
 
   const renderActionSheet = () => {
-    if (!selectedMessage) return null;
+    if (!selectedMessage || !actionSheetVisible) return null;
 
     const { message } = selectedMessage;
     const actions = message.isUser
@@ -478,7 +513,7 @@ const ModernMessagesScreen = () => {
         ];
 
     // Calculate menu position
-    const { width: screenWidth } = Dimensions.get('window');
+    const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
     const menuWidth = 200;
     const menuHeight = actions.length * 44 + 16;
     
@@ -488,64 +523,72 @@ const ModernMessagesScreen = () => {
     // Ensure menu stays within screen bounds
     if (menuX < 10) menuX = 10;
     if (menuX + menuWidth > screenWidth - 10) menuX = screenWidth - menuWidth - 10;
-    if (menuY < 50) menuY = menuPosition.y + 10;
+    
+    // Check if menu would be too high or too low
+    const safeAreaTop = 50;
+    const safeAreaBottom = screenHeight - keyboardHeight - 100;
+    
+    if (menuY < safeAreaTop) {
+      menuY = menuPosition.y + 10; // Show below the touch point
+    }
+    if (menuY + menuHeight > safeAreaBottom) {
+      menuY = menuPosition.y - menuHeight - 10; // Show above the touch point
+    }
 
     return (
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={actionSheetVisible}
-        onRequestClose={() => setActionSheetVisible(false)}
-      >
+      <>
         <Pressable 
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }]}
           onPress={() => setActionSheetVisible(false)}
+          pointerEvents="auto"
+        />
+        <View 
+          style={[
+            styles.contextMenu,
+            {
+              position: 'absolute',
+              left: menuX,
+              top: menuY,
+            }
+          ]}
+          pointerEvents="auto"
         >
-          <View 
-            style={[
-              styles.contextMenu,
-              {
-                left: menuX,
-                top: menuY,
-              }
-            ]}
-          >
-            {actions.map((action, index) => (
-              <TouchableOpacity
-                key={action.id}
-                style={[
-                  styles.contextMenuItem,
-                  index === actions.length - 1 && styles.contextMenuItemLast
-                ]}
-                onPress={() => handleActionPress(action.id)}
-              >
-                <Ionicons 
-                  name={action.icon as any} 
-                  size={20} 
-                  color={action.destructive ? theme.colors.error : theme.colors.textPrimary} 
-                />
-                <Text style={[
-                  styles.contextMenuText,
-                  action.destructive && styles.contextMenuTextDestructive
-                ]}>
-                  {action.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </Pressable>
-      </Modal>
+          {actions.map((action, index) => (
+            <TouchableOpacity
+              key={action.id}
+              style={[
+                styles.contextMenuItem,
+                index === actions.length - 1 && styles.contextMenuItemLast
+              ]}
+              onPress={() => handleActionPress(action.id)}
+            >
+              <Ionicons 
+                name={action.icon as any} 
+                size={20} 
+                color={action.destructive ? theme.colors.error : theme.colors.textPrimary} 
+              />
+              <Text style={[
+                styles.contextMenuText,
+                action.destructive && styles.contextMenuTextDestructive
+              ]}>
+                {action.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </>
     );
   };
 
   const renderMessage = (message: Message, index: number) => (
     <View key={message.id}>
-      <TouchableOpacity
+      <Pressable
         onLongPress={(event) => handleMessageLongPress(event, message, index)}
-        activeOpacity={0.8}
-        style={[
+        delayLongPress={500}
+        style={({ pressed }) => [
           styles.messageContainer,
           message.isUser ? styles.userMessageContainer : styles.aiMessageContainer,
+          pressed && { opacity: 0.8 }
         ]}
       >
         {!message.isUser && (
@@ -566,7 +609,7 @@ const ModernMessagesScreen = () => {
             {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
         </View>
-      </TouchableOpacity>
+      </Pressable>
       
       {/* Apply Modifications Button */}
       {!message.isUser && message.canApplyModifications && (
@@ -729,11 +772,10 @@ const ModernMessagesScreen = () => {
       marginLeft: theme.spacing.xs,
     },
     modalOverlay: {
-      flex: 1,
       backgroundColor: 'rgba(0, 0, 0, 0.1)',
+      zIndex: 1000,
     },
     contextMenu: {
-      position: 'absolute',
       backgroundColor: theme.colors.surface,
       borderRadius: theme.borderRadius.md,
       shadowColor: '#000',
@@ -746,6 +788,7 @@ const ModernMessagesScreen = () => {
       elevation: 10,
       minWidth: 200,
       paddingVertical: theme.spacing.xs,
+      zIndex: 1001,
     },
     contextMenuItem: {
       flexDirection: 'row',
@@ -785,12 +828,14 @@ const ModernMessagesScreen = () => {
         style={styles.keyboardAvoidingContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        pointerEvents="box-none"
       >
         <ScrollView
           ref={scrollViewRef}
           style={styles.messagesScrollView}
           contentContainerStyle={styles.messagesContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="always"
         >
           {messages.map((message, index) => renderMessage(message, index))}
           {isTyping && (
@@ -830,7 +875,8 @@ const ModernMessagesScreen = () => {
         </View>
       </KeyboardAvoidingView>
       
-      {renderActionSheet()}
+      {/* Action sheet overlay - rendered inside SafeAreaView to not dismiss keyboard */}
+      {actionSheetVisible && renderActionSheet()}
     </SafeAreaView>
   );
 };
